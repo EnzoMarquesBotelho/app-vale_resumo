@@ -3,7 +3,9 @@ import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import type {
   ArquivoImportado,
+  Exercicio,
   Flashcard,
+  ModoConteudo,
   ModoResumo,
   OllamaStatus,
 } from "@shared/types";
@@ -20,8 +22,11 @@ import {
 } from "../services/ollama.js";
 import { SemTextoParaResumirError, gerarResumo } from "../services/resumo.js";
 import {
+  ExerciciosInvalidosError,
   FlashcardsInvalidosError,
+  SemTextoParaExerciciosError,
   SemTextoParaFlashcardsError,
+  gerarExercicios,
   gerarFlashcards,
 } from "../services/parse.js";
 
@@ -71,6 +76,23 @@ function mensagemAmigavelFlashcards(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar os flashcards. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração de exercícios em mensagens amigáveis.
+ * Como nas demais, o texto vai direto para a UI.
+ */
+function mensagemAmigavelExercicios(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof SemTextoParaExerciciosError) {
+    return erro.message;
+  }
+  if (erro instanceof ExerciciosInvalidosError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar os exercícios. Tente novamente.";
 }
 
 /**
@@ -172,6 +194,28 @@ export function registerIpcHandlers(): void {
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelFlashcards(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.gerarExercicios,
+    async (
+      _event,
+      texto: string,
+      modo: ModoConteudo,
+      quantidade: number,
+    ): Promise<Exercicio[]> => {
+      try {
+        // Usa o modelo atualmente selecionado na UI (não só o default).
+        return await gerarExercicios({
+          texto,
+          modo,
+          quantidade,
+          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+        });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelExercicios(erro));
       }
     },
   );

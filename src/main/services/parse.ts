@@ -12,11 +12,13 @@
  * A chamada ao modelo é injetável para facilitar os testes (Ollama mockado).
  */
 import {
+  montarPromptCorrigirExercicios,
   montarPromptCorrigirFlashcards,
+  montarPromptExercicios,
   montarPromptFlashcards,
   normalizarQuantidade,
 } from "@shared/prompts";
-import type { Flashcard } from "@shared/types";
+import type { Exercicio, Flashcard, ModoConteudo } from "@shared/types";
 import { generate as generatePadrao } from "./ollama.js";
 
 /** Função que gera texto a partir de um prompt (Ollama por padrão). */
@@ -210,4 +212,149 @@ export async function gerarFlashcards({
   }
 
   throw new FlashcardsInvalidosError();
+}
+
+/** Erro lançado quando não há texto para gerar exercícios. */
+export class SemTextoParaExerciciosError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "SEM_TEXTO_PARA_EXERCICIOS" as const;
+  constructor() {
+    super(
+      "Não há texto para gerar exercícios. Importe um arquivo com conteúdo.",
+    );
+    this.name = "SemTextoParaExerciciosError";
+  }
+}
+
+/**
+ * Erro lançado quando, mesmo após a re-tentativa corretiva, a resposta do
+ * modelo não pôde ser interpretada como exercícios válidos.
+ */
+export class ExerciciosInvalidosError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "EXERCICIOS_INVALIDOS" as const;
+  constructor() {
+    super(
+      "A IA não devolveu exercícios em um formato válido. Tente gerar novamente.",
+    );
+    this.name = "ExerciciosInvalidosError";
+  }
+}
+
+/**
+ * `true` se o valor tem enunciado e resposta não vazios. O `modo` do exercício
+ * é definido pela geração (não vem do modelo), então não é validado aqui.
+ */
+function ehExercicioBruto(
+  valor: unknown,
+): valor is { enunciado: string; resposta: string } {
+  if (typeof valor !== "object" || valor === null) return false;
+  const obj = valor as Record<string, unknown>;
+  return (
+    typeof obj.enunciado === "string" &&
+    obj.enunciado.trim().length > 0 &&
+    typeof obj.resposta === "string" &&
+    obj.resposta.trim().length > 0
+  );
+}
+
+/**
+ * Interpreta uma resposta "crua" do modelo como uma lista de exercícios no
+ * `modo` indicado. Reusa `extrairBlocoJson` (o mesmo parser dos flashcards).
+ *
+ * Aceita duas formas: um objeto `{ "exercicios": [...] }` ou um array direto
+ * `[...]`. Extrai o bloco JSON, faz o parse e valida cada item; itens inválidos
+ * são descartados e as strings são aparadas (trim). O `modo` é anexado a cada
+ * exercício a partir do argumento (não é lido da resposta do modelo).
+ *
+ * @returns a lista de exercícios válidos, ou `null` se nada pôde ser extraído.
+ */
+export function parseExercicios(
+  resposta: string,
+  modo: ModoConteudo,
+): Exercicio[] | null {
+  const bloco = extrairBlocoJson(resposta);
+  if (bloco === null) return null;
+
+  let dados: unknown;
+  try {
+    dados = JSON.parse(bloco);
+  } catch {
+    return null;
+  }
+
+  // Normaliza para o array de candidatos, aceitando as duas formas.
+  let candidatos: unknown;
+  if (Array.isArray(dados)) {
+    candidatos = dados;
+  } else if (typeof dados === "object" && dados !== null) {
+    candidatos = (dados as Record<string, unknown>).exercicios;
+  }
+  if (!Array.isArray(candidatos)) return null;
+
+  const exercicios = candidatos.filter(ehExercicioBruto).map((e) => ({
+    enunciado: e.enunciado.trim(),
+    resposta: e.resposta.trim(),
+    modo,
+  }));
+
+  return exercicios.length > 0 ? exercicios : null;
+}
+
+/** Parâmetros para gerar uma lista de exercícios. */
+export interface GerarExerciciosParams {
+  /** Texto a usar como base (já extraído do arquivo importado). */
+  texto: string;
+  /** Natureza da lista: teórica, prática ou mista. */
+  modo: ModoConteudo;
+  /** Quantidade desejada de exercícios (normalizada aos limites 5–100). */
+  quantidade: number;
+  /**
+   * Gerador de texto a usar. Default: o cliente Ollama (`generate`).
+   * Injetável nos testes para mockar a resposta do modelo.
+   */
+  gerar?: GerarTexto;
+}
+
+/**
+ * Gera uma lista de exercícios a partir do `texto`, no `modo` escolhido,
+ * pedindo `quantidade` exercícios ao modelo.
+ *
+ * Fluxo tolerante a falhas (nunca quebra a UI), igual ao dos flashcards:
+ *  1. pede os exercícios em JSON e tenta interpretar a resposta;
+ *  2. se o JSON vier malformado, dispara UMA re-tentativa com prompt corretivo;
+ *  3. se ainda assim falhar, lança `ExerciciosInvalidosError` (mensagem clara).
+ *
+ * A `quantidade` é normalizada aos limites do MVP (5–100).
+ *
+ * @throws {SemTextoParaExerciciosError} se o texto estiver vazio.
+ * @throws {ExerciciosInvalidosError} se o parsing falhar mesmo após a re-tentativa.
+ * @throws {OllamaIndisponivelError} (propagado) se o Ollama estiver offline.
+ */
+export async function gerarExercicios({
+  texto,
+  modo,
+  quantidade,
+  gerar = generatePadrao,
+}: GerarExerciciosParams): Promise<Exercicio[]> {
+  if (texto.trim().length === 0) {
+    throw new SemTextoParaExerciciosError();
+  }
+  const n = normalizarQuantidade(quantidade);
+
+  // 1ª tentativa: prompt normal.
+  const primeira = await gerar(montarPromptExercicios(modo, n, texto));
+  const exercicios = parseExercicios(primeira, modo);
+  if (exercicios !== null) {
+    return exercicios.slice(0, n);
+  }
+
+  // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
+  const segunda = await gerar(montarPromptCorrigirExercicios(n, primeira));
+  const corrigidos = parseExercicios(segunda, modo);
+  if (corrigidos !== null) {
+    return corrigidos.slice(0, n);
+  }
+
+  throw new ExerciciosInvalidosError();
 }

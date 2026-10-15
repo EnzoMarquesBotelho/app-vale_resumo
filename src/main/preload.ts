@@ -21,6 +21,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarResumo, texto, modo),
   gerarFlashcards: (texto, quantidade) =>
     ipcRenderer.invoke(IPC_CHANNELS.gerarFlashcards, texto, quantidade),
+  gerarExercicios: (texto, modo, quantidade) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarExercicios, texto, modo, quantidade),
 };
 
 contextBridge.exposeInMainWorld("api", api);

@@ -7,7 +7,9 @@
 
 import type {
   ArquivoImportado,
+  Exercicio,
   Flashcard,
+  ModoConteudo,
   ModoResumo,
   OllamaStatus,
 } from "./types";
@@ -26,6 +28,8 @@ export const IPC_CHANNELS = {
   gerarResumo: "resumo:gerar",
   /** Gera flashcards (quantidade escolhível) a partir de um texto. */
   gerarFlashcards: "flashcards:gerar",
+  /** Gera exercícios (modo teórica/prática/mista, 5–100) a partir de um texto. */
+  gerarExercicios: "exercicios:gerar",
 } as const;
 
 /**
@@ -74,4 +78,16 @@ export interface AppApi {
    * @returns a lista de flashcards gerados.
    */
   gerarFlashcards: (texto: string, quantidade: number) => Promise<Flashcard[]>;
+  /**
+   * Gera uma lista de exercícios a partir do `texto`, no `modo` escolhido
+   * (teórica/prática/mista). A `quantidade` é ajustada aos limites do MVP
+   * (5–100) no processo main. O parsing é tolerante: se o modelo devolver JSON
+   * malformado, há uma re-tentativa corretiva antes de falhar.
+   * @returns a lista de exercícios gerados.
+   */
+  gerarExercicios: (
+    texto: string,
+    modo: ModoConteudo,
+    quantidade: number,
+  ) => Promise<Exercicio[]>;
 }

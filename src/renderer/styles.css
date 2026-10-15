@@ -372,3 +372,106 @@ select {
   display: flex;
   gap: 0.75rem;
 }
+
+.exercicios {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exercicios-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.exercicios-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.exercicios-controles {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.exercicios-modo,
+.exercicios-quantidade {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.exercicios-quantidade input {
+  font: inherit;
+  width: 5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.exercicios-erro {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #431717;
+  color: #fecaca;
+}
+
+.exercicios-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.exercicios-contador {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.exercicios-lista {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.exercicio-item {
+  padding: 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  background: #0b1220;
+}
+
+.exercicio-enunciado {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.exercicio-resposta summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #86efac;
+}
+
+.exercicio-resposta p {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: #0f2e1b;
+  color: #e2e8f0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

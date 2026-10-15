@@ -127,13 +127,13 @@ quantidade escolhível (5–100); UI navegável (virar carta).
 estruturado; UI de lista.
 
 **Acceptance criteria:**
-- [ ] Gera lista de exercícios nos três modos (teórica/prática/mista).
-- [ ] Quantidade entre 5 e 100 respeitada.
-- [ ] Lista exibida de forma legível.
+- [x] Gera lista de exercícios nos três modos (teórica/prática/mista).
+- [x] Quantidade entre 5 e 100 respeitada.
+- [x] Lista exibida de forma legível.
 
 **Verification:**
-- [ ] Testes: `npm test` (parsing + limites 5–100)
-- [ ] Manual: gerar nos três modos
+- [x] Testes: `npm test` (parsing + limites 5–100)
+- [x] Manual: gerar nos três modos
 
 **Dependencies:** Task 6 (reusa parser/estrutura)
 **Files likely touched:** `src/shared/prompts.ts`, `src/main/services/parse.ts`, `src/renderer/views/Exercicios.tsx`, `tests/exercicios.test.ts`

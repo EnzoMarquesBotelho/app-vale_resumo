@@ -6,7 +6,7 @@
  * Nomes de identificadores em inglês, conforme o estilo do projeto.
  */
 
-import type { ModoResumo } from "./types";
+import type { ModoConteudo, ModoResumo } from "./types";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "./types";
 
 /** Instrução de tamanho/profundidade por modo de resumo. */
@@ -113,6 +113,68 @@ export function montarPromptCorrigirFlashcards(
     `Corrija e responda APENAS com um JSON válido com ${n} flashcards, sem ` +
       "nenhum texto fora do JSON, no formato:",
     '{"flashcards": [{"pergunta": "...", "resposta": "..."}]}',
+    "",
+    "Resposta anterior a corrigir:",
+    respostaAnterior,
+  ].join("\n");
+}
+
+/** Instrução de natureza por modo de lista de exercícios. */
+const INSTRUCOES_EXERCICIOS: Record<ModoConteudo, string> = {
+  teorica:
+    "Gere exercícios PURAMENTE TEÓRICOS: perguntas conceituais, de definição, " +
+    "explicação e compreensão, sem cálculos nem resolução de problemas práticos.",
+  pratica:
+    "Gere exercícios PURAMENTE PRÁTICOS: problemas para resolver, aplicações, " +
+    "cálculos ou situações concretas, evitando perguntas apenas conceituais.",
+  mista:
+    "Gere uma lista MISTA: combine exercícios teóricos (conceituais) e práticos " +
+    "(aplicação/resolução), equilibrando os dois tipos.",
+};
+
+/**
+ * Monta o prompt que pede `quantidade` exercícios (enunciado + resposta) em
+ * JSON a partir do conteúdo, no `modo` escolhido (teórica/prática/mista). A
+ * saída estruturada permite que a UI monte a lista; o parser (`parse.ts`) é
+ * tolerante caso o modelo adicione texto ao redor do JSON. A `quantidade` é
+ * normalizada aos limites do MVP (5–100).
+ */
+export function montarPromptExercicios(
+  modo: ModoConteudo,
+  quantidade: number,
+  texto: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "Você é um assistente de estudos. Crie uma lista de exercícios em português " +
+      "a partir do conteúdo abaixo.",
+    INSTRUCOES_EXERCICIOS[modo],
+    `Gere exatamente ${n} exercícios cobrindo os pontos mais importantes do conteúdo.`,
+    "Cada exercício deve ter um enunciado claro e uma resposta/gabarito correto e conciso.",
+    "Responda APENAS com um JSON válido, sem comentários nem texto fora do JSON, " +
+      "no formato:",
+    '{"exercicios": [{"enunciado": "...", "resposta": "..."}]}',
+    "",
+    "Conteúdo:",
+    texto,
+  ].join("\n");
+}
+
+/**
+ * Monta o prompt corretivo usado quando o modelo devolve um JSON malformado
+ * para a lista de exercícios. Reapresenta o formato esperado e a resposta
+ * anterior, pedindo somente o JSON corrigido. Usado pela re-tentativa única.
+ */
+export function montarPromptCorrigirExercicios(
+  quantidade: number,
+  respostaAnterior: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "A resposta anterior não era um JSON válido no formato pedido.",
+    `Corrija e responda APENAS com um JSON válido com ${n} exercícios, sem ` +
+      "nenhum texto fora do JSON, no formato:",
+    '{"exercicios": [{"enunciado": "...", "resposta": "..."}]}',
     "",
     "Resposta anterior a corrigir:",
     respostaAnterior,
