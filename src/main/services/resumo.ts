@@ -9,6 +9,12 @@
  *
  * Textos pequenos (um único pedaço) são resumidos em uma só chamada.
  * A chamada ao modelo é injetável para facilitar os testes (Ollama mockado).
+ *
+ * Limite conhecido (MVP): a etapa reduce é de passo único — concatena todos os
+ * resumos parciais num só prompt. Para materiais de faculdade típicos isso é
+ * suficiente, mas um texto com dezenas de pedaços pode gerar um prompt de
+ * combinação grande o bastante para pressionar a janela de contexto. Um reduce
+ * hierárquico (combinar em níveis) fica para quando surgir um PDF muito extenso.
  */
 import { tamanhoMaximoChunkCaracteres } from "@shared/constants";
 import {
