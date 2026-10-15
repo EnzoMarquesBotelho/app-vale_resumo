@@ -17,6 +17,8 @@ const api: AppApi = {
   ollamaStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ollamaStatus),
   ollamaSelecionarModelo: (modelo: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.ollamaSelecionarModelo, modelo),
+  gerarResumo: (texto, modo) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarResumo, texto, modo),
 };
 
 contextBridge.exposeInMainWorld("api", api);

@@ -196,3 +196,64 @@ select {
   font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
   font-size: 0.9rem;
 }
+
+.resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.resumo-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.resumo-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.resumo-controles {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.resumo-modo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.resumo-erro {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #431717;
+  color: #fecaca;
+}
+
+.resumo-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resumo-texto {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #0b1220;
+  color: #e2e8f0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  font-family: inherit;
+  font-size: 0.95rem;
+}

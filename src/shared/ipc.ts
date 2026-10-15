@@ -5,7 +5,11 @@
  * via `contextBridge`. Main e renderer importam daqui para não divergirem.
  */
 
-import type { ArquivoImportado, OllamaStatus } from "./types";
+import type {
+  ArquivoImportado,
+  ModoResumo,
+  OllamaStatus,
+} from "./types";
 
 /** Nomes dos canais de IPC. */
 export const IPC_CHANNELS = {
@@ -17,6 +21,8 @@ export const IPC_CHANNELS = {
   ollamaStatus: "ollama:status",
   /** Define o modelo selecionado para as gerações. */
   ollamaSelecionarModelo: "ollama:selecionar-modelo",
+  /** Gera um resumo (curto/longo) a partir de um texto. */
+  gerarResumo: "resumo:gerar",
 } as const;
 
 /**
@@ -51,4 +57,10 @@ export interface AppApi {
    * @param modelo nome do modelo (ex.: "llama3.1:8b")
    */
   ollamaSelecionarModelo: (modelo: string) => Promise<OllamaStatus>;
+  /**
+   * Gera um resumo do `texto` no `modo` escolhido (curto ou longo). Textos
+   * grandes são divididos e resumidos em etapas no processo main.
+   * @returns o texto do resumo gerado.
+   */
+  gerarResumo: (texto: string, modo: ModoResumo) => Promise<string>;
 }

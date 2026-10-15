@@ -94,12 +94,12 @@ ausente/offline, mostrando instruções claras. Seletor de modelo (default `llam
 UI para escolher modo e ver o resumo.
 
 **Acceptance criteria:**
-- [ ] Gera resumo nos modos curto e longo a partir do texto importado.
-- [ ] Textos grandes são divididos em pedaços e resumidos sem estourar o contexto.
+- [x] Gera resumo nos modos curto e longo a partir do texto importado.
+- [x] Textos grandes são divididos em pedaços e resumidos sem estourar o contexto.
 
 **Verification:**
-- [ ] Testes: `npm test` (fluxo texto→prompt→resposta mockada→resumo)
-- [ ] Manual: gerar resumo curto e longo de um PDF real
+- [x] Testes: `npm test` (fluxo texto→prompt→resposta mockada→resumo)
+- [x] Manual: gerar resumo curto e longo de um PDF real
 
 **Dependencies:** Task 3, Task 4
 **Files likely touched:** `src/shared/prompts.ts`, `src/main/ipc/`, `src/renderer/views/Resumo.tsx`, `tests/resumo.test.ts`

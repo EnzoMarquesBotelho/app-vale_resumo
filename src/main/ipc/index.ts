@@ -1,13 +1,23 @@
 import { dialog, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
-import type { ArquivoImportado, OllamaStatus } from "@shared/types";
+import type {
+  ArquivoImportado,
+  ModoResumo,
+  OllamaStatus,
+} from "@shared/types";
 import {
   ArquivoMuitoGrandeError,
   FormatoNaoSuportadoError,
   importarArquivo,
 } from "../services/files.js";
-import { isOllamaRunning, listModels } from "../services/ollama.js";
+import {
+  OllamaIndisponivelError,
+  generate,
+  isOllamaRunning,
+  listModels,
+} from "../services/ollama.js";
+import { SemTextoParaResumirError, gerarResumo } from "../services/resumo.js";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -24,6 +34,20 @@ function mensagemAmigavel(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível importar o arquivo. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração de resumo em mensagens amigáveis.
+ * Como em `mensagemAmigavel`, o texto vai direto para a UI.
+ */
+function mensagemAmigavelResumo(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof SemTextoParaResumirError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar o resumo. Tente novamente.";
 }
 
 /**
@@ -89,6 +113,22 @@ export function registerIpcHandlers(): void {
       } catch (erro) {
         // Rejeita com uma frase pronta para o usuário em vez de um detalhe interno.
         throw new Error(mensagemAmigavel(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.gerarResumo,
+    async (_event, texto: string, modo: ModoResumo): Promise<string> => {
+      try {
+        // Usa o modelo atualmente selecionado na UI (não só o default).
+        return await gerarResumo({
+          texto,
+          modo,
+          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+        });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelResumo(erro));
       }
     },
   );

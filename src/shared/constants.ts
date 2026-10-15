@@ -20,3 +20,11 @@ export const tamanhoMaximoArquivoBytes = 50 * 1024 * 1024;
 
 /** Aviso exibido quando um PDF não tem texto extraível (ex.: escaneado). */
 export const avisoSemTextoExtraivel = "sem texto extraível";
+
+/**
+ * Tamanho máximo (em caracteres) de cada pedaço (chunk) enviado ao modelo ao
+ * resumir textos grandes. Mantém cada chamada dentro de uma janela de contexto
+ * confortável para modelos locais (~8k tokens). Textos acima disso são
+ * divididos em pedaços e resumidos em etapas (map→reduce).
+ */
+export const tamanhoMaximoChunkCaracteres = 12000;

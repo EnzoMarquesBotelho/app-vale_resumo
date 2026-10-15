@@ -22,7 +22,13 @@ function mensagemDeErro(e: unknown): string {
  * Tela de importação: o usuário escolhe um arquivo (.txt/.md/.pdf) e vê o
  * texto extraído. PDFs sem texto extraível exibem o aviso correspondente.
  */
-export function Importar(): React.JSX.Element {
+/** Props da tela de importação. */
+interface ImportarProps {
+  /** Notifica o componente pai sobre o arquivo importado (ou `null`). */
+  onImportado?: (arquivo: ArquivoImportado | null) => void;
+}
+
+export function Importar({ onImportado }: ImportarProps): React.JSX.Element {
   const [arquivo, setArquivo] = useState<ArquivoImportado | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -35,10 +41,12 @@ export function Importar(): React.JSX.Element {
       // `null` = usuário cancelou a seleção: mantém o estado anterior.
       if (resultado) {
         setArquivo(resultado);
+        onImportado?.(resultado);
       }
     } catch (e) {
       setArquivo(null);
       setErro(mensagemDeErro(e));
+      onImportado?.(null);
     } finally {
       setCarregando(false);
     }
