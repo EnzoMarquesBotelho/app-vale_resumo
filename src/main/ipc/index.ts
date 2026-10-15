@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import type {
   ArquivoImportado,
+  Flashcard,
   ModoResumo,
   OllamaStatus,
 } from "@shared/types";
@@ -18,6 +19,11 @@ import {
   listModels,
 } from "../services/ollama.js";
 import { SemTextoParaResumirError, gerarResumo } from "../services/resumo.js";
+import {
+  FlashcardsInvalidosError,
+  SemTextoParaFlashcardsError,
+  gerarFlashcards,
+} from "../services/parse.js";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -48,6 +54,23 @@ function mensagemAmigavelResumo(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar o resumo. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração de flashcards em mensagens amigáveis.
+ * Como nas demais, o texto vai direto para a UI.
+ */
+function mensagemAmigavelFlashcards(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof SemTextoParaFlashcardsError) {
+    return erro.message;
+  }
+  if (erro instanceof FlashcardsInvalidosError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar os flashcards. Tente novamente.";
 }
 
 /**
@@ -129,6 +152,26 @@ export function registerIpcHandlers(): void {
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelResumo(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.gerarFlashcards,
+    async (
+      _event,
+      texto: string,
+      quantidade: number,
+    ): Promise<Flashcard[]> => {
+      try {
+        // Usa o modelo atualmente selecionado na UI (não só o default).
+        return await gerarFlashcards({
+          texto,
+          quantidade,
+          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+        });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelFlashcards(erro));
       }
     },
   );

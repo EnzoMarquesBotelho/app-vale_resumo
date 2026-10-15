@@ -110,13 +110,13 @@ UI para escolher modo e ver o resumo.
 quantidade escolhível (5–100); UI navegável (virar carta).
 
 **Acceptance criteria:**
-- [ ] Gera N flashcards (N escolhido pelo usuário, 5–100) estruturados pergunta/resposta.
-- [ ] JSON malformado é tratado (parser tolerante / re-tentativa), sem quebrar a UI.
-- [ ] UI permite navegar e virar os cards.
+- [x] Gera N flashcards (N escolhido pelo usuário, 5–100) estruturados pergunta/resposta.
+- [x] JSON malformado é tratado (parser tolerante / re-tentativa), sem quebrar a UI.
+- [x] UI permite navegar e virar os cards.
 
 **Verification:**
-- [ ] Testes: `npm test` (parsing de respostas boas e malformadas)
-- [ ] Manual: gerar e navegar flashcards
+- [x] Testes: `npm test` (parsing de respostas boas e malformadas)
+- [x] Manual: gerar e navegar flashcards
 
 **Dependencies:** Task 5
 **Files likely touched:** `src/shared/prompts.ts`, `src/main/services/parse.ts`, `src/renderer/views/Flashcards.tsx`, `tests/flashcards.test.ts`

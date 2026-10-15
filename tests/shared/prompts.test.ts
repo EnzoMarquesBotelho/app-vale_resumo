@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   montarPromptCombinarResumos,
+  montarPromptCorrigirFlashcards,
+  montarPromptFlashcards,
   montarPromptResumo,
+  normalizarQuantidade,
 } from "@shared/prompts";
 
 describe("montarPromptResumo", () => {
@@ -36,5 +39,56 @@ describe("montarPromptCombinarResumos", () => {
     expect(prompt).toContain("Parte 2:");
     expect(prompt).toContain("parcial dois");
     expect(prompt).toContain("LONGO");
+  });
+});
+
+describe("normalizarQuantidade", () => {
+  it("mantém valores dentro da faixa 5–100", () => {
+    expect(normalizarQuantidade(5)).toBe(5);
+    expect(normalizarQuantidade(42)).toBe(42);
+    expect(normalizarQuantidade(100)).toBe(100);
+  });
+
+  it("eleva ao mínimo valores abaixo de 5", () => {
+    expect(normalizarQuantidade(1)).toBe(5);
+    expect(normalizarQuantidade(0)).toBe(5);
+  });
+
+  it("limita ao máximo valores acima de 100", () => {
+    expect(normalizarQuantidade(500)).toBe(100);
+  });
+
+  it("arredonda valores não inteiros", () => {
+    expect(normalizarQuantidade(7.4)).toBe(7);
+    expect(normalizarQuantidade(7.6)).toBe(8);
+  });
+
+  it("usa o mínimo para NaN", () => {
+    expect(normalizarQuantidade(Number.NaN)).toBe(5);
+  });
+});
+
+describe("montarPromptFlashcards", () => {
+  it("inclui o conteúdo e pede saída em JSON com a quantidade", () => {
+    const prompt = montarPromptFlashcards(12, "conteúdo de teste");
+    expect(prompt).toContain("conteúdo de teste");
+    expect(prompt).toContain("12 flashcards");
+    expect(prompt).toContain('{"flashcards"');
+    expect(prompt.toLowerCase()).toContain("português");
+  });
+
+  it("normaliza a quantidade pedida aos limites (5–100)", () => {
+    expect(montarPromptFlashcards(2, "x")).toContain("5 flashcards");
+    expect(montarPromptFlashcards(200, "x")).toContain("100 flashcards");
+  });
+});
+
+describe("montarPromptCorrigirFlashcards", () => {
+  it("reapresenta o formato e inclui a resposta anterior", () => {
+    const prompt = montarPromptCorrigirFlashcards(10, "resposta ruim");
+    expect(prompt).toContain("não era um JSON válido");
+    expect(prompt).toContain("10 flashcards");
+    expect(prompt).toContain("resposta ruim");
+    expect(prompt).toContain('{"flashcards"');
   });
 });

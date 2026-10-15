@@ -4,6 +4,7 @@ import type { ArquivoImportado } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
 import { Importar } from "./views/Importar";
 import { Resumo } from "./views/Resumo";
+import { Flashcards } from "./views/Flashcards";
 
 /** Casca principal do app. No MVP, importa um arquivo e gera o resumo. */
 export function App(): React.JSX.Element {
@@ -15,6 +16,7 @@ export function App(): React.JSX.Element {
       <OllamaStatus />
       <Importar onImportado={setArquivo} />
       <Resumo arquivo={arquivo} />
+      <Flashcards arquivo={arquivo} />
     </main>
   );
 }

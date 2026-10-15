@@ -7,6 +7,7 @@
  */
 
 import type { ModoResumo } from "./types";
+import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "./types";
 
 /** Instrução de tamanho/profundidade por modo de resumo. */
 const INSTRUCOES_RESUMO: Record<ModoResumo, string> = {
@@ -55,5 +56,65 @@ export function montarPromptCombinarResumos(
     "Responda apenas com o resumo final, sem comentários sobre a tarefa.",
     "",
     partes,
+  ].join("\n");
+}
+
+/**
+ * Garante que a quantidade de flashcards fique dentro dos limites do MVP
+ * (`QUANTIDADE_MINIMA`–`QUANTIDADE_MAXIMA`). Valores fora da faixa são
+ * ajustados para a borda mais próxima; valores não inteiros são arredondados.
+ * Centraliza a regra para prompt e serviço usarem o mesmo valor.
+ */
+export function normalizarQuantidade(quantidade: number): number {
+  const inteiro = Math.round(quantidade);
+  if (Number.isNaN(inteiro)) return QUANTIDADE_MINIMA;
+  if (inteiro < QUANTIDADE_MINIMA) return QUANTIDADE_MINIMA;
+  if (inteiro > QUANTIDADE_MAXIMA) return QUANTIDADE_MAXIMA;
+  return inteiro;
+}
+
+/**
+ * Monta o prompt que pede `quantidade` flashcards (pares pergunta/resposta) em
+ * JSON a partir do conteúdo. A saída estruturada permite que a UI monte os
+ * cards; o parser (`parse.ts`) é tolerante caso o modelo adicione texto ao
+ * redor do JSON. A `quantidade` é normalizada aos limites do MVP (5–100).
+ */
+export function montarPromptFlashcards(
+  quantidade: number,
+  texto: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "Você é um assistente de estudos. Crie flashcards (pares pergunta/resposta) " +
+      "em português a partir do conteúdo abaixo.",
+    `Gere exatamente ${n} flashcards cobrindo os pontos mais importantes do conteúdo.`,
+    "Cada flashcard deve ter uma pergunta objetiva e uma resposta correta e concisa.",
+    "Responda APENAS com um JSON válido, sem comentários nem texto fora do JSON, " +
+      "no formato:",
+    '{"flashcards": [{"pergunta": "...", "resposta": "..."}]}',
+    "",
+    "Conteúdo:",
+    texto,
+  ].join("\n");
+}
+
+/**
+ * Monta o prompt corretivo usado quando o modelo devolve um JSON malformado.
+ * Reapresenta o formato esperado e a resposta anterior, pedindo somente o JSON
+ * corrigido. Usado pela re-tentativa única em `parse.ts`/serviço de flashcards.
+ */
+export function montarPromptCorrigirFlashcards(
+  quantidade: number,
+  respostaAnterior: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "A resposta anterior não era um JSON válido no formato pedido.",
+    `Corrija e responda APENAS com um JSON válido com ${n} flashcards, sem ` +
+      "nenhum texto fora do JSON, no formato:",
+    '{"flashcards": [{"pergunta": "...", "resposta": "..."}]}',
+    "",
+    "Resposta anterior a corrigir:",
+    respostaAnterior,
   ].join("\n");
 }

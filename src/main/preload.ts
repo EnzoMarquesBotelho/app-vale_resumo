@@ -19,6 +19,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.ollamaSelecionarModelo, modelo),
   gerarResumo: (texto, modo) =>
     ipcRenderer.invoke(IPC_CHANNELS.gerarResumo, texto, modo),
+  gerarFlashcards: (texto, quantidade) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarFlashcards, texto, quantidade),
 };
 
 contextBridge.exposeInMainWorld("api", api);

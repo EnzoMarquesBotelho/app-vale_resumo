@@ -7,6 +7,7 @@
 
 import type {
   ArquivoImportado,
+  Flashcard,
   ModoResumo,
   OllamaStatus,
 } from "./types";
@@ -23,6 +24,8 @@ export const IPC_CHANNELS = {
   ollamaSelecionarModelo: "ollama:selecionar-modelo",
   /** Gera um resumo (curto/longo) a partir de um texto. */
   gerarResumo: "resumo:gerar",
+  /** Gera flashcards (quantidade escolhível) a partir de um texto. */
+  gerarFlashcards: "flashcards:gerar",
 } as const;
 
 /**
@@ -63,4 +66,12 @@ export interface AppApi {
    * @returns o texto do resumo gerado.
    */
   gerarResumo: (texto: string, modo: ModoResumo) => Promise<string>;
+  /**
+   * Gera flashcards (pares pergunta/resposta) a partir do `texto`. A
+   * `quantidade` é ajustada aos limites do MVP (5–100) no processo main. O
+   * parsing é tolerante: se o modelo devolver JSON malformado, há uma
+   * re-tentativa corretiva antes de falhar.
+   * @returns a lista de flashcards gerados.
+   */
+  gerarFlashcards: (texto: string, quantidade: number) => Promise<Flashcard[]>;
 }
