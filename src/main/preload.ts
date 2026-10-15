@@ -14,6 +14,9 @@ const api: AppApi = {
   ping: (mensagem: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.ping, mensagem),
   importarArquivo: () => ipcRenderer.invoke(IPC_CHANNELS.importarArquivo),
+  ollamaStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ollamaStatus),
+  ollamaSelecionarModelo: (modelo: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ollamaSelecionarModelo, modelo),
 };
 
 contextBridge.exposeInMainWorld("api", api);

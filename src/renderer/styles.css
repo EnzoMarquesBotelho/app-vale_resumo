@@ -50,6 +50,87 @@ button:disabled {
   cursor: default;
 }
 
+select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.ollama-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: #121c33;
+}
+
+.ollama-status-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ollama-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ollama-badge::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ollama-badge.ok {
+  background: #0f2e1b;
+  color: #86efac;
+}
+
+.ollama-badge.offline {
+  background: #431717;
+  color: #fecaca;
+}
+
+.ollama-modelo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+.ollama-instrucoes {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #3b2f0b;
+  color: #fde68a;
+}
+
+.ollama-instrucoes p {
+  margin: 0 0 0.5rem;
+}
+
+.ollama-instrucoes ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .importar {
   display: flex;
   flex-direction: column;

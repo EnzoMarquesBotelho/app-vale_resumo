@@ -80,3 +80,16 @@ export interface ArquivoImportado {
 /** Limites de quantidade para flashcards e exercícios (inclusivos). */
 export const QUANTIDADE_MINIMA = 5;
 export const QUANTIDADE_MAXIMA = 100;
+
+/**
+ * Estado de disponibilidade do Ollama, consultado pela UI para mostrar o
+ * status e, quando offline, as instruções de instalação/inicialização.
+ */
+export interface OllamaStatus {
+  /** `true` quando o Ollama está acessível localmente. */
+  disponivel: boolean;
+  /** Modelos baixados localmente (vazio se offline ou nenhum baixado). */
+  modelos: string[];
+  /** Modelo atualmente selecionado para as gerações. */
+  modeloSelecionado: string;
+}

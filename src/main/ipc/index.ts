@@ -1,12 +1,13 @@
 import { dialog, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
-import { extensoesSuportadas } from "@shared/constants";
-import type { ArquivoImportado } from "@shared/types";
+import { defaultModel, extensoesSuportadas } from "@shared/constants";
+import type { ArquivoImportado, OllamaStatus } from "@shared/types";
 import {
   ArquivoMuitoGrandeError,
   FormatoNaoSuportadoError,
   importarArquivo,
 } from "../services/files.js";
+import { isOllamaRunning, listModels } from "../services/ollama.js";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -26,6 +27,20 @@ function mensagemAmigavel(erro: unknown): string {
 }
 
 /**
+ * Modelo selecionado para as gerações. Começa no default (`llama3.1:8b`) e é
+ * ajustável em runtime pelo seletor de modelo na UI. Mantido em memória no
+ * processo main; a persistência entre sessões fica para a Task de persistência.
+ */
+let modeloSelecionado = defaultModel;
+
+/** Monta o status atual do Ollama consultando disponibilidade e modelos. */
+async function obterStatusOllama(): Promise<OllamaStatus> {
+  const disponivel = await isOllamaRunning();
+  const modelos = disponivel ? await listModels() : [];
+  return { disponivel, modelos, modeloSelecionado };
+}
+
+/**
  * Registra todos os handlers de IPC do processo main.
  * Chamado uma única vez quando o app fica pronto.
  */
@@ -33,6 +48,22 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.ping,
     (_event, mensagem: string): string => `pong: ${mensagem}`,
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ollamaStatus,
+    (): Promise<OllamaStatus> => obterStatusOllama(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ollamaSelecionarModelo,
+    (_event, modelo: string): Promise<OllamaStatus> => {
+      // Ignora valores vazios: mantém o modelo atual em vez de ficar sem modelo.
+      if (typeof modelo === "string" && modelo.trim().length > 0) {
+        modeloSelecionado = modelo.trim();
+      }
+      return obterStatusOllama();
+    },
   );
 
   ipcMain.handle(

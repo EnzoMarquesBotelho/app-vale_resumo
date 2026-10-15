@@ -5,7 +5,7 @@
  * via `contextBridge`. Main e renderer importam daqui para não divergirem.
  */
 
-import type { ArquivoImportado } from "./types";
+import type { ArquivoImportado, OllamaStatus } from "./types";
 
 /** Nomes dos canais de IPC. */
 export const IPC_CHANNELS = {
@@ -13,6 +13,10 @@ export const IPC_CHANNELS = {
   ping: "app:ping",
   /** Abre um seletor de arquivo e importa o escolhido (texto extraído). */
   importarArquivo: "arquivo:importar",
+  /** Consulta o status do Ollama (disponível, modelos, modelo selecionado). */
+  ollamaStatus: "ollama:status",
+  /** Define o modelo selecionado para as gerações. */
+  ollamaSelecionarModelo: "ollama:selecionar-modelo",
 } as const;
 
 /**
@@ -37,4 +41,14 @@ export interface AppApi {
    * @returns o arquivo importado, ou `null` se o usuário cancelou a seleção.
    */
   importarArquivo: () => Promise<ArquivoImportado | null>;
+  /**
+   * Consulta se o Ollama está rodando, quais modelos estão baixados e qual
+   * modelo está selecionado. Nunca rejeita: offline vira `disponivel: false`.
+   */
+  ollamaStatus: () => Promise<OllamaStatus>;
+  /**
+   * Define o modelo usado nas gerações e devolve o status atualizado.
+   * @param modelo nome do modelo (ex.: "llama3.1:8b")
+   */
+  ollamaSelecionarModelo: (modelo: string) => Promise<OllamaStatus>;
 }

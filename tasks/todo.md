@@ -77,13 +77,13 @@ IPC de importação; UI para escolher arquivo e exibir o texto extraído. PDF se
 ausente/offline, mostrando instruções claras. Seletor de modelo (default `llama3.1:8b`).
 
 **Acceptance criteria:**
-- [ ] App detecta se o Ollama está rodando e exibe status.
-- [ ] Ollama ausente → mensagem com instruções, sem crash.
-- [ ] Modelo configurável, default `llama3.1:8b`.
+- [x] App detecta se o Ollama está rodando e exibe status.
+- [x] Ollama ausente → mensagem com instruções, sem crash.
+- [x] Modelo configurável, default `llama3.1:8b`.
 
 **Verification:**
-- [ ] Testes: `npm test` (ollama mockado)
-- [ ] Manual: com Ollama parado, ver mensagem de instrução
+- [x] Testes: `npm test` (ollama mockado)
+- [x] Manual: com Ollama parado, ver mensagem de instrução
 
 **Dependencies:** Task 2
 **Files likely touched:** `src/main/services/ollama.ts`, `src/main/ipc/`, `src/renderer/components/OllamaStatus.tsx`, `tests/ollama.test.ts`
