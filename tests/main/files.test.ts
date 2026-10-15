@@ -1,9 +1,14 @@
-import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { avisoSemTextoExtraivel } from "@shared/constants";
+import { afterAll, describe, expect, it } from "vitest";
 import {
+  avisoSemTextoExtraivel,
+  tamanhoMaximoArquivoBytes,
+} from "@shared/constants";
+import {
+  ArquivoMuitoGrandeError,
   FormatoNaoSuportadoError,
   detectarFormato,
   extrairTextoPdf,
@@ -75,6 +80,33 @@ describe("importarArquivo: PDF", () => {
     expect(r.formato).toBe("pdf");
     expect(r.texto).toBe("");
     expect(r.semTextoExtraivel).toBe(true);
+  });
+});
+
+describe("importarArquivo: guarda de tamanho", () => {
+  // Diretório temporário próprio do teste (fora de tests/fixtures): o arquivo
+  // grande é gerado em runtime e removido depois, sem commitar um fixture enorme.
+  let dirTemp: string;
+
+  afterAll(async () => {
+    if (dirTemp) {
+      await rm(dirTemp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejeita arquivo acima do limite com ArquivoMuitoGrandeError", async () => {
+    dirTemp = await mkdtemp(join(tmpdir(), "files-test-"));
+    const caminho = join(dirTemp, "enorme.txt");
+    // Um byte acima do limite basta para disparar a guarda.
+    await writeFile(caminho, Buffer.alloc(tamanhoMaximoArquivoBytes + 1, 0x61));
+    await expect(importarArquivo(caminho)).rejects.toBeInstanceOf(
+      ArquivoMuitoGrandeError,
+    );
+  });
+
+  it("aceita arquivo dentro do limite", async () => {
+    const r = await importarArquivo(fixture("amostra.txt"));
+    expect(r.semTextoExtraivel).toBe(false);
   });
 });
 

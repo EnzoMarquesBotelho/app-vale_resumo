@@ -2,7 +2,28 @@ import { dialog, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
 import { extensoesSuportadas } from "@shared/constants";
 import type { ArquivoImportado } from "@shared/types";
-import { importarArquivo } from "../services/files.js";
+import {
+  ArquivoMuitoGrandeError,
+  FormatoNaoSuportadoError,
+  importarArquivo,
+} from "../services/files.js";
+
+/**
+ * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
+ * O `message` resultante é exibido diretamente na UI (via rejeição do IPC),
+ * então precisa ser uma frase pronta para um usuário iniciante — nunca um
+ * detalhe interno. Casos inesperados viram uma mensagem genérica.
+ */
+function mensagemAmigavel(erro: unknown): string {
+  if (erro instanceof FormatoNaoSuportadoError) {
+    const lista = extensoesSuportadas.map((e) => `.${e}`).join(", ");
+    return `Esse tipo de arquivo ainda não é suportado. Escolha um arquivo ${lista}.`;
+  }
+  if (erro instanceof ArquivoMuitoGrandeError) {
+    return erro.message;
+  }
+  return "Não foi possível importar o arquivo. Tente novamente.";
+}
 
 /**
  * Registra todos os handlers de IPC do processo main.
@@ -32,7 +53,12 @@ export function registerIpcHandlers(): void {
         return null;
       }
 
-      return importarArquivo(filePaths[0]);
+      try {
+        return await importarArquivo(filePaths[0]);
+      } catch (erro) {
+        // Rejeita com uma frase pronta para o usuário em vez de um detalhe interno.
+        throw new Error(mensagemAmigavel(erro));
+      }
     },
   );
 }

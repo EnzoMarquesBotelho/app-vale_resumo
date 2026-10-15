@@ -3,6 +3,22 @@ import { avisoSemTextoExtraivel } from "@shared/constants";
 import type { ArquivoImportado } from "@shared/types";
 
 /**
+ * Extrai uma frase amigável do erro vindo do IPC. O Electron encapsula o erro
+ * do handler com um prefixo técnico (ex.: "Error occurred in handler for
+ * 'arquivo:importar': Error: ..."); aqui removemos esse ruído e mostramos
+ * apenas a mensagem pronta para o usuário.
+ */
+function mensagemDeErro(e: unknown): string {
+  if (!(e instanceof Error) || e.message.length === 0) {
+    return "Falha ao importar o arquivo.";
+  }
+  // Pega o texto após o último "Error: " adicionado pelo encapsulamento do IPC.
+  const partes = e.message.split("Error: ");
+  const limpo = (partes[partes.length - 1] ?? e.message).trim();
+  return limpo.length > 0 ? limpo : "Falha ao importar o arquivo.";
+}
+
+/**
  * Tela de importação: o usuário escolhe um arquivo (.txt/.md/.pdf) e vê o
  * texto extraído. PDFs sem texto extraível exibem o aviso correspondente.
  */
@@ -22,7 +38,7 @@ export function Importar(): React.JSX.Element {
       }
     } catch (e) {
       setArquivo(null);
-      setErro(e instanceof Error ? e.message : "Falha ao importar o arquivo.");
+      setErro(mensagemDeErro(e));
     } finally {
       setCarregando(false);
     }

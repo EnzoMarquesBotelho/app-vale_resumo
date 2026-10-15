@@ -7,14 +7,16 @@
  * MVP: apenas `.txt`, `.md` e `.pdf` são suportados. PDFs sem texto extraível
  * (ex.: escaneados) retornam `semTextoExtraivel: true`.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { extensoesSuportadas } from "@shared/constants";
+import { extensoesSuportadas, tamanhoMaximoArquivoBytes } from "@shared/constants";
 import type { ArquivoImportado, FormatoArquivo } from "@shared/types";
 
 /** Erro lançado quando o formato do arquivo não é suportado no MVP. */
 export class FormatoNaoSuportadoError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "FORMATO_NAO_SUPORTADO" as const;
   constructor(public readonly extensao: string) {
     super(
       `Formato não suportado: ".${extensao}". ` +
@@ -23,6 +25,21 @@ export class FormatoNaoSuportadoError extends Error {
           .join(", ")}.`,
     );
     this.name = "FormatoNaoSuportadoError";
+  }
+}
+
+/** Erro lançado quando o arquivo excede o tamanho máximo permitido no MVP. */
+export class ArquivoMuitoGrandeError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "ARQUIVO_MUITO_GRANDE" as const;
+  constructor(public readonly tamanhoBytes: number) {
+    const limiteMb = Math.round(tamanhoMaximoArquivoBytes / (1024 * 1024));
+    const atualMb = (tamanhoBytes / (1024 * 1024)).toFixed(1);
+    super(
+      `Arquivo muito grande (${atualMb} MB). ` +
+        `O limite atual é de ${limiteMb} MB.`,
+    );
+    this.name = "ArquivoMuitoGrandeError";
   }
 }
 
@@ -69,6 +86,12 @@ export async function importarArquivo(
 ): Promise<ArquivoImportado> {
   const formato = detectarFormato(caminho);
   const nome = basename(caminho);
+
+  // Guarda de tamanho: evita carregar arquivos enormes inteiros na memória.
+  const { size } = await stat(caminho);
+  if (size > tamanhoMaximoArquivoBytes) {
+    throw new ArquivoMuitoGrandeError(size);
+  }
 
   if (formato === "pdf") {
     const buffer = await readFile(caminho);
