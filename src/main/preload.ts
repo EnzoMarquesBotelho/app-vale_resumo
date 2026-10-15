@@ -1,17 +1,20 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
+import { IPC_CHANNELS, type AppApi } from "@shared/ipc";
 
 /**
- * Minimal, safe API exposed to the renderer during scaffolding.
- * The full typed IPC surface is added in a later task.
+ * API tipada exposta ao renderer via `contextBridge`.
+ * O renderer nunca acessa `ipcRenderer` diretamente: só os métodos aqui.
  */
-const api = {
+const api: AppApi = {
   versions: {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
     node: process.versions.node,
   },
-} as const;
+  ping: (mensagem: string): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ping, mensagem),
+};
 
 contextBridge.exposeInMainWorld("api", api);
 
-export type PreloadApi = typeof api;
+export type PreloadApi = AppApi;

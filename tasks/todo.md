@@ -37,21 +37,21 @@ e janela do app abrindo com uma tela placeholder.
 e um esqueleto de IPC tipado (preload + canais) para o renderer chamar o main com segurança.
 
 **Acceptance criteria:**
-- [ ] Tipos de domínio definidos e exportados.
-- [ ] Preload expõe uma API tipada ao renderer via `contextBridge`.
-- [ ] Um canal de teste (ex.: `ping`) funciona renderer→main→renderer.
+- [x] Tipos de domínio definidos e exportados.
+- [x] Preload expõe uma API tipada ao renderer via `contextBridge`.
+- [x] Um canal de teste (ex.: `ping`) funciona renderer→main→renderer.
 
 **Verification:**
-- [ ] Build: `npm run build`
-- [ ] Manual: chamada `ping` retorna no renderer
+- [x] Build: `npm run build`
+- [x] Manual: chamada `ping` retorna no renderer
 
 **Dependencies:** Task 1
 **Files likely touched:** `src/shared/types.ts`, `src/main/preload.ts`, `src/main/ipc/index.ts`, `src/renderer/state/`
 **Estimated scope:** S
 
 ### Checkpoint: Fundação
-- [ ] `npm run build`, `npm run lint`, `npm test` passam
-- [ ] App abre e o IPC de teste funciona
+- [x] `npm run build`, `npm run lint`, `npm test` passam
+- [x] App abre e o IPC de teste funciona
 - [ ] Revisar com o usuário antes de prosseguir
 
 ## Fase 2: Núcleo
