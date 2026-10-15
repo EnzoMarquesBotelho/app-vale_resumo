@@ -17,26 +17,101 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 2rem;
-  text-align: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem 2rem;
 }
 
 .app-shell h1 {
   margin: 0;
-  font-size: 1.9rem;
-}
-
-.app-shell p {
-  margin: 0;
-  max-width: 48ch;
-  line-height: 1.5;
-  color: #cbd5e1;
+  font-size: 1.6rem;
 }
 
 .app-meta {
   font-size: 0.85rem;
   color: #94a3b8;
+}
+
+button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: #1e293b;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #334155;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.importar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.importar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.importar-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.importar-erro {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #431717;
+  color: #fecaca;
+}
+
+.importar-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.importar-resultado h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+
+.importar-aviso {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #3b2f0b;
+  color: #fde68a;
+}
+
+.importar-texto {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #0b1220;
+  color: #e2e8f0;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  font-size: 0.9rem;
 }

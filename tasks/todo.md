@@ -61,12 +61,12 @@ e um esqueleto de IPC tipado (preload + canais) para o renderer chamar o main co
 IPC de importação; UI para escolher arquivo e exibir o texto extraído. PDF sem texto → aviso.
 
 **Acceptance criteria:**
-- [ ] Importar `.txt`, `.md` e `.pdf` exibe o texto extraído.
-- [ ] PDF escaneado/sem texto mostra "sem texto extraível".
+- [x] Importar `.txt`, `.md` e `.pdf` exibe o texto extraído.
+- [x] PDF escaneado/sem texto mostra "sem texto extraível".
 
 **Verification:**
-- [ ] Testes: `npm test` (unit de `files.ts` com arquivos de amostra)
-- [ ] Manual: importar os 3 formatos
+- [x] Testes: `npm test` (unit de `files.ts` com arquivos de amostra)
+- [x] Manual: importar os 3 formatos
 
 **Dependencies:** Task 2
 **Files likely touched:** `src/main/services/files.ts`, `src/main/ipc/`, `src/renderer/views/Importar.tsx`, `tests/files.test.ts`

@@ -59,6 +59,24 @@ export interface Exercicio {
   modo: ModoConteudo;
 }
 
+/**
+ * Resultado de importar e extrair o texto de um arquivo.
+ * Produzido pelo serviço `files.ts` e devolvido ao renderer via IPC.
+ */
+export interface ArquivoImportado {
+  /** Nome do arquivo original (ex.: "Capítulo 1.pdf"). */
+  nome: string;
+  /** Formato detectado a partir da extensão. */
+  formato: FormatoArquivo;
+  /** Texto extraído do arquivo. Vazio quando não há texto extraível. */
+  texto: string;
+  /**
+   * `true` quando o arquivo (ex.: PDF escaneado) não tem texto extraível.
+   * Nesse caso a UI exibe o aviso "sem texto extraível".
+   */
+  semTextoExtraivel: boolean;
+}
+
 /** Limites de quantidade para flashcards e exercícios (inclusivos). */
 export const QUANTIDADE_MINIMA = 5;
 export const QUANTIDADE_MAXIMA = 100;

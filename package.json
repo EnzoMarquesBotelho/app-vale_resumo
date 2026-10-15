@@ -34,5 +34,8 @@
     "typescript-eslint": "8.71.2",
     "vite": "7.3.7",
     "vitest": "3.2.7"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.4.299"
   }
 }

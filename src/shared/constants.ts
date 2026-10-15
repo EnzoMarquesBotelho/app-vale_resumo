@@ -7,3 +7,9 @@ export const ollamaBaseUrl = "http://localhost:11434";
 
 /** Modelo padrão usado para as gerações (configurável nas opções). */
 export const defaultModel = "llama3.1:8b";
+
+/** Extensões de arquivo suportadas para importação no MVP (sem o ponto). */
+export const extensoesSuportadas = ["txt", "md", "pdf"] as const;
+
+/** Aviso exibido quando um PDF não tem texto extraível (ex.: escaneado). */
+export const avisoSemTextoExtraivel = "sem texto extraível";
