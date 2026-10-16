@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { avisoSemTextoExtraivel } from "@shared/constants";
 import type { ArquivoImportado } from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC. O Electron encapsula o erro
@@ -44,7 +45,7 @@ export function Importar({
     setErro(null);
     setCarregando(true);
     try {
-      const resultado = await window.api?.importarArquivo();
+      const resultado = await getApi().importarArquivo();
       // `null` = usuário cancelou a seleção: mantém o estado anterior.
       if (resultado) {
         onImportado?.(resultado);

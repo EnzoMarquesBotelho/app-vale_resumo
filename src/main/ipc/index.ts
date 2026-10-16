@@ -206,11 +206,16 @@ export function registerIpcHandlers(): void {
       const { canceled, filePaths } = await dialog.showOpenDialog({
         title: "Importar arquivo de estudo",
         properties: ["openFile"],
+        // Um filtro combinado (todos os formatos de uma vez) + um por tipo +
+        // "Todos os arquivos". No Windows, filtros separados evitam o caso em
+        // que o usuário não enxerga os .txt/.md porque o filtro ativo some com
+        // eles; "Todos os arquivos" é a saída de emergência.
         filters: [
-          {
-            name: "Arquivos de estudo",
-            extensions: [...extensoesSuportadas],
-          },
+          { name: "Arquivos de estudo (.txt, .md, .pdf)", extensions: [...extensoesSuportadas] },
+          { name: "Texto (.txt)", extensions: ["txt"] },
+          { name: "Markdown (.md)", extensions: ["md"] },
+          { name: "PDF (.pdf)", extensions: ["pdf"] },
+          { name: "Todos os arquivos", extensions: ["*"] },
         ],
       });
 

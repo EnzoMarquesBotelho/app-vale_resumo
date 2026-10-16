@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
 import type { ArquivoImportado, Flashcard } from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -69,7 +70,7 @@ export function Flashcards({
     setVirado(false);
     setGerando(true);
     try {
-      const resultado = await window.api?.gerarFlashcards(
+      const resultado = await getApi().gerarFlashcards(
         arquivo.texto,
         quantidade,
       );

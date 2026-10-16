@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
 import type { ArquivoImportado, Exercicio, ModoConteudo } from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -80,7 +81,7 @@ export function Exercicios({
     setExercicios(null);
     setGerando(true);
     try {
-      const resultado = await window.api?.gerarExercicios(
+      const resultado = await getApi().gerarExercicios(
         arquivo.texto,
         modo,
         quantidade,

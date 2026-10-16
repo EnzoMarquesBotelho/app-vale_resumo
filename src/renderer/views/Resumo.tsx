@@ -4,6 +4,7 @@ import type {
   ModoResumo,
   Resumo as ResumoArtefato,
 } from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -68,7 +69,7 @@ export function Resumo({
     setResumo(null);
     setGerando(true);
     try {
-      const resultado = await window.api?.gerarResumo(arquivo.texto, modo);
+      const resultado = await getApi().gerarResumo(arquivo.texto, modo);
       setResumo(resultado ?? null);
       if (resultado != null && onGerado) {
         onGerado({
