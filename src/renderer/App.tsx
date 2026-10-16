@@ -15,6 +15,7 @@ import { Resumo } from "./views/Resumo";
 import { Flashcards } from "./views/Flashcards";
 import { Exercicios } from "./views/Exercicios";
 import { MapaMental } from "./views/MapaMental";
+import { Agenda } from "./views/Agenda";
 import { Historico } from "./views/Historico";
 
 /** Abas de navegação do app, na ordem em que aparecem. */
@@ -24,6 +25,7 @@ type Aba =
   | "flashcards"
   | "exercicios"
   | "mapa"
+  | "agenda"
   | "historico";
 
 /** Rótulos (em português) e ícone de cada aba. */
@@ -33,6 +35,7 @@ const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
   { id: "flashcards", rotulo: "Flashcards", icone: "🃏" },
   { id: "exercicios", rotulo: "Exercícios", icone: "✏️" },
   { id: "mapa", rotulo: "Mapa mental", icone: "🗺️" },
+  { id: "agenda", rotulo: "Agenda", icone: "📅" },
   { id: "historico", rotulo: "Histórico", icone: "🗂️" },
 ];
 
@@ -312,6 +315,7 @@ export function App(): React.JSX.Element {
             onGerado={temTexto ? (m) => void salvarMapaMental(m) : undefined}
           />
         )}
+        {abaExibida === "agenda" && <Agenda />}
         {abaExibida === "historico" && (
           <Historico
             recarregar={versaoHistorico}
