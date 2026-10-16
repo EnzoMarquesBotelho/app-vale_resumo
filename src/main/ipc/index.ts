@@ -173,6 +173,31 @@ async function obterStatusOllama(): Promise<OllamaStatus> {
 }
 
 /**
+ * Resolve, no momento da geração, um modelo que realmente exista no Ollama.
+ * É a última linha de defesa contra "model not found": mesmo que o modelo
+ * selecionado na UI (ou o default) não esteja instalado, consultamos a lista
+ * atual de modelos e reconciliamos para uma variante compatível. Se não der
+ * para listar (ex.: Ollama offline), devolvemos o selecionado e deixamos a
+ * geração falhar com a mensagem amigável de Ollama indisponível.
+ */
+async function modeloParaGeracao(): Promise<string> {
+  let instalados: string[];
+  try {
+    const lista = await listModels();
+    instalados = Array.isArray(lista) ? lista : [];
+  } catch {
+    instalados = [];
+  }
+  if (instalados.length === 0) return modeloSelecionado;
+  const resolvido = escolherModeloDisponivel(modeloSelecionado, instalados);
+  // Se o usuário não escolheu manualmente, alinhamos o estado exibido também.
+  if (!modeloEscolhidoManualmente) {
+    modeloSelecionado = resolvido;
+  }
+  return resolvido;
+}
+
+/**
  * Registra todos os handlers de IPC do processo main.
  * Chamado uma única vez quando o app fica pronto.
  */
@@ -236,11 +261,12 @@ export function registerIpcHandlers(): void {
     IPC_CHANNELS.gerarResumo,
     async (_event, texto: string, modo: ModoResumo): Promise<string> => {
       try {
-        // Usa o modelo atualmente selecionado na UI (não só o default).
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
         return await gerarResumo({
           texto,
           modo,
-          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+          gerar: (prompt) => generate({ prompt, model }),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelResumo(erro));
@@ -256,11 +282,12 @@ export function registerIpcHandlers(): void {
       quantidade: number,
     ): Promise<Flashcard[]> => {
       try {
-        // Usa o modelo atualmente selecionado na UI (não só o default).
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
         return await gerarFlashcards({
           texto,
           quantidade,
-          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+          gerar: (prompt) => generate({ prompt, model }),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelFlashcards(erro));
@@ -277,12 +304,13 @@ export function registerIpcHandlers(): void {
       quantidade: number,
     ): Promise<Exercicio[]> => {
       try {
-        // Usa o modelo atualmente selecionado na UI (não só o default).
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
         return await gerarExercicios({
           texto,
           modo,
           quantidade,
-          gerar: (prompt) => generate({ prompt, model: modeloSelecionado }),
+          gerar: (prompt) => generate({ prompt, model }),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelExercicios(erro));

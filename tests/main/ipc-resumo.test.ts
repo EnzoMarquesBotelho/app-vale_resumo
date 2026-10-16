@@ -21,13 +21,14 @@ vi.mock("electron", () => ({
 
 // Ollama mockado no nível do serviço: `generate` não chama modelo real.
 const generate = vi.fn<(p: { prompt: string; model?: string }) => Promise<string>>();
+const listModels = vi.fn<() => Promise<string[]>>();
 vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
   },
   generate: (params: { prompt: string; model?: string }) => generate(params),
   isOllamaRunning: vi.fn(),
-  listModels: vi.fn(),
+  listModels: () => listModels(),
 }));
 
 import { IPC_CHANNELS } from "@shared/ipc";
@@ -46,6 +47,9 @@ describe("IPC: gerar resumo", () => {
   beforeEach(() => {
     registered.clear();
     generate.mockReset();
+    listModels.mockReset();
+    // Por padrão, sem modelos listados: a geração usa o default selecionado.
+    listModels.mockResolvedValue([]);
     registerIpcHandlers();
   });
 
@@ -67,6 +71,23 @@ describe("IPC: gerar resumo", () => {
     const params = generate.mock.calls[0][0];
     expect(params.prompt).toContain("texto para resumir");
     expect(params.model).toBe("llama3.1:8b");
+  });
+
+  it("resolve o modelo para uma variante instalada quando o default não existe", async () => {
+    // Cenário real: default é llama3.1:8b, mas a máquina só tem llama3.1:latest
+    // (e outros). A geração deve usar a variante compatível, não o default
+    // inexistente — evitando o erro 404 "model not found" do Ollama.
+    listModels.mockResolvedValue([
+      "qwen2.5:7b",
+      "llama3.1:latest",
+      "gemma2:9b",
+    ]);
+    generate.mockResolvedValue("resumo gerado");
+
+    await chamar(IPC_CHANNELS.gerarResumo, "texto", "curto");
+
+    const params = generate.mock.calls[0][0];
+    expect(params.model).toBe("llama3.1:latest");
   });
 
   it("converte falha em mensagem amigável", async () => {
