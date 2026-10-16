@@ -271,6 +271,7 @@ export function App(): React.JSX.Element {
           <Importar
             arquivo={arquivo}
             onImportado={aoImportar}
+            onLoteImportado={() => setVersaoHistorico((v) => v + 1)}
             {...(documento === null
               ? {
                   onConfirmarCaderno: (a, nome) =>

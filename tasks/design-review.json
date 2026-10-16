@@ -1,0 +1,30 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "title": "normalizarCaminhoOrigem: alvo da unificação de separador não especificado fora do Windows",
+      "location": "design.md — seção 'Persistência: checagem de duplicata', definição de normalizarCaminhoOrigem",
+      "problem": "No ramo não-Windows o design diz 'separadores unificados' mas não diz para qual separador; interpretar como \\->/ estaria errado em POSIX, onde \\ é caractere válido de nome de arquivo. Como a função é aplicada dos dois lados da comparação de dedup, uma escolha inconsistente ou incorreta quebra a dedup silenciosamente.",
+      "fix": "Especificar: no Windows, replace(/\\//g, '\\\\').toLowerCase(); fora do Windows, normalização é APENAS trim() — nenhuma conversão de separador (/ já é o único separador e \\ é caractere de nome válido). Incluir o snippet concreto da função."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Derivação de nomePasta (passo 1) não é extraída como função e depende de basename ser variante Windows",
+      "location": "design.md — 'Orquestração' passo 1 e 'Testabilidade' (teste de raiz de drive / raiz POSIX)",
+      "problem": "O design manda unit-testar a derivação do passo 1 com 'C:\\\\' e '/' como 'função pura', mas (a) não existe símbolo exportado para o teste chamar e (b) em runner POSIX path.basename('C:\\\\') devolve 'C:\\\\' (não 'C:'), então o guard /^[A-Za-z]:$/ não casa e o teste do caso Windows falha. Suposição implícita incorreta sobre node:path no CI.",
+      "fix": "Extrair nomePastaParaCaderno(pastaEscolhida) exportada em pasta.ts, usando path.win32.basename quando o caminho contém '\\\\' e path.posix.basename caso contrário, aplicando o guard /^[A-Za-z]:$/ e vazio -> ''. Passo 1 passa a chamar essa função; o teste a chama direto com 'C:\\\\' e '/'. Alternativa: declarar explicitamente que o teste usa path.win32. O design precisa escolher uma."
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "CA6 (PDF sem texto importado) não refletido no resumo do lote",
+      "location": "design.md — CA6 e seção UI (resumoLoteTexto)",
+      "problem": "PDFs sem texto contam em 'importados' (correto, CA6), mas o resumo não distingue importados-com-texto de importados-vazios; um lote só de escaneados dirá 'N importados' sem menção. Não é bug, mas é um canto que o coder pode 'consertar' indevidamente adicionando contador fora de escopo.",
+      "fix": "Acrescentar frase em CA6 ou na seção UI: documentos sem texto extraível contam só em 'importados'; não há contador separado de 'sem texto' no resumo (fora de escopo). O aviso 'sem texto extraível' aparece por documento ao abri-lo, como hoje."
+    }
+  ],
+  "reviewDoc": "c:\\Dev\\.worktrees\\importpasta\\tasks\\design-review.md"
+}

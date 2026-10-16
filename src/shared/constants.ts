@@ -40,3 +40,13 @@ export const MAPA_MAX_NOS = 200;
 export const MAPA_ROTULO_MAX = 120;
 /** Máximo de filhos diretos por nó (poda defensiva de leques enormes). */
 export const MAPA_MAX_FILHOS_POR_NO = 12;
+
+/**
+ * Profundidade máxima de subpastas na varredura de uma pasta importada. A
+ * pasta escolhida tem profundidade 0; descemos para uma subpasta só se a
+ * profundidade dela for <= este teto. Logo, com o teto 10, a 1ª subpasta de
+ * profundidade 11 é a primeira podada.
+ */
+export const PASTA_PROFUNDIDADE_MAXIMA = 10;
+/** Máximo de arquivos suportados aceitos em um único lote de importação. */
+export const PASTA_MAX_ARQUIVOS_LOTE = 500;

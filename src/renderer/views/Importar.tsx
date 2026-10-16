@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { avisoSemTextoExtraivel } from "@shared/constants";
-import type { ArquivoImportado, ResumoCaderno } from "@shared/types";
+import type {
+  ArquivoImportado,
+  ResultadoImportacaoPasta,
+  ResumoCaderno,
+} from "@shared/types";
 import { getApi } from "../api";
+import { resumoLoteTexto } from "./resumoLote";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC. O Electron encapsula o erro
@@ -39,15 +44,27 @@ interface ImportarProps {
    * (`undefined`) = reabertura (rótulo somente-leitura, sem criar documento).
    */
   onConfirmarCaderno?: (arquivo: ArquivoImportado, cadernoNome: string) => void;
+  /**
+   * Notifica o App de que um lote de pasta foi importado, para recarregar o
+   * Histórico. Passada nos DOIS modos (importação e reabertura): o lote cria
+   * documentos direto no disco e não depende de `arquivo`/`documento` ativo.
+   */
+  onLoteImportado?: () => void;
 }
 
 export function Importar({
   arquivo,
   onImportado,
   onConfirmarCaderno,
+  onLoteImportado,
 }: ImportarProps): React.JSX.Element {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Estado do lote de importação de pasta (independente do fluxo de arquivo).
+  const [carregandoPasta, setCarregandoPasta] = useState(false);
+  const [erroPasta, setErroPasta] = useState<string | null>(null);
+  const [resultadoPasta, setResultadoPasta] =
+    useState<ResultadoImportacaoPasta | null>(null);
   // Grafia do caderno escolhida/editada pelo usuário no fluxo de importação.
   const [cadernoEscolhido, setCadernoEscolhido] = useState(
     arquivo?.cadernoNomeSugerido ?? "",
@@ -113,6 +130,24 @@ export function Importar({
     }
   }
 
+  async function escolherPasta(): Promise<void> {
+    setErroPasta(null);
+    setResultadoPasta(null);
+    setCarregandoPasta(true);
+    try {
+      const r = await getApi().importarPasta();
+      // `null` = usuário cancelou a seleção: mantém o estado anterior.
+      if (r !== null) {
+        setResultadoPasta(r);
+        onLoteImportado?.();
+      }
+    } catch (e) {
+      setErroPasta(mensagemDeErro(e));
+    } finally {
+      setCarregandoPasta(false);
+    }
+  }
+
   async function confirmarCaderno(): Promise<void> {
     if (arquivo === null || onConfirmarCaderno === undefined) return;
     onConfirmarCaderno(arquivo, cadernoEscolhido);
@@ -131,14 +166,35 @@ export function Importar({
       <header className="importar-header">
         <h2>Importar arquivo</h2>
         <p className="app-meta">Formatos suportados: .txt, .md, .pdf</p>
-        <button
-          type="button"
-          onClick={() => void escolherArquivo()}
-          disabled={carregando}
-        >
-          {carregando ? "Importando…" : "Escolher arquivo"}
-        </button>
+        <div className="importar-acoes">
+          <button
+            type="button"
+            onClick={() => void escolherArquivo()}
+            disabled={carregando || carregandoPasta}
+          >
+            {carregando ? "Importando…" : "Escolher arquivo"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void escolherPasta()}
+            disabled={carregando || carregandoPasta}
+          >
+            {carregandoPasta ? "Importando pasta…" : "Escolher pasta"}
+          </button>
+        </div>
       </header>
+
+      {erroPasta !== null && (
+        <p className="importar-erro" role="alert">
+          {erroPasta}
+        </p>
+      )}
+
+      {resultadoPasta !== null && (
+        <p className="importar-lote-resumo" role="status">
+          {resumoLoteTexto(resultadoPasta)}
+        </p>
+      )}
 
       {erro !== null && (
         <p className="importar-erro" role="alert">

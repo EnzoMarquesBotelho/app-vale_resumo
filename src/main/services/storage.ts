@@ -418,6 +418,44 @@ export async function salvarMapaMental(
 }
 
 /**
+ * Normaliza um `caminhoOrigem` para servir de chave de deduplicação.
+ *
+ * No Windows (`process.platform === "win32"`), o FS é case-insensitive e aceita
+ * `/` e `\` como separador: unificamos para `\` e baixamos a caixa. Fora do
+ * Windows (POSIX), `/` já é o único separador e `\` é um caractere válido em
+ * nome de arquivo — então a normalização é APENAS `trim()`, sem conversão de
+ * separador nem mudança de caixa (FS case-sensitive). A mesma função é aplicada
+ * dos dois lados da comparação de dedup.
+ */
+export function normalizarCaminhoOrigem(p: string): string {
+  const aparado = p.trim();
+  if (process.platform === "win32") {
+    return aparado.replace(/\//g, "\\").toLowerCase();
+  }
+  return aparado;
+}
+
+/**
+ * Retorna o conjunto de `caminhoOrigem` (normalizados via
+ * `normalizarCaminhoOrigem`) de todos os documentos já salvos. Usado pela
+ * importação em lote para pular arquivos já importados. Caminhos ausentes/vazios
+ * não entram no conjunto. Leitura tolerante: diretório ausente → conjunto vazio.
+ */
+export async function caminhosOrigemImportados(
+  baseDir?: string,
+): Promise<Set<string>> {
+  const documentos = await carregarTodos(baseDir);
+  const conjunto = new Set<string>();
+  for (const documento of documentos) {
+    const origem = documento.caminhoOrigem?.trim();
+    if (origem) {
+      conjunto.add(normalizarCaminhoOrigem(origem));
+    }
+  }
+  return conjunto;
+}
+
+/**
  * Remove um documento salvo pelo id. Remover algo inexistente é um no-op
  * (não lança), para a UI poder apagar sem corrida de estado.
  */

@@ -20,10 +20,12 @@ vi.mock("electron", () => ({
 
 import {
   DocumentoNaoEncontradoError,
+  caminhosOrigemImportados,
   carregarDocumento,
   criarDocumento,
   listarCadernos,
   listarDocumentos,
+  normalizarCaminhoOrigem,
   removerDocumento,
   salvarDocumento,
   salvarExercicios,
@@ -560,5 +562,80 @@ describe("storage: listar documentos por caderno", () => {
   it("cadernoId desconhecido devolve lista vazia", async () => {
     await criarDocumento(novoDoc("a.txt", "txt", "a"), baseDir);
     expect(await listarDocumentos("inexistente", baseDir)).toEqual([]);
+  });
+});
+
+describe("normalizarCaminhoOrigem", () => {
+  const plataformaOriginal = process.platform;
+
+  function definirPlataforma(valor: NodeJS.Platform): void {
+    Object.defineProperty(process, "platform", {
+      value: valor,
+      configurable: true,
+    });
+  }
+
+  afterEach(() => {
+    definirPlataforma(plataformaOriginal);
+  });
+
+  it("no Windows unifica separadores para \\ e baixa a caixa", () => {
+    definirPlataforma("win32");
+    expect(normalizarCaminhoOrigem("C:/Users/X/Facul/A.txt")).toBe(
+      "c:\\users\\x\\facul\\a.txt",
+    );
+    // Caminhos que diferem só na caixa/separador normalizam igual.
+    expect(normalizarCaminhoOrigem("  C:\\Users\\x\\facul\\a.txt  ")).toBe(
+      "c:\\users\\x\\facul\\a.txt",
+    );
+  });
+
+  it("fora do Windows normaliza APENAS com trim (sem converter separador nem caixa)", () => {
+    definirPlataforma("linux");
+    // "\" é caractere de nome válido em POSIX: NÃO é convertido.
+    expect(normalizarCaminhoOrigem("  /home/x/arquivo\\estranho.txt  ")).toBe(
+      "/home/x/arquivo\\estranho.txt",
+    );
+    // Caixa preservada (FS case-sensitive).
+    expect(normalizarCaminhoOrigem("/home/X/Facul/A.txt")).toBe(
+      "/home/X/Facul/A.txt",
+    );
+  });
+});
+
+describe("caminhosOrigemImportados", () => {
+  it("diretório ausente devolve conjunto vazio", async () => {
+    const conjunto = await caminhosOrigemImportados(baseDir);
+    expect(conjunto.size).toBe(0);
+  });
+
+  it("inclui só os documentos com caminhoOrigem (normalizado)", async () => {
+    await criarDocumento(
+      {
+        nome: "a.txt",
+        formato: "txt",
+        texto: "a",
+        cadernoId: "geral",
+        cadernoNome: "Geral",
+        caminhoOrigem: "/home/x/Facul/a.txt",
+      },
+      baseDir,
+    );
+    await criarDocumento(
+      {
+        nome: "b.txt",
+        formato: "txt",
+        texto: "b",
+        cadernoId: "geral",
+        cadernoNome: "Geral",
+      },
+      baseDir,
+    );
+
+    const conjunto = await caminhosOrigemImportados(baseDir);
+    expect(conjunto.size).toBe(1);
+    expect(conjunto.has(normalizarCaminhoOrigem("/home/x/Facul/a.txt"))).toBe(
+      true,
+    );
   });
 });

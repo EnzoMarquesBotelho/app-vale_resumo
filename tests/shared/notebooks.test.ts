@@ -3,6 +3,8 @@ import {
   CADERNO_GERAL_ID,
   CADERNO_GERAL_NOME,
   CADERNO_NOME_MAX,
+  SEPARADOR_CADERNO,
+  derivarCadernoComposto,
   derivarCadernoDeCaminho,
   derivarNomeExibicaoCaderno,
   montarCaderno,
@@ -107,5 +109,65 @@ describe("derivarCadernoDeCaminho", () => {
     expect(derivarCadernoDeCaminho("..\\_extracted_text\\x.txt").cadernoId).toBe(
       "extracted-text",
     );
+  });
+});
+
+describe("SEPARADOR_CADERNO", () => {
+  it("é o travessão com espaços usado nos cadernos compostos", () => {
+    expect(SEPARADOR_CADERNO).toBe(" — ");
+  });
+});
+
+describe("derivarCadernoComposto", () => {
+  it("arquivo direto na pasta escolhida usa o nome da pasta", () => {
+    expect(derivarCadernoComposto("Facul", "nota.txt")).toEqual({
+      cadernoId: "facul",
+      cadernoNome: "Facul",
+    });
+  });
+
+  it("um nível de subpasta vira o nome da subpasta", () => {
+    expect(derivarCadernoComposto("Facul", "Teórica\\x.pdf")).toEqual({
+      cadernoId: "teorica",
+      cadernoNome: "Teórica",
+    });
+  });
+
+  it("vários níveis juntam as subpastas com ' — '", () => {
+    expect(derivarCadernoComposto("Facul", "Cálculo\\Teórica\\x.pdf")).toEqual({
+      cadernoId: "calculo-teorica",
+      cadernoNome: "Cálculo — Teórica",
+    });
+  });
+
+  it("aceita separador '/' de forma equivalente", () => {
+    expect(derivarCadernoComposto("Facul", "Cálculo/Teórica/x.pdf")).toEqual({
+      cadernoId: "calculo-teorica",
+      cadernoNome: "Cálculo — Teórica",
+    });
+  });
+
+  it("preserva acentos e espaços no nome, slugifica o id", () => {
+    expect(
+      derivarCadernoComposto("Facul", "Álgebra Linear\\Prática\\lista.md"),
+    ).toEqual({
+      cadernoId: "algebra-linear-pratica",
+      cadernoNome: "Álgebra Linear — Prática",
+    });
+  });
+
+  it("colisão cruzada entre matérias resolve em ids distintos", () => {
+    const calculo = derivarCadernoComposto("Facul", "Cálculo\\Teórica\\a.pdf");
+    const fisica = derivarCadernoComposto("Facul", "Física\\Teórica\\b.pdf");
+    expect(calculo.cadernoId).toBe("calculo-teorica");
+    expect(fisica.cadernoId).toBe("fisica-teorica");
+    expect(calculo.cadernoId).not.toBe(fisica.cadernoId);
+  });
+
+  it("nome de pasta vazio (raiz saneada) cai no caderno padrão", () => {
+    expect(derivarCadernoComposto("", "nota.txt")).toEqual({
+      cadernoId: CADERNO_GERAL_ID,
+      cadernoNome: CADERNO_GERAL_NOME,
+    });
   });
 });

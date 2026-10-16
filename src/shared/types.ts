@@ -195,6 +195,29 @@ export interface ResumoCaderno {
   atualizadoEm: string;
 }
 
+/**
+ * Resultado de uma importação de pasta em lote (contagens + cadernos tocados).
+ *
+ * Documentos importados sem texto extraível (ex.: PDFs escaneados) contam
+ * apenas em `importados`; NÃO há contador separado de "sem texto" no resumo do
+ * lote (fora de escopo). O aviso "sem texto extraível" aparece por documento ao
+ * abri-lo no Histórico, como hoje.
+ */
+export interface ResultadoImportacaoPasta {
+  /** Documentos efetivamente criados. */
+  importados: number;
+  /** Arquivos com extensão não suportada (contados, não lidos). */
+  ignoradosPorFormato: number;
+  /** Arquivos pulados por já terem sido importados (mesmo caminhoOrigem). */
+  ignoradosPorDuplicata: number;
+  /** Arquivos encontrados mas que falharam ao ler/extrair/salvar. */
+  falhas: number;
+  /** Nomes de exibição dos cadernos tocados (distintos, ordenados). */
+  cadernosTocados: string[];
+  /** `null` se nada estourou; senão qual limite parou/afetou o lote. */
+  limiteExcedido: "arquivos" | "profundidade" | null;
+}
+
 /** Limites de quantidade para flashcards e exercícios (inclusivos). */
 export const QUANTIDADE_MINIMA = 5;
 export const QUANTIDADE_MAXIMA = 100;

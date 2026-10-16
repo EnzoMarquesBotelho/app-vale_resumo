@@ -16,12 +16,14 @@ import type {
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
+  ResultadoImportacaoPasta,
 } from "@shared/types";
 import {
   ArquivoMuitoGrandeError,
   FormatoNaoSuportadoError,
   importarArquivo,
 } from "../services/files.js";
+import { importarPasta } from "../services/pasta.js";
 import {
   OllamaIndisponivelError,
   generate,
@@ -70,6 +72,16 @@ function mensagemAmigavel(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível importar o arquivo. Tente novamente.";
+}
+
+/**
+ * Mensagem amigável para a importação de pasta. Diferente do fluxo de arquivo
+ * único, o fluxo de pasta NÃO tem erros tipados a mapear: formato e tamanho
+ * viram contagens no `ResultadoImportacaoPasta`, não exceções. A genérica cobre
+ * o único caminho de rejeição (a `readdir` da pasta escolhida/raiz falhar).
+ */
+function mensagemAmigavelPasta(): string {
+  return "Não foi possível importar a pasta. Tente novamente.";
 }
 
 /**
@@ -281,6 +293,26 @@ export function registerIpcHandlers(): void {
       } catch (erro) {
         // Rejeita com uma frase pronta para o usuário em vez de um detalhe interno.
         throw new Error(mensagemAmigavel(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.importarPasta,
+    async (): Promise<ResultadoImportacaoPasta | null> => {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: "Importar pasta de estudo",
+        properties: ["openDirectory"],
+      });
+
+      if (canceled || filePaths.length === 0) {
+        return null;
+      }
+
+      try {
+        return await importarPasta(filePaths[0]);
+      } catch {
+        throw new Error(mensagemAmigavelPasta());
       }
     },
   );

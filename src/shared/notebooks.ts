@@ -12,6 +12,13 @@ export const CADERNO_GERAL_ID = "geral";
 export const CADERNO_GERAL_NOME = "Geral";
 /** Teto defensivo para o comprimento do nome de exibição do caderno. */
 export const CADERNO_NOME_MAX = 200;
+/**
+ * Separador de exibição entre segmentos de um caderno composto (ex.:
+ * "Cálculo — Teórica"). Declarado AQUI (não em `constants.ts`) para manter a
+ * regra do módulo: `notebooks.ts` só importa tipos de `./types` e permanece
+ * autocontido. O renderer, se precisar do literal, importa de `@shared/notebooks`.
+ */
+export const SEPARADOR_CADERNO = " — ";
 
 /**
  * Normaliza um nome bruto de caderno em um `cadernoId` estável, usado para
@@ -94,4 +101,32 @@ export function derivarCadernoDeCaminho(caminhoAbsoluto: string): {
     return { cadernoId: CADERNO_GERAL_ID, cadernoNome: CADERNO_GERAL_NOME };
   }
   return montarCaderno(candidato);
+}
+
+/**
+ * Deriva o caderno composto a partir do caminho de um arquivo relativo à pasta
+ * escolhida. As subpastas entre a pasta escolhida e o arquivo são juntadas com
+ * `SEPARADOR_CADERNO` (" — "); quando o arquivo está direto na pasta escolhida
+ * (sem subpasta), usa o `nomePastaEscolhida` como caderno. Função pura: não
+ * toca o disco.
+ *
+ * @param nomePastaEscolhida nome (basename) já saneado da pasta escolhida pelo
+ *   usuário (raiz de drive/raiz POSIX já reduzidas a "" pelo chamador, caindo
+ *   em `Geral`).
+ * @param caminhoRelativo caminho do arquivo relativo à pasta escolhida
+ *   (ex.: "Cálculo/Teórica/x.pdf"; aceita "/" e "\").
+ * @returns o par id/nome coerente do caderno.
+ */
+export function derivarCadernoComposto(
+  nomePastaEscolhida: string,
+  caminhoRelativo: string,
+): { cadernoId: string; cadernoNome: string } {
+  const segmentos = caminhoRelativo.split(/[\\/]+/).filter((s) => s !== "");
+  // Descarta o último segmento (o nome do arquivo); o resto são as subpastas.
+  const subpastas = segmentos.slice(0, -1);
+  const bruto =
+    subpastas.length === 0
+      ? nomePastaEscolhida
+      : subpastas.join(SEPARADOR_CADERNO);
+  return montarCaderno(bruto);
 }

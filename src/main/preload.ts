@@ -14,6 +14,7 @@ const api: AppApi = {
   ping: (mensagem: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.ping, mensagem),
   importarArquivo: () => ipcRenderer.invoke(IPC_CHANNELS.importarArquivo),
+  importarPasta: () => ipcRenderer.invoke(IPC_CHANNELS.importarPasta),
   ollamaStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ollamaStatus),
   ollamaSelecionarModelo: (modelo: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.ollamaSelecionarModelo, modelo),

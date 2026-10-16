@@ -19,6 +19,7 @@ import type {
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
+  ResultadoImportacaoPasta,
 } from "./types";
 
 /** Nomes dos canais de IPC. */
@@ -27,6 +28,8 @@ export const IPC_CHANNELS = {
   ping: "app:ping",
   /** Abre um seletor de arquivo e importa o escolhido (texto extraído). */
   importarArquivo: "arquivo:importar",
+  /** Abre um seletor de PASTA e importa em lote os arquivos suportados. */
+  importarPasta: "pasta:importar",
   /** Consulta o status do Ollama (disponível, modelos, modelo selecionado). */
   ollamaStatus: "ollama:status",
   /** Define o modelo selecionado para as gerações. */
@@ -81,6 +84,13 @@ export interface AppApi {
    * @returns o arquivo importado, ou `null` se o usuário cancelou a seleção.
    */
   importarArquivo: () => Promise<ArquivoImportado | null>;
+  /**
+   * Abre o seletor de pasta, varre recursivamente (até o teto de profundidade),
+   * importa em lote os arquivos .txt/.md/.pdf (texto apenas, sem IA), pulando os
+   * já importados (mesmo caminhoOrigem), e devolve o resumo do lote.
+   * @returns o resultado do lote, ou `null` se o usuário cancelou a seleção.
+   */
+  importarPasta: () => Promise<ResultadoImportacaoPasta | null>;
   /**
    * Consulta se o Ollama está rodando, quais modelos estão baixados e qual
    * modelo está selecionado. Nunca rejeita: offline vira `disponivel: false`.
