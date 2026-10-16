@@ -1,0 +1,36 @@
+# Configuração do electron-builder para gerar o executável distribuível do app.
+# Usada por `npm run package`. Gera um instalador Windows (NSIS) em `release/`.
+appId: com.appestudos.ialocal
+productName: App de Estudos com IA Local
+
+# Diretórios de saída e de recursos de build (ícones etc.).
+directories:
+  output: release
+  buildResources: resources
+
+# Arquivos empacotados dentro do app. O electron-vite gera tudo em `out/`.
+files:
+  - out/**/*
+  - package.json
+
+# Alvo Windows: instalador NSIS (um .exe distribuível que o usuário executa
+# para instalar o app). Arquitetura x64.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+# Opções do instalador: permite escolher o diretório, cria atalhos no menu
+# iniciar e na área de trabalho. Instalação por usuário (não exige admin).
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: App de Estudos
+
+# Evita tentar baixar/assinar binários online durante o empacotamento local.
+# O app é 100% offline; não há assinatura de código configurada.
+npmRebuild: false

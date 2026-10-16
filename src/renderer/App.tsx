@@ -14,6 +14,18 @@ import { Flashcards } from "./views/Flashcards";
 import { Exercicios } from "./views/Exercicios";
 import { Historico } from "./views/Historico";
 
+/** Abas de navegação do app, na ordem em que aparecem. */
+type Aba = "importar" | "resumo" | "flashcards" | "exercicios" | "historico";
+
+/** Rótulos (em português) e ícone de cada aba. */
+const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
+  { id: "importar", rotulo: "Importar", icone: "📄" },
+  { id: "resumo", rotulo: "Resumo", icone: "📝" },
+  { id: "flashcards", rotulo: "Flashcards", icone: "🃏" },
+  { id: "exercicios", rotulo: "Exercícios", icone: "✏️" },
+  { id: "historico", rotulo: "Histórico", icone: "🗂️" },
+];
+
 /**
  * Casca principal do app. Orquestra o fluxo: importar um arquivo cria um
  * documento salvo; os artefatos gerados (resumo/flashcards/exercícios) são
@@ -25,6 +37,8 @@ export function App(): React.JSX.Element {
   const [documento, setDocumento] = useState<DocumentoSalvo | null>(null);
   // Incrementado a cada save para o Histórico recarregar a lista.
   const [versaoHistorico, setVersaoHistorico] = useState(0);
+  // Aba atualmente visível. Começa em "Importar", o primeiro passo do fluxo.
+  const [abaAtiva, setAbaAtiva] = useState<Aba>("importar");
 
   const temTexto =
     arquivo !== null && !arquivo.semTextoExtraivel && arquivo.texto.length > 0;
@@ -54,6 +68,8 @@ export function App(): React.JSX.Element {
       if (salvo) {
         setDocumento(salvo);
         setVersaoHistorico((v) => v + 1);
+        // Com texto importado, leva o usuário ao próximo passo do fluxo.
+        setAbaAtiva("resumo");
       }
     } catch {
       // Falha ao criar o registro não bloqueia a geração; sem persistência
@@ -70,7 +86,19 @@ export function App(): React.JSX.Element {
       texto: salvo.texto,
       semTextoExtraivel: false,
     });
+    // Mostra o resumo do documento reaberto; o usuário navega pelas abas.
+    setAbaAtiva("resumo");
   }
+
+  // Aba efetivamente exibida: se o arquivo ativo ficar sem texto (ex.: erro ao
+  // importar limpou o arquivo), uma aba de geração não faz sentido, então
+  // caímos de volta para "Importar". Derivado em render — sem efeito/estado
+  // extra para corrigir a seleção.
+  const ehAbaGeracao =
+    abaAtiva === "resumo" ||
+    abaAtiva === "flashcards" ||
+    abaAtiva === "exercicios";
+  const abaExibida: Aba = ehAbaGeracao && !temTexto ? "importar" : abaAtiva;
 
   async function salvarResumo(resumo: ResumoArtefato): Promise<void> {
     if (documento === null) return;
@@ -120,34 +148,95 @@ export function App(): React.JSX.Element {
     }
   }
 
+  // Abas de geração ficam desabilitadas enquanto não há texto importado.
+  function abaDesabilitada(id: Aba): boolean {
+    const ehGeracao =
+      id === "resumo" || id === "flashcards" || id === "exercicios";
+    return ehGeracao && !temTexto;
+  }
+
   return (
-    <main className="app-shell">
-      <h1>{appName}</h1>
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header-titulo">
+          <span className="app-logo" aria-hidden="true">
+            🎓
+          </span>
+          <div>
+            <h1>{appName}</h1>
+            <p className="app-subtitulo">
+              Resumos, flashcards e exercícios gerados localmente com IA
+            </p>
+          </div>
+        </div>
+        {documento !== null && (
+          <p className="app-documento-ativo" title={documento.nome}>
+            Documento: <strong>{documento.nome}</strong>
+          </p>
+        )}
+      </header>
+
       <OllamaStatus />
-      <Importar arquivo={arquivo} onImportado={(a) => void aoImportar(a)} />
-      <Resumo
-        key={`resumo-${chaveDocumento}`}
-        arquivo={arquivo}
-        resumoSalvo={documento?.resumo ?? null}
-        onGerado={temTexto ? (r) => void salvarResumo(r) : undefined}
-      />
-      <Flashcards
-        key={`flashcards-${chaveDocumento}`}
-        arquivo={arquivo}
-        flashcardsSalvos={documento?.flashcards ?? null}
-        onGerado={temTexto ? (f) => void salvarFlashcards(f) : undefined}
-      />
-      <Exercicios
-        key={`exercicios-${chaveDocumento}`}
-        arquivo={arquivo}
-        exerciciosSalvos={documento?.exercicios ?? null}
-        onGerado={temTexto ? (e) => void salvarExercicios(e) : undefined}
-      />
-      <Historico
-        recarregar={versaoHistorico}
-        documentoAtivoId={documento?.id ?? null}
-        onReabrir={aoReabrir}
-      />
-    </main>
+
+      <nav className="app-nav" aria-label="Navegação principal">
+        {ABAS.map((aba) => (
+          <button
+            key={aba.id}
+            type="button"
+            className={`app-nav-item ${abaExibida === aba.id ? "ativo" : ""}`}
+            onClick={() => setAbaAtiva(aba.id)}
+            disabled={abaDesabilitada(aba.id)}
+            aria-current={abaExibida === aba.id ? "page" : undefined}
+            title={
+              abaDesabilitada(aba.id)
+                ? "Importe um arquivo com texto primeiro"
+                : undefined
+            }
+          >
+            <span className="app-nav-icone" aria-hidden="true">
+              {aba.icone}
+            </span>
+            {aba.rotulo}
+          </button>
+        ))}
+      </nav>
+
+      <main className="app-conteudo">
+        {abaExibida === "importar" && (
+          <Importar arquivo={arquivo} onImportado={(a) => void aoImportar(a)} />
+        )}
+        {abaExibida === "resumo" && (
+          <Resumo
+            key={`resumo-${chaveDocumento}`}
+            arquivo={arquivo}
+            resumoSalvo={documento?.resumo ?? null}
+            onGerado={temTexto ? (r) => void salvarResumo(r) : undefined}
+          />
+        )}
+        {abaExibida === "flashcards" && (
+          <Flashcards
+            key={`flashcards-${chaveDocumento}`}
+            arquivo={arquivo}
+            flashcardsSalvos={documento?.flashcards ?? null}
+            onGerado={temTexto ? (f) => void salvarFlashcards(f) : undefined}
+          />
+        )}
+        {abaExibida === "exercicios" && (
+          <Exercicios
+            key={`exercicios-${chaveDocumento}`}
+            arquivo={arquivo}
+            exerciciosSalvos={documento?.exercicios ?? null}
+            onGerado={temTexto ? (e) => void salvarExercicios(e) : undefined}
+          />
+        )}
+        {abaExibida === "historico" && (
+          <Historico
+            recarregar={versaoHistorico}
+            documentoAtivoId={documento?.id ?? null}
+            onReabrir={aoReabrir}
+          />
+        )}
+      </main>
+    </div>
   );
 }
