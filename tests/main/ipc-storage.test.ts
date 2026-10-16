@@ -30,6 +30,7 @@ const listarCadernos = vi.fn();
 const salvarResumo = vi.fn();
 const salvarFlashcards = vi.fn();
 const salvarExercicios = vi.fn();
+const salvarMapaMental = vi.fn();
 const removerDocumento = vi.fn();
 
 vi.mock("../../src/main/services/storage.js", () => ({
@@ -46,6 +47,7 @@ vi.mock("../../src/main/services/storage.js", () => ({
   salvarResumo: (...args: unknown[]) => salvarResumo(...args),
   salvarFlashcards: (...args: unknown[]) => salvarFlashcards(...args),
   salvarExercicios: (...args: unknown[]) => salvarExercicios(...args),
+  salvarMapaMental: (...args: unknown[]) => salvarMapaMental(...args),
   removerDocumento: (...args: unknown[]) => removerDocumento(...args),
 }));
 
@@ -81,6 +83,7 @@ describe("IPC: persistência", () => {
     salvarResumo.mockReset();
     salvarFlashcards.mockReset();
     salvarExercicios.mockReset();
+    salvarMapaMental.mockReset();
     removerDocumento.mockReset();
     registerIpcHandlers();
   });
@@ -93,7 +96,27 @@ describe("IPC: persistência", () => {
     expect(registered.has(IPC_CHANNELS.salvarResumo)).toBe(true);
     expect(registered.has(IPC_CHANNELS.salvarFlashcards)).toBe(true);
     expect(registered.has(IPC_CHANNELS.salvarExercicios)).toBe(true);
+    expect(registered.has(IPC_CHANNELS.salvarMapaMental)).toBe(true);
     expect(registered.has(IPC_CHANNELS.removerDocumento)).toBe(true);
+  });
+
+  it("salvarMapaMental repassa id e mapa ao serviço e devolve o documento", async () => {
+    salvarMapaMental.mockResolvedValue(documento);
+    const mapa = {
+      documentoId: "abc",
+      raiz: { id: "n0", rotulo: "Tema", filhos: [] },
+      geradoEm: "2026-01-01T00:00:00.000Z",
+    };
+    const resultado = await chamar(IPC_CHANNELS.salvarMapaMental, "abc", mapa);
+    expect(resultado).toEqual(documento);
+    expect(salvarMapaMental).toHaveBeenCalledWith("abc", mapa);
+  });
+
+  it("converte falha ao salvar o mapa mental em mensagem amigável", async () => {
+    salvarMapaMental.mockRejectedValue(new Error("disco cheio"));
+    await expect(
+      chamar(IPC_CHANNELS.salvarMapaMental, "abc", {}),
+    ).rejects.toThrow(/Não foi possível salvar ou carregar os dados/);
   });
 
   it("criarDocumento monta o caderno e repassa os campos ao serviço", async () => {

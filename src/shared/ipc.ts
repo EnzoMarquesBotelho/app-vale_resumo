@@ -11,8 +11,10 @@ import type {
   Exercicio,
   Flashcard,
   FormatoArquivo,
+  MapaMental,
   ModoConteudo,
   ModoResumo,
+  NoMapaMental,
   OllamaStatus,
   Resumo,
   ResumoCaderno,
@@ -35,6 +37,8 @@ export const IPC_CHANNELS = {
   gerarFlashcards: "flashcards:gerar",
   /** Gera exercícios (modo teórica/prática/mista, 5–100) a partir de um texto. */
   gerarExercicios: "exercicios:gerar",
+  /** Gera o mapa mental (árvore hierárquica) a partir de um texto. */
+  gerarMapaMental: "mapamental:gerar",
   /** Cria e salva um novo documento (sem artefatos) a partir de um arquivo. */
   criarDocumento: "documento:criar",
   /** Salva o resumo gerado em um documento existente. */
@@ -43,6 +47,8 @@ export const IPC_CHANNELS = {
   salvarFlashcards: "documento:salvar-flashcards",
   /** Salva os exercícios gerados em um documento existente. */
   salvarExercicios: "documento:salvar-exercicios",
+  /** Salva o mapa mental gerado em um documento existente. */
+  salvarMapaMental: "documento:salvar-mapa-mental",
   /** Lista os documentos salvos (resumos leves) para o Histórico. */
   listarDocumentos: "documento:listar",
   /** Lista os cadernos agregados (derivados dos documentos) para o Histórico. */
@@ -112,6 +118,13 @@ export interface AppApi {
     quantidade: number,
   ) => Promise<Exercicio[]>;
   /**
+   * Gera um mapa mental (árvore tema → ramos → sub-ramos) a partir do `texto`.
+   * Parsing tolerante com uma re-tentativa corretiva, como flashcards/exercícios.
+   * @returns a árvore raiz do mapa mental gerado (sempre não-nula; falhas são
+   *   rejeições do IPC com mensagem amigável).
+   */
+  gerarMapaMental: (texto: string) => Promise<NoMapaMental>;
+  /**
    * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
    * importado, para que os artefatos gerados possam ser anexados e persistidos.
    * O `cadernoNome` é a grafia escolhida/editada na importação; o main deriva
@@ -145,6 +158,8 @@ export interface AppApi {
     id: string,
     exercicios: Exercicio[],
   ) => Promise<DocumentoSalvo>;
+  /** Salva o mapa mental gerado no documento `id` e devolve o registro. */
+  salvarMapaMental: (id: string, mapa: MapaMental) => Promise<DocumentoSalvo>;
   /**
    * Lista os documentos salvos como resumos leves, do mais recente para o mais
    * antigo. Usado pela tela de Histórico. Sem `cadernoId`, devolve todos; com

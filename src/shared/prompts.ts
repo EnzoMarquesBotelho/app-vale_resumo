@@ -6,6 +6,7 @@
  * Nomes de identificadores em inglês, conforme o estilo do projeto.
  */
 
+import { MAPA_PROFUNDIDADE_MAXIMA } from "./constants";
 import type { ModoConteudo, ModoResumo } from "./types";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "./types";
 
@@ -113,6 +114,59 @@ export function montarPromptCorrigirFlashcards(
     `Corrija e responda APENAS com um JSON válido com ${n} flashcards, sem ` +
       "nenhum texto fora do JSON, no formato:",
     '{"flashcards": [{"pergunta": "...", "resposta": "..."}]}',
+    "",
+    "Resposta anterior a corrigir:",
+    respostaAnterior,
+  ].join("\n");
+}
+
+/**
+ * Formato aninhado (sem ids) do mapa mental pedido ao modelo. O main atribui os
+ * ids após validar — o modelo é ruim em manter ids únicos, então o prompt só
+ * pede rótulos + filhos. Reusado no prompt normal e no corretivo.
+ */
+const FORMATO_MAPA_MENTAL =
+  '{"raiz": {"rotulo": "Tema central", "filhos": ' +
+  '[{"rotulo": "Ramo", "filhos": []}]}}';
+
+/**
+ * Monta o prompt que pede um mapa mental (árvore tema → ramos → sub-ramos) em
+ * JSON aninhado a partir do conteúdo. A saída estruturada permite que a UI
+ * desenhe a árvore; o parser (`mapa.ts`) é tolerante caso o modelo adicione
+ * texto ao redor do JSON. Pede rótulos curtos e profundidade de até
+ * `MAPA_PROFUNDIDADE_MAXIMA` níveis, sem ids (o main os atribui).
+ */
+export function montarPromptMapaMental(texto: string): string {
+  return [
+    "Você é um assistente de estudos. Crie um mapa mental hierárquico em " +
+      "português a partir do conteúdo abaixo.",
+    "O mapa é uma árvore: um tema central na raiz, ramos (subtemas) e " +
+      "sub-ramos (detalhes).",
+    "Use rótulos CURTOS (poucas palavras), não frases longas nem parágrafos.",
+    `Use no máximo ${MAPA_PROFUNDIDADE_MAXIMA} níveis de profundidade ` +
+      "(a raiz é o nível 1).",
+    "Responda APENAS com um JSON válido, sem ids, sem comentários nem texto " +
+      "fora do JSON, no formato:",
+    FORMATO_MAPA_MENTAL,
+    "",
+    "Conteúdo:",
+    texto,
+  ].join("\n");
+}
+
+/**
+ * Monta o prompt corretivo usado quando o modelo devolve um JSON malformado
+ * para o mapa mental. Reapresenta o formato esperado e a resposta anterior,
+ * pedindo somente o JSON corrigido. Usado pela re-tentativa única em `mapa.ts`.
+ */
+export function montarPromptCorrigirMapaMental(
+  respostaAnterior: string,
+): string {
+  return [
+    "A resposta anterior não era um JSON válido no formato pedido.",
+    "Corrija e responda APENAS com um JSON válido do mapa mental, sem ids e " +
+      "sem nenhum texto fora do JSON, no formato:",
+    FORMATO_MAPA_MENTAL,
     "",
     "Resposta anterior a corrigir:",
     respostaAnterior,

@@ -1,0 +1,22 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "NIT",
+      "title": "Checklist 1.2.1 cobre so imports de tipo; os imports de valor que mapa.ts precisa (gerarResumo, dividirEmChunks, extrairBlocoJson) nao sao enumerados",
+      "location": "Secao 1.2.1 e 2.4",
+      "problem": "A tabela 1.2.1 e explicitamente so de import type, mas mapa.ts depende de tres imports de valor citados apenas em prosa: gerarResumo e dividirEmChunks (de ./resumo.js) e extrairBlocoJson (de ./parse.js). Todos existem e sao exportados (verificado), entao nao e risco de inviabilidade, mas o gate de chunking em 2.4 depende de dividirEmChunks sem a lista nomea-lo.",
+      "fix": "Acrescentar uma linha de imports de valor em mapa.ts: import { dividirEmChunks, gerarResumo, type GerarTexto } from \"./resumo.js\"; e import { extrairBlocoJson } from \"./parse.js\";"
+    },
+    {
+      "id": 2,
+      "severity": "NIT",
+      "title": "Origem do tipo GerarTexto ambigua: exportado tanto por resumo.ts quanto por parse.ts",
+      "location": "Secao 2 (GerarMapaMentalParams.gerar?: GerarTexto)",
+      "problem": "O design usa GerarTexto sem dizer de onde importar. O codigo atual duplica a definicao em src/main/services/resumo.ts e src/main/services/parse.ts; qualquer uma compila, mas deixar em aberto espalha a microdecisao para o coder.",
+      "fix": "Fixar a origem numa frase: como mapa.ts ja importa gerarResumo/dividirEmChunks de ./resumo.js, importar GerarTexto do mesmo modulo (import { ..., type GerarTexto } from \"./resumo.js\";)."
+    }
+  ],
+  "reviewDoc": "c:\\Dev\\.worktrees\\mapas\\tasks\\design-mapas-review.md"
+}

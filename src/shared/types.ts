@@ -47,6 +47,34 @@ export interface Resumo {
   geradoEm: string;
 }
 
+/**
+ * Um nó da árvore do mapa mental. A árvore é estritamente hierárquica
+ * (cada nó tem no máximo um pai), espelhando a estrutura tema → ramos →
+ * sub-ramos. `id` é único dentro de um mesmo mapa e serve de `key` estável
+ * na UI e para controlar expandir/colapsar.
+ */
+export interface NoMapaMental {
+  /** Id único do nó dentro do mapa (ex.: "n0", "n1", ...). */
+  id: string;
+  /** Rótulo curto exibido no nó (texto em português). */
+  rotulo: string;
+  /** Filhos diretos (ramos). Vazio em uma folha. */
+  filhos: NoMapaMental[];
+}
+
+/**
+ * Mapa mental gerado a partir de um documento. É a raiz da árvore mais os
+ * metadados de geração, análogo a `Resumo`. O nó `raiz` é o tema central.
+ */
+export interface MapaMental {
+  /** Documento de origem (preenchido ao salvar; "" até persistir). */
+  documentoId: string;
+  /** Nó central da árvore (o tema). */
+  raiz: NoMapaMental;
+  /** Data de geração em formato ISO 8601. */
+  geradoEm: string;
+}
+
 /** Par pergunta/resposta extraído do conteúdo. */
 export interface Flashcard {
   /** Pergunta (frente do card). */
@@ -122,6 +150,8 @@ export interface DocumentoSalvo {
   flashcards?: Flashcard[];
   /** Exercícios gerados, se houver. */
   exercicios?: Exercicio[];
+  /** Mapa mental gerado, se houver. */
+  mapaMental?: MapaMental;
 }
 
 /**
@@ -149,6 +179,8 @@ export interface ResumoDocumentoSalvo {
   temFlashcards: boolean;
   /** `true` se o documento tem exercícios salvos. */
   temExercicios: boolean;
+  /** `true` se o documento tem um mapa mental salvo. */
+  temMapaMental: boolean;
 }
 
 /** Um caderno agregado para a tela de Histórico (derivado dos documentos). */

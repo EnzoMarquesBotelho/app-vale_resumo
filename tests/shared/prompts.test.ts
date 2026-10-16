@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   montarPromptCombinarResumos,
   montarPromptCorrigirFlashcards,
+  montarPromptCorrigirMapaMental,
   montarPromptFlashcards,
+  montarPromptMapaMental,
   montarPromptResumo,
   normalizarQuantidade,
 } from "@shared/prompts";
@@ -90,5 +92,30 @@ describe("montarPromptCorrigirFlashcards", () => {
     expect(prompt).toContain("10 flashcards");
     expect(prompt).toContain("resposta ruim");
     expect(prompt).toContain('{"flashcards"');
+  });
+});
+
+describe("montarPromptMapaMental", () => {
+  it("inclui o conteúdo e pede o formato JSON aninhado", () => {
+    const prompt = montarPromptMapaMental("conteúdo de teste");
+    expect(prompt).toContain("conteúdo de teste");
+    expect(prompt).toContain('"raiz"');
+    expect(prompt).toContain('"filhos"');
+    expect(prompt.toLowerCase()).toContain("português");
+  });
+
+  it("pede rótulos curtos e limita a profundidade", () => {
+    const prompt = montarPromptMapaMental("x");
+    expect(prompt.toLowerCase()).toContain("curto");
+    expect(prompt).toContain("4 níveis");
+  });
+});
+
+describe("montarPromptCorrigirMapaMental", () => {
+  it("reapresenta o formato e inclui a resposta anterior", () => {
+    const prompt = montarPromptCorrigirMapaMental("resposta ruim");
+    expect(prompt).toContain("não era um JSON válido");
+    expect(prompt).toContain("resposta ruim");
+    expect(prompt).toContain('"raiz"');
   });
 });

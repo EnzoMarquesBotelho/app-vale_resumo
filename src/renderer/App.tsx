@@ -5,6 +5,7 @@ import type {
   DocumentoSalvo,
   Exercicio,
   Flashcard,
+  MapaMental as MapaMentalArtefato,
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
@@ -13,10 +14,17 @@ import { Importar } from "./views/Importar";
 import { Resumo } from "./views/Resumo";
 import { Flashcards } from "./views/Flashcards";
 import { Exercicios } from "./views/Exercicios";
+import { MapaMental } from "./views/MapaMental";
 import { Historico } from "./views/Historico";
 
 /** Abas de navegação do app, na ordem em que aparecem. */
-type Aba = "importar" | "resumo" | "flashcards" | "exercicios" | "historico";
+type Aba =
+  | "importar"
+  | "resumo"
+  | "flashcards"
+  | "exercicios"
+  | "mapa"
+  | "historico";
 
 /** Rótulos (em português) e ícone de cada aba. */
 const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
@@ -24,6 +32,7 @@ const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
   { id: "resumo", rotulo: "Resumo", icone: "📝" },
   { id: "flashcards", rotulo: "Flashcards", icone: "🃏" },
   { id: "exercicios", rotulo: "Exercícios", icone: "✏️" },
+  { id: "mapa", rotulo: "Mapa mental", icone: "🗺️" },
   { id: "historico", rotulo: "Histórico", icone: "🗂️" },
 ];
 
@@ -122,7 +131,8 @@ export function App(): React.JSX.Element {
   const ehAbaGeracao =
     abaAtiva === "resumo" ||
     abaAtiva === "flashcards" ||
-    abaAtiva === "exercicios";
+    abaAtiva === "exercicios" ||
+    abaAtiva === "mapa";
   const abaExibida: Aba = ehAbaGeracao && !temTexto ? "importar" : abaAtiva;
 
   /**
@@ -173,10 +183,23 @@ export function App(): React.JSX.Element {
     );
   }
 
+  async function salvarMapaMental(mapa: MapaMentalArtefato): Promise<void> {
+    if (documento === null) return;
+    await persistirArtefato("mapa mental", () =>
+      getApi().salvarMapaMental(documento.id, {
+        ...mapa,
+        documentoId: documento.id,
+      }),
+    );
+  }
+
   // Abas de geração ficam desabilitadas enquanto não há texto importado.
   function abaDesabilitada(id: Aba): boolean {
     const ehGeracao =
-      id === "resumo" || id === "flashcards" || id === "exercicios";
+      id === "resumo" ||
+      id === "flashcards" ||
+      id === "exercicios" ||
+      id === "mapa";
     return ehGeracao && !temTexto;
   }
 
@@ -278,6 +301,14 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             exerciciosSalvos={documento?.exercicios ?? null}
             onGerado={temTexto ? (e) => void salvarExercicios(e) : undefined}
+          />
+        )}
+        {abaExibida === "mapa" && (
+          <MapaMental
+            key={`mapa-${chaveDocumento}`}
+            arquivo={arquivo}
+            mapaMentalSalvo={documento?.mapaMental ?? null}
+            onGerado={temTexto ? (m) => void salvarMapaMental(m) : undefined}
           />
         )}
         {abaExibida === "historico" && (

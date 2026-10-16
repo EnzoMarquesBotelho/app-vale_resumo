@@ -23,6 +23,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarFlashcards, texto, quantidade),
   gerarExercicios: (texto, modo, quantidade) =>
     ipcRenderer.invoke(IPC_CHANNELS.gerarExercicios, texto, modo, quantidade),
+  gerarMapaMental: (texto) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarMapaMental, texto),
   criarDocumento: (nome, formato, texto, cadernoNome, caminhoOrigem) =>
     ipcRenderer.invoke(
       IPC_CHANNELS.criarDocumento,
@@ -38,6 +40,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.salvarFlashcards, id, flashcards),
   salvarExercicios: (id, exercicios) =>
     ipcRenderer.invoke(IPC_CHANNELS.salvarExercicios, id, exercicios),
+  salvarMapaMental: (id, mapa) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarMapaMental, id, mapa),
   listarDocumentos: (cadernoId) =>
     ipcRenderer.invoke(IPC_CHANNELS.listarDocumentos, cadernoId),
   listarCadernos: () => ipcRenderer.invoke(IPC_CHANNELS.listarCadernos),

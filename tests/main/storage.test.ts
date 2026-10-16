@@ -7,6 +7,7 @@ import type {
   Exercicio,
   Flashcard,
   FormatoArquivo,
+  MapaMental,
   Resumo,
 } from "@shared/types";
 
@@ -27,6 +28,7 @@ import {
   salvarDocumento,
   salvarExercicios,
   salvarFlashcards,
+  salvarMapaMental,
   salvarResumo,
 } from "../../src/main/services/storage.js";
 import type { NovoDocumento } from "../../src/main/services/storage.js";
@@ -102,6 +104,19 @@ const exerciciosExemplo: Exercicio[] = [
   { enunciado: "Explique X.", resposta: "X é...", modo: "teorica" },
   { enunciado: "Calcule Y.", resposta: "Y = ...", modo: "teorica" },
 ];
+
+const mapaMentalExemplo: MapaMental = {
+  documentoId: "",
+  raiz: {
+    id: "n0",
+    rotulo: "Tema central",
+    filhos: [
+      { id: "n1", rotulo: "Ramo A", filhos: [] },
+      { id: "n2", rotulo: "Ramo B", filhos: [] },
+    ],
+  },
+  geradoEm: new Date().toISOString(),
+};
 
 describe("storage: criar e carregar documento", () => {
   it("cria um documento e o carrega de volta igual (round-trip)", async () => {
@@ -211,6 +226,26 @@ describe("storage: salvar artefatos por documento (round-trip)", () => {
     ).rejects.toBeInstanceOf(DocumentoNaoEncontradoError);
   });
 
+  it("salvarMapaMental persiste o mapa e carrega de volta igual (round-trip)", async () => {
+    const criado = await criarDocumento(
+      novoDoc("Mapa.md", "md", "texto base"),
+      baseDir,
+    );
+    await salvarMapaMental(criado.id, mapaMentalExemplo, baseDir);
+
+    const carregado = await carregarDocumento(criado.id, baseDir);
+    expect(carregado.mapaMental).toEqual(mapaMentalExemplo);
+    // Preserva os outros campos e não cria artefatos fantasmas.
+    expect(carregado.texto).toBe("texto base");
+    expect(carregado.resumo).toBeUndefined();
+  });
+
+  it("salvarMapaMental lança para um documento inexistente", async () => {
+    await expect(
+      salvarMapaMental("nao-existe", mapaMentalExemplo, baseDir),
+    ).rejects.toBeInstanceOf(DocumentoNaoEncontradoError);
+  });
+
   it("atualizadoEm muda ao salvar um artefato", async () => {
     const criado = await criarDocumento(novoDoc("a.txt", "txt", "a"), baseDir);
     // Garante uma marca de tempo diferente da criação.
@@ -241,7 +276,26 @@ describe("storage: listar documentos", () => {
       temResumo: true,
       temFlashcards: false,
       temExercicios: false,
+      temMapaMental: false,
     });
+  });
+
+  it("reporta temMapaMental conforme o mapa estiver salvo ou ausente", async () => {
+    const comMapa = await criarDocumento(
+      novoDoc("com-mapa.txt", "txt", "x"),
+      baseDir,
+    );
+    await salvarMapaMental(comMapa.id, mapaMentalExemplo, baseDir);
+    const semMapa = await criarDocumento(
+      novoDoc("sem-mapa.txt", "txt", "y"),
+      baseDir,
+    );
+
+    const lista = await listarDocumentos(undefined, baseDir);
+    const itemCom = lista.find((d) => d.id === comMapa.id);
+    const itemSem = lista.find((d) => d.id === semMapa.id);
+    expect(itemCom?.temMapaMental).toBe(true);
+    expect(itemSem?.temMapaMental).toBe(false);
   });
 
   it("ordena do mais recente para o mais antigo (atualizadoEm desc)", async () => {

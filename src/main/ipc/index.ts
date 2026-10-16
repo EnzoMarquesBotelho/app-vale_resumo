@@ -8,8 +8,10 @@ import type {
   Exercicio,
   Flashcard,
   FormatoArquivo,
+  MapaMental,
   ModoConteudo,
   ModoResumo,
+  NoMapaMental,
   OllamaStatus,
   Resumo,
   ResumoCaderno,
@@ -28,6 +30,11 @@ import {
 } from "../services/ollama.js";
 import { SemTextoParaResumirError, gerarResumo } from "../services/resumo.js";
 import {
+  MapaMentalInvalidoError,
+  SemTextoParaMapaMentalError,
+  gerarMapaMental,
+} from "../services/mapa.js";
+import {
   ExerciciosInvalidosError,
   FlashcardsInvalidosError,
   SemTextoParaExerciciosError,
@@ -44,6 +51,7 @@ import {
   removerDocumento,
   salvarExercicios,
   salvarFlashcards,
+  salvarMapaMental,
   salvarResumo,
 } from "../services/storage.js";
 
@@ -110,6 +118,23 @@ function mensagemAmigavelExercicios(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar os exercícios. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração do mapa mental em mensagens amigáveis.
+ * Como nas demais, o texto vai direto para a UI.
+ */
+function mensagemAmigavelMapaMental(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof SemTextoParaMapaMentalError) {
+    return erro.message;
+  }
+  if (erro instanceof MapaMentalInvalidoError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar o mapa mental. Tente novamente.";
 }
 
 /**
@@ -322,6 +347,23 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.gerarMapaMental,
+    async (_event, texto: string): Promise<NoMapaMental> => {
+      try {
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
+        const mapa = await gerarMapaMental({
+          texto,
+          gerar: (prompt) => generate({ prompt, model }),
+        });
+        return mapa.raiz;
+      } catch (erro) {
+        throw new Error(mensagemAmigavelMapaMental(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.criarDocumento,
     async (
       _event,
@@ -384,6 +426,21 @@ export function registerIpcHandlers(): void {
     ): Promise<DocumentoSalvo> => {
       try {
         return await salvarExercicios(id, exercicios);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarMapaMental,
+    async (
+      _event,
+      id: string,
+      mapa: MapaMental,
+    ): Promise<DocumentoSalvo> => {
+      try {
+        return await salvarMapaMental(id, mapa);
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));
       }

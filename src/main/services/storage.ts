@@ -28,6 +28,7 @@ import type {
   Exercicio,
   Flashcard,
   FormatoArquivo,
+  MapaMental,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
@@ -267,6 +268,7 @@ export async function listarDocumentos(
       temExercicios:
         documento.exercicios !== undefined &&
         documento.exercicios.length > 0,
+      temMapaMental: documento.mapaMental !== undefined,
     });
   }
 
@@ -399,6 +401,20 @@ export async function salvarExercicios(
 ): Promise<DocumentoSalvo> {
   const documento = await carregarDocumento(id, baseDir);
   return salvarDocumento({ ...documento, exercicios }, baseDir);
+}
+
+/**
+ * Salva o mapa mental gerado em um documento existente e devolve o registro
+ * atualizado.
+ * @throws {DocumentoNaoEncontradoError} se o documento não existir.
+ */
+export async function salvarMapaMental(
+  id: string,
+  mapaMental: MapaMental,
+  baseDir?: string,
+): Promise<DocumentoSalvo> {
+  const documento = await carregarDocumento(id, baseDir);
+  return salvarDocumento({ ...documento, mapaMental }, baseDir);
 }
 
 /**

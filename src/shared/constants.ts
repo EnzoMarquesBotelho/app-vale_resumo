@@ -28,3 +28,15 @@ export const avisoSemTextoExtraivel = "sem texto extraível";
  * divididos em pedaços e resumidos em etapas (map→reduce).
  */
 export const tamanhoMaximoChunkCaracteres = 12000;
+
+/** Profundidade máxima da árvore do mapa mental (raiz = nível 1). */
+export const MAPA_PROFUNDIDADE_MAXIMA = 4;
+/** Número máximo de nós no mapa inteiro (defesa contra respostas gigantes). */
+export const MAPA_MAX_NOS = 200;
+/**
+ * Comprimento máximo do rótulo de um nó (caracteres); truncado com reticência
+ * na fronteira de palavra ao validar (ver `mapa.ts`).
+ */
+export const MAPA_ROTULO_MAX = 120;
+/** Máximo de filhos diretos por nó (poda defensiva de leques enormes). */
+export const MAPA_MAX_FILHOS_POR_NO = 12;
