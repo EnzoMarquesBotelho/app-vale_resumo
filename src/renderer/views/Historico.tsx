@@ -50,6 +50,7 @@ function etiquetas(resumo: ResumoDocumentoSalvo): string {
   if (resumo.temFlashcards) partes.push("Flashcards");
   if (resumo.temExercicios) partes.push("Exercícios");
   if (resumo.temMapaMental) partes.push("Mapa mental");
+  if (resumo.temQuiz) partes.push("Quiz");
   return partes.length > 0 ? partes.join(" · ") : "Sem artefatos ainda";
 }
 

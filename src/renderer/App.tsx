@@ -6,6 +6,7 @@ import type {
   Exercicio,
   Flashcard,
   MapaMental as MapaMentalArtefato,
+  Quiz as QuizArtefato,
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
@@ -15,6 +16,7 @@ import { Resumo } from "./views/Resumo";
 import { Flashcards } from "./views/Flashcards";
 import { Exercicios } from "./views/Exercicios";
 import { MapaMental } from "./views/MapaMental";
+import { Quiz } from "./views/Quiz";
 import { Agenda } from "./views/Agenda";
 import { Historico } from "./views/Historico";
 
@@ -25,6 +27,7 @@ type Aba =
   | "flashcards"
   | "exercicios"
   | "mapa"
+  | "quiz"
   | "agenda"
   | "historico";
 
@@ -35,6 +38,7 @@ const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
   { id: "flashcards", rotulo: "Flashcards", icone: "🃏" },
   { id: "exercicios", rotulo: "Exercícios", icone: "✏️" },
   { id: "mapa", rotulo: "Mapa mental", icone: "🗺️" },
+  { id: "quiz", rotulo: "Quiz", icone: "❓" },
   { id: "agenda", rotulo: "Agenda", icone: "📅" },
   { id: "historico", rotulo: "Histórico", icone: "🗂️" },
 ];
@@ -135,7 +139,8 @@ export function App(): React.JSX.Element {
     abaAtiva === "resumo" ||
     abaAtiva === "flashcards" ||
     abaAtiva === "exercicios" ||
-    abaAtiva === "mapa";
+    abaAtiva === "mapa" ||
+    abaAtiva === "quiz";
   const abaExibida: Aba = ehAbaGeracao && !temTexto ? "importar" : abaAtiva;
 
   /**
@@ -196,13 +201,24 @@ export function App(): React.JSX.Element {
     );
   }
 
+  async function salvarQuiz(quiz: QuizArtefato): Promise<void> {
+    if (documento === null) return;
+    await persistirArtefato("quiz", () =>
+      getApi().salvarQuiz(documento.id, {
+        ...quiz,
+        documentoId: documento.id,
+      }),
+    );
+  }
+
   // Abas de geração ficam desabilitadas enquanto não há texto importado.
   function abaDesabilitada(id: Aba): boolean {
     const ehGeracao =
       id === "resumo" ||
       id === "flashcards" ||
       id === "exercicios" ||
-      id === "mapa";
+      id === "mapa" ||
+      id === "quiz";
     return ehGeracao && !temTexto;
   }
 
@@ -313,6 +329,14 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             mapaMentalSalvo={documento?.mapaMental ?? null}
             onGerado={temTexto ? (m) => void salvarMapaMental(m) : undefined}
+          />
+        )}
+        {abaExibida === "quiz" && (
+          <Quiz
+            key={`quiz-${chaveDocumento}`}
+            arquivo={arquivo}
+            quizSalvo={documento?.quiz ?? null}
+            onGerado={temTexto ? (q) => void salvarQuiz(q) : undefined}
           />
         )}
         {abaExibida === "agenda" && <Agenda />}
