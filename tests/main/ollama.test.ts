@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultModel, ollamaBaseUrl } from "@shared/constants";
 import {
+  GeracaoFalhouError,
   OllamaIndisponivelError,
   generate,
   isOllamaRunning,
@@ -145,13 +146,58 @@ describe("generate", () => {
     expect(Object.keys(corpo)).not.toContain("format");
   });
 
-  it("lança OllamaIndisponivelError quando o fetch rejeita (offline)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+  it("passa um signal de AbortController ao fetch (timeout explícito)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respostaFake({ ok: true, json: { response: "ok" } }),
     );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generate({ prompt: "x" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeDefined();
+  });
+
+  it("lança OllamaIndisponivelError na recusa de conexão (cause.code ECONNREFUSED)", async () => {
+    const erro = Object.assign(new TypeError("fetch failed"), {
+      cause: { code: "ECONNREFUSED" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(erro));
     await expect(generate({ prompt: "x" })).rejects.toBeInstanceOf(
       OllamaIndisponivelError,
+    );
+  });
+
+  it("lança OllamaIndisponivelError na recusa de conexão (code direto)", async () => {
+    const erro = Object.assign(new Error("recusado"), { code: "ECONNREFUSED" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(erro));
+    await expect(generate({ prompt: "x" })).rejects.toBeInstanceOf(
+      OllamaIndisponivelError,
+    );
+  });
+
+  it("lança GeracaoFalhouError quando a conexão cai no meio (ECONNRESET)", async () => {
+    const erro = Object.assign(new TypeError("socket hang up"), {
+      cause: { code: "ECONNRESET" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(erro));
+    await expect(generate({ prompt: "x" })).rejects.toBeInstanceOf(
+      GeracaoFalhouError,
+    );
+  });
+
+  it("lança GeracaoFalhouError no timeout/abort (AbortError)", async () => {
+    const erro = Object.assign(new Error("aborted"), { name: "AbortError" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(erro));
+    await expect(generate({ prompt: "x" })).rejects.toBeInstanceOf(
+      GeracaoFalhouError,
+    );
+  });
+
+  it("lança GeracaoFalhouError para uma falha de fetch não reconhecida", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("falha qualquer")));
+    await expect(generate({ prompt: "x" })).rejects.toBeInstanceOf(
+      GeracaoFalhouError,
     );
   });
 

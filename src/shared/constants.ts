@@ -8,6 +8,16 @@ export const ollamaBaseUrl = "http://localhost:11434";
 /** Modelo padrão usado para as gerações (configurável nas opções). */
 export const defaultModel = "llama3.1:8b";
 
+/**
+ * Tempo máximo total (em ms) de uma geração sem streaming no Ollama local.
+ * O `fetch` nativo do processo main não impõe um timeout total, então uma
+ * geração travada ficaria pendurada indefinidamente. Usamos um AbortController
+ * com este teto generoso (gerações locais longas são normais). Atingir este
+ * tempo é mapeado como "a geração falhou/demorou demais" — NÃO como "Ollama
+ * offline", porque o Ollama estava acessível e apenas não concluiu a tempo.
+ */
+export const OLLAMA_GENERATE_TIMEOUT_MS = 300_000;
+
 /** Extensões de arquivo suportadas para importação no MVP (sem o ponto). */
 export const extensoesSuportadas = ["txt", "md", "pdf"] as const;
 

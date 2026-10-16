@@ -33,6 +33,9 @@ vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
   },
+  GeracaoFalhouError: class GeracaoFalhouError extends Error {
+    readonly code = "GERACAO_FALHOU" as const;
+  },
   generate: (params: {
     prompt: string;
     model?: string;

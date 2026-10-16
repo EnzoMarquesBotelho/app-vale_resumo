@@ -94,6 +94,16 @@ vi.mock("../../src/main/services/ollama.js", () => ({
       this.name = "OllamaIndisponivelError";
     }
   },
+  GeracaoFalhouError: class GeracaoFalhouError extends Error {
+    readonly code = "GERACAO_FALHOU" as const;
+    constructor() {
+      super(
+        "A geração falhou ou demorou demais. Tente novamente, reduza a " +
+          "quantidade, ou use um modelo mais leve.",
+      );
+      this.name = "GeracaoFalhouError";
+    }
+  },
   generate: (...args: unknown[]) => generate(...args),
   isOllamaRunning: vi.fn(async () => true),
   listModels: (...args: unknown[]) => listModels(...args),

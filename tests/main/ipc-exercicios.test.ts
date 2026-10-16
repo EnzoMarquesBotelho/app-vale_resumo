@@ -31,6 +31,20 @@ const generate =
 vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
+    constructor() {
+      super("O Ollama não está rodando. Inicie o Ollama e tente novamente.");
+      this.name = "OllamaIndisponivelError";
+    }
+  },
+  GeracaoFalhouError: class GeracaoFalhouError extends Error {
+    readonly code = "GERACAO_FALHOU" as const;
+    constructor() {
+      super(
+        "A geração falhou ou demorou demais. Tente novamente, reduza a " +
+          "quantidade, ou use um modelo mais leve.",
+      );
+      this.name = "GeracaoFalhouError";
+    }
   },
   generate: (params: {
     prompt: string;
@@ -44,6 +58,10 @@ vi.mock("../../src/main/services/ollama.js", () => ({
 import { IPC_CHANNELS } from "@shared/ipc";
 import type { Exercicio } from "@shared/types";
 import { registerIpcHandlers } from "../../src/main/ipc/index.js";
+import {
+  GeracaoFalhouError,
+  OllamaIndisponivelError,
+} from "../../src/main/services/ollama.js";
 
 const evento = {} as IpcMainInvokeEvent;
 
@@ -120,5 +138,21 @@ describe("IPC: gerar exercícios", () => {
     await expect(
       chamar(IPC_CHANNELS.gerarExercicios, "texto base", "mista", 10),
     ).rejects.toThrow(/Não foi possível gerar os exercícios/);
+  });
+
+  it("mapeia GeracaoFalhouError para a mensagem honesta (não 'offline')", async () => {
+    generate.mockRejectedValue(new GeracaoFalhouError());
+
+    await expect(
+      chamar(IPC_CHANNELS.gerarExercicios, "texto base", "mista", 100),
+    ).rejects.toThrow(/demorou demais|reduza a quantidade/);
+  });
+
+  it("mapeia OllamaIndisponivelError para a mensagem de offline", async () => {
+    generate.mockRejectedValue(new OllamaIndisponivelError());
+
+    await expect(
+      chamar(IPC_CHANNELS.gerarExercicios, "texto base", "mista", 10),
+    ).rejects.toThrow(/Ollama não está rodando/);
   });
 });

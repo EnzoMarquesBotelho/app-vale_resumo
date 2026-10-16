@@ -34,6 +34,7 @@ import {
 } from "../services/files.js";
 import { importarPasta } from "../services/pasta.js";
 import {
+  GeracaoFalhouError,
   OllamaIndisponivelError,
   generate,
   isOllamaRunning,
@@ -121,6 +122,9 @@ function mensagemAmigavelResumo(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
     return erro.message;
   }
+  if (erro instanceof GeracaoFalhouError) {
+    return erro.message;
+  }
   if (erro instanceof SemTextoParaResumirError) {
     return erro.message;
   }
@@ -133,6 +137,9 @@ function mensagemAmigavelResumo(erro: unknown): string {
  */
 function mensagemAmigavelFlashcards(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof GeracaoFalhouError) {
     return erro.message;
   }
   if (erro instanceof SemTextoParaFlashcardsError) {
@@ -152,6 +159,9 @@ function mensagemAmigavelExercicios(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
     return erro.message;
   }
+  if (erro instanceof GeracaoFalhouError) {
+    return erro.message;
+  }
   if (erro instanceof SemTextoParaExerciciosError) {
     return erro.message;
   }
@@ -169,6 +179,9 @@ function mensagemAmigavelMapaMental(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
     return erro.message;
   }
+  if (erro instanceof GeracaoFalhouError) {
+    return erro.message;
+  }
   if (erro instanceof SemTextoParaMapaMentalError) {
     return erro.message;
   }
@@ -184,6 +197,9 @@ function mensagemAmigavelMapaMental(erro: unknown): string {
  */
 function mensagemAmigavelQuiz(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof GeracaoFalhouError) {
     return erro.message;
   }
   if (erro instanceof SemTextoParaQuizError) {
@@ -229,6 +245,9 @@ function mensagemAmigavelProva(erro: unknown): string {
  */
 function mensagemAmigavelDica(erro: unknown): string {
   if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof GeracaoFalhouError) {
     return erro.message;
   }
   if (erro instanceof ProvaNaoEncontradaError) {
