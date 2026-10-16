@@ -29,6 +29,7 @@ import type {
   Flashcard,
   FormatoArquivo,
   MapaMental,
+  Quiz,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
@@ -416,6 +417,20 @@ export async function salvarMapaMental(
 ): Promise<DocumentoSalvo> {
   const documento = await carregarDocumento(id, baseDir);
   return salvarDocumento({ ...documento, mapaMental }, baseDir);
+}
+
+/**
+ * Salva o quiz gerado em um documento existente e devolve o registro
+ * atualizado.
+ * @throws {DocumentoNaoEncontradoError} se o documento não existir.
+ */
+export async function salvarQuiz(
+  id: string,
+  quiz: Quiz,
+  baseDir?: string,
+): Promise<DocumentoSalvo> {
+  const documento = await carregarDocumento(id, baseDir);
+  return salvarDocumento({ ...documento, quiz }, baseDir);
 }
 
 /**

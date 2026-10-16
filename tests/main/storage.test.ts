@@ -8,6 +8,7 @@ import type {
   Flashcard,
   FormatoArquivo,
   MapaMental,
+  Quiz,
   Resumo,
 } from "@shared/types";
 
@@ -31,6 +32,7 @@ import {
   salvarExercicios,
   salvarFlashcards,
   salvarMapaMental,
+  salvarQuiz,
   salvarResumo,
 } from "../../src/main/services/storage.js";
 import type { NovoDocumento } from "../../src/main/services/storage.js";
@@ -117,6 +119,23 @@ const mapaMentalExemplo: MapaMental = {
       { id: "n2", rotulo: "Ramo B", filhos: [] },
     ],
   },
+  geradoEm: new Date().toISOString(),
+};
+
+const quizExemplo: Quiz = {
+  documentoId: "",
+  modo: "misto",
+  perguntas: [
+    {
+      tipo: "multipla",
+      enunciado: "Quanto é 2+2?",
+      alternativas: [
+        { texto: "3", correta: false },
+        { texto: "4", correta: true },
+      ],
+    },
+    { tipo: "aberta", enunciado: "Explique X.", gabarito: "X é Y." },
+  ],
   geradoEm: new Date().toISOString(),
 };
 
@@ -248,6 +267,26 @@ describe("storage: salvar artefatos por documento (round-trip)", () => {
     ).rejects.toBeInstanceOf(DocumentoNaoEncontradoError);
   });
 
+  it("salvarQuiz persiste o quiz e carrega de volta igual (round-trip)", async () => {
+    const criado = await criarDocumento(
+      novoDoc("Quiz.md", "md", "texto base"),
+      baseDir,
+    );
+    await salvarQuiz(criado.id, quizExemplo, baseDir);
+
+    const carregado = await carregarDocumento(criado.id, baseDir);
+    expect(carregado.quiz).toEqual(quizExemplo);
+    // Preserva os outros campos e não cria artefatos fantasmas.
+    expect(carregado.texto).toBe("texto base");
+    expect(carregado.resumo).toBeUndefined();
+  });
+
+  it("salvarQuiz lança para um documento inexistente", async () => {
+    await expect(
+      salvarQuiz("nao-existe", quizExemplo, baseDir),
+    ).rejects.toBeInstanceOf(DocumentoNaoEncontradoError);
+  });
+
   it("atualizadoEm muda ao salvar um artefato", async () => {
     const criado = await criarDocumento(novoDoc("a.txt", "txt", "a"), baseDir);
     // Garante uma marca de tempo diferente da criação.
@@ -298,6 +337,24 @@ describe("storage: listar documentos", () => {
     const itemSem = lista.find((d) => d.id === semMapa.id);
     expect(itemCom?.temMapaMental).toBe(true);
     expect(itemSem?.temMapaMental).toBe(false);
+  });
+
+  it("reporta temQuiz conforme o quiz estiver salvo ou ausente", async () => {
+    const comQuiz = await criarDocumento(
+      novoDoc("com-quiz.txt", "txt", "x"),
+      baseDir,
+    );
+    await salvarQuiz(comQuiz.id, quizExemplo, baseDir);
+    const semQuiz = await criarDocumento(
+      novoDoc("sem-quiz.txt", "txt", "y"),
+      baseDir,
+    );
+
+    const lista = await listarDocumentos(undefined, baseDir);
+    const itemCom = lista.find((d) => d.id === comQuiz.id);
+    const itemSem = lista.find((d) => d.id === semQuiz.id);
+    expect(itemCom?.temQuiz).toBe(true);
+    expect(itemSem?.temQuiz).toBe(false);
   });
 
   it("ordena do mais recente para o mais antigo (atualizadoEm desc)", async () => {

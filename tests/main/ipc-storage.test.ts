@@ -31,6 +31,7 @@ const salvarResumo = vi.fn();
 const salvarFlashcards = vi.fn();
 const salvarExercicios = vi.fn();
 const salvarMapaMental = vi.fn();
+const salvarQuiz = vi.fn();
 const removerDocumento = vi.fn();
 
 vi.mock("../../src/main/services/storage.js", () => ({
@@ -48,6 +49,7 @@ vi.mock("../../src/main/services/storage.js", () => ({
   salvarFlashcards: (...args: unknown[]) => salvarFlashcards(...args),
   salvarExercicios: (...args: unknown[]) => salvarExercicios(...args),
   salvarMapaMental: (...args: unknown[]) => salvarMapaMental(...args),
+  salvarQuiz: (...args: unknown[]) => salvarQuiz(...args),
   removerDocumento: (...args: unknown[]) => removerDocumento(...args),
 }));
 
@@ -84,6 +86,7 @@ describe("IPC: persistência", () => {
     salvarFlashcards.mockReset();
     salvarExercicios.mockReset();
     salvarMapaMental.mockReset();
+    salvarQuiz.mockReset();
     removerDocumento.mockReset();
     registerIpcHandlers();
   });
@@ -97,6 +100,7 @@ describe("IPC: persistência", () => {
     expect(registered.has(IPC_CHANNELS.salvarFlashcards)).toBe(true);
     expect(registered.has(IPC_CHANNELS.salvarExercicios)).toBe(true);
     expect(registered.has(IPC_CHANNELS.salvarMapaMental)).toBe(true);
+    expect(registered.has(IPC_CHANNELS.salvarQuiz)).toBe(true);
     expect(registered.has(IPC_CHANNELS.removerDocumento)).toBe(true);
   });
 
@@ -116,6 +120,26 @@ describe("IPC: persistência", () => {
     salvarMapaMental.mockRejectedValue(new Error("disco cheio"));
     await expect(
       chamar(IPC_CHANNELS.salvarMapaMental, "abc", {}),
+    ).rejects.toThrow(/Não foi possível salvar ou carregar os dados/);
+  });
+
+  it("salvarQuiz repassa id e quiz ao serviço e devolve o documento", async () => {
+    salvarQuiz.mockResolvedValue(documento);
+    const quiz = {
+      documentoId: "abc",
+      modo: "misto",
+      perguntas: [{ tipo: "aberta", enunciado: "E", gabarito: "G" }],
+      geradoEm: "2026-01-01T00:00:00.000Z",
+    };
+    const resultado = await chamar(IPC_CHANNELS.salvarQuiz, "abc", quiz);
+    expect(resultado).toEqual(documento);
+    expect(salvarQuiz).toHaveBeenCalledWith("abc", quiz);
+  });
+
+  it("converte falha ao salvar o quiz em mensagem amigável", async () => {
+    salvarQuiz.mockRejectedValue(new Error("disco cheio"));
+    await expect(
+      chamar(IPC_CHANNELS.salvarQuiz, "abc", {}),
     ).rejects.toThrow(/Não foi possível salvar ou carregar os dados/);
   });
 

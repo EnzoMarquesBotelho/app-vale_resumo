@@ -14,10 +14,13 @@ import type {
   FormatoArquivo,
   MapaMental,
   ModoConteudo,
+  ModoQuiz,
   ModoResumo,
   NoMapaMental,
   OllamaStatus,
+  PerguntaQuiz,
   Prova,
+  Quiz,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
@@ -47,6 +50,8 @@ export const IPC_CHANNELS = {
   gerarExercicios: "exercicios:gerar",
   /** Gera o mapa mental (árvore hierárquica) a partir de um texto. */
   gerarMapaMental: "mapamental:gerar",
+  /** Gera um quiz (múltipla/aberta/misto, 5–100) a partir de um texto. */
+  gerarQuiz: "quiz:gerar",
   /** Cria e salva um novo documento (sem artefatos) a partir de um arquivo. */
   criarDocumento: "documento:criar",
   /** Salva o resumo gerado em um documento existente. */
@@ -57,6 +62,8 @@ export const IPC_CHANNELS = {
   salvarExercicios: "documento:salvar-exercicios",
   /** Salva o mapa mental gerado em um documento existente. */
   salvarMapaMental: "documento:salvar-mapa-mental",
+  /** Salva o quiz gerado em um documento existente. */
+  salvarQuiz: "documento:salvar-quiz",
   /** Lista os documentos salvos (resumos leves) para o Histórico. */
   listarDocumentos: "documento:listar",
   /** Lista os cadernos agregados (derivados dos documentos) para o Histórico. */
@@ -158,6 +165,19 @@ export interface AppApi {
    */
   gerarMapaMental: (texto: string) => Promise<NoMapaMental>;
   /**
+   * Gera um quiz (perguntas de múltipla escolha e/ou abertas) a partir do
+   * `texto`, no `modo` escolhido (multipla/aberta/misto). A `quantidade` é
+   * ajustada aos limites do MVP (5–100) no processo main. Parsing tolerante com
+   * uma re-tentativa corretiva, como flashcards/exercícios.
+   * @returns a lista de perguntas do quiz gerado (sempre não-nula; falhas são
+   *   rejeições do IPC com mensagem amigável).
+   */
+  gerarQuiz: (
+    texto: string,
+    modo: ModoQuiz,
+    quantidade: number,
+  ) => Promise<PerguntaQuiz[]>;
+  /**
    * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
    * importado, para que os artefatos gerados possam ser anexados e persistidos.
    * O `cadernoNome` é a grafia escolhida/editada na importação; o main deriva
@@ -193,6 +213,8 @@ export interface AppApi {
   ) => Promise<DocumentoSalvo>;
   /** Salva o mapa mental gerado no documento `id` e devolve o registro. */
   salvarMapaMental: (id: string, mapa: MapaMental) => Promise<DocumentoSalvo>;
+  /** Salva o quiz gerado no documento `id` e devolve o registro. */
+  salvarQuiz: (id: string, quiz: Quiz) => Promise<DocumentoSalvo>;
   /**
    * Lista os documentos salvos como resumos leves, do mais recente para o mais
    * antigo. Usado pela tela de Histórico. Sem `cadernoId`, devolve todos; com

@@ -13,10 +13,13 @@ import type {
   FormatoArquivo,
   MapaMental,
   ModoConteudo,
+  ModoQuiz,
   ModoResumo,
   NoMapaMental,
   OllamaStatus,
+  PerguntaQuiz,
   Prova,
+  Quiz,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
@@ -43,6 +46,11 @@ import {
   gerarMapaMental,
 } from "../services/mapa.js";
 import {
+  QuizInvalidoError,
+  SemTextoParaQuizError,
+  gerarQuiz,
+} from "../services/quiz.js";
+import {
   ExerciciosInvalidosError,
   FlashcardsInvalidosError,
   SemTextoParaExerciciosError,
@@ -60,6 +68,7 @@ import {
   salvarExercicios,
   salvarFlashcards,
   salvarMapaMental,
+  salvarQuiz,
   salvarResumo,
 } from "../services/storage.js";
 import {
@@ -167,6 +176,23 @@ function mensagemAmigavelMapaMental(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar o mapa mental. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração do quiz em mensagens amigáveis.
+ * Como nas demais, o texto vai direto para a UI.
+ */
+function mensagemAmigavelQuiz(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof SemTextoParaQuizError) {
+    return erro.message;
+  }
+  if (erro instanceof QuizInvalidoError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar o quiz. Tente novamente.";
 }
 
 /**
@@ -487,6 +513,30 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.gerarQuiz,
+    async (
+      _event,
+      texto: string,
+      modo: ModoQuiz,
+      quantidade: number,
+    ): Promise<PerguntaQuiz[]> => {
+      try {
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
+        const quiz = await gerarQuiz({
+          texto,
+          modo,
+          quantidade,
+          gerar: (prompt, format) => generate({ prompt, model, format }),
+        });
+        return quiz.perguntas;
+      } catch (erro) {
+        throw new Error(mensagemAmigavelQuiz(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.criarDocumento,
     async (
       _event,
@@ -564,6 +614,17 @@ export function registerIpcHandlers(): void {
     ): Promise<DocumentoSalvo> => {
       try {
         return await salvarMapaMental(id, mapa);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarQuiz,
+    async (_event, id: string, quiz: Quiz): Promise<DocumentoSalvo> => {
+      try {
+        return await salvarQuiz(id, quiz);
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));
       }
