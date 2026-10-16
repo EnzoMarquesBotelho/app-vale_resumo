@@ -234,3 +234,144 @@ export interface OllamaStatus {
   /** Modelo atualmente selecionado para as gerações. */
   modeloSelecionado: string;
 }
+
+/** Modo de distribuição de uma prova abrangente entre os cadernos. */
+export type ModoDistribuicao = "rotacao" | "intercalado";
+
+/**
+ * Vínculo de uma prova: ligada a UM caderno, ou abrangente (cobre todos os
+ * cadernos) com um modo de distribuição. É uma união discriminada por `tipo`
+ * para que o código trate os dois casos sem campos ambíguos/opcionais soltos.
+ */
+export type VinculoProva =
+  | {
+      /** Prova ligada a um único caderno. */
+      tipo: "caderno";
+      /** Id normalizado do caderno-alvo (como em `Documento.cadernoId`). */
+      cadernoId: string;
+      /** Nome de exibição do caderno (grafia no momento da criação). */
+      cadernoNome: string;
+    }
+  | {
+      /** Prova abrangente (ex.: ENEM/ENADE): cobre todos os cadernos. */
+      tipo: "abrangente";
+      /** Como distribuir os cadernos pelos dias de revisão. */
+      modoDistribuicao: ModoDistribuicao;
+    };
+
+/**
+ * Uma sessão de revisão agendada para uma prova, em um dia específico.
+ * `data` é a data-calendário local, formatada como "YYYY-MM-DD" — uma data
+ * pura, SEM horário nem fuso, para a aritmética de dias ser estável e
+ * testável. `manual` registra se a sessão foi sugerida pelo algoritmo ou
+ * criada/alterada manualmente, para a regra de recomputar-vs-preservar.
+ */
+export interface SessaoRevisao {
+  /** Id único da sessão dentro de uma prova (ex.: "s0", "s1", ...). */
+  id: string;
+  /** Dia da revisão como data-calendário local "YYYY-MM-DD". */
+  data: string;
+  /**
+   * Quantos dias antes da prova esta sessão cai (ex.: 7, 3, 1). Campo SEMPRE
+   * derivado das datas: `diferencaDias(prova.data, data)`. Para sugeridas,
+   * coincide com o intervalo que a gerou; para manuais em data arbitrária, é
+   * recalculado em `salvarSessoes` (nunca vem solto do renderer).
+   */
+  diasAntes: number;
+  /** `true` se o usuário criou/editou/moveu esta sessão (edição manual). */
+  manual: boolean;
+  /**
+   * `true` se o usuário marcou esta sessão como concluída. Opcional e
+   * puramente aditivo; ausente/`false` = não concluída.
+   */
+  concluida?: boolean;
+}
+
+/**
+ * Uma prova com data, vínculo (caderno único ou abrangente) e a agenda de
+ * revisão por repetição espaçada. As `sessoes` guardam tanto o que o algoritmo
+ * sugeriu quanto o que o usuário editou — nunca são recomputadas de modo a
+ * apagar silenciosamente edições manuais. `intervalos` são os "dias antes"
+ * usados ao gerar a agenda automática (default 7/3/1, configuráveis).
+ */
+export interface Prova {
+  /** Identificador único da prova (nome do arquivo JSON em disco). */
+  id: string;
+  /** Título da prova (texto em português, ex.: "P1 de Cálculo"). */
+  titulo: string;
+  /** Data da prova como data-calendário local "YYYY-MM-DD". */
+  data: string;
+  /** Vínculo: caderno único ou abrangente com modo de distribuição. */
+  vinculo: VinculoProva;
+  /** Intervalos de repetição espaçada ("dias antes"), ex.: [7, 3, 1]. */
+  intervalos: number[];
+  /** Sessões de revisão (sugeridas + edições manuais), ordenadas por data. */
+  sessoes: SessaoRevisao[];
+  /** Data de criação em ISO 8601 (timestamp completo). */
+  criadoEm: string;
+  /** Data da última atualização em ISO 8601 (timestamp completo). */
+  atualizadoEm: string;
+}
+
+/**
+ * Resumo de uma prova para a lista da tela de Agenda (contagem regressiva),
+ * sem carregar as sessões inteiras. `diasRestantes` e `estado` são calculados
+ * em relação ao "hoje" local; por isso vêm do handler, que injeta a data atual
+ * na lógica pura — a listagem crua do disco não os traz.
+ */
+export interface ResumoProva {
+  /** Id da prova. */
+  id: string;
+  /** Título da prova. */
+  titulo: string;
+  /** Data da prova "YYYY-MM-DD". */
+  data: string;
+  /** Dias restantes até a prova (0 = hoje; negativo = já passou). */
+  diasRestantes: number;
+  /** Classificação temporal para destaque/filtro na UI. */
+  estado: "hoje" | "amanha" | "futura" | "passada";
+  /** Tipo do vínculo, para a UI mostrar o rótulo certo sem carregar tudo. */
+  tipoVinculo: "caderno" | "abrangente";
+  /** Nome do caderno-alvo (só quando `tipoVinculo === "caderno"`). */
+  cadernoNome?: string;
+}
+
+/**
+ * Um caderno em foco na dica do dia, com o estado do seu material. A UI monta
+ * a frase a partir destes campos ("N documentos; tem resumo e flashcards").
+ * Derivado de `ResumoCaderno` + flags de artefatos agregadas.
+ */
+export interface CadernoEmFoco {
+  /** Id normalizado do caderno. */
+  cadernoId: string;
+  /** Nome de exibição do caderno. */
+  cadernoNome: string;
+  /** Quantos documentos o caderno tem (de `ResumoCaderno.totalDocumentos`). */
+  totalDocumentos: number;
+  /** `true` se ALGUM documento do caderno tem resumo salvo. */
+  temResumo: boolean;
+  /** `true` se ALGUM documento do caderno tem flashcards salvos. */
+  temFlashcards: boolean;
+}
+
+/**
+ * Dica mecânica do dia para uma prova: o que revisar hoje, derivada das datas,
+ * do vínculo e do modo de distribuição — SEM IA. `cadernosEmFoco` descreve o(s)
+ * alvo(s) de hoje COM o estado do material (contagem de documentos e artefatos);
+ * `mensagem` é a frase pronta em português para a UI.
+ */
+export interface DicaDoDia {
+  /** Id da prova a que a dica se refere. */
+  provaId: string;
+  /** Dias restantes até a prova (espelha `ResumoProva.diasRestantes`). */
+  diasRestantes: number;
+  /** `true` se existe uma sessão de revisão agendada para hoje. */
+  temRevisaoHoje: boolean;
+  /**
+   * Cadernos em foco hoje, com estado do material. Vazio quando não há revisão
+   * hoje ou quando a prova abrangente não tem cadernos ainda.
+   */
+  cadernosEmFoco: CadernoEmFoco[];
+  /** Frase pronta em português para exibir. */
+  mensagem: string;
+}

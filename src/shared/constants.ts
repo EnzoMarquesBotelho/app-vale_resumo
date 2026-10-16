@@ -50,3 +50,10 @@ export const MAPA_MAX_FILHOS_POR_NO = 12;
 export const PASTA_PROFUNDIDADE_MAXIMA = 10;
 /** Máximo de arquivos suportados aceitos em um único lote de importação. */
 export const PASTA_MAX_ARQUIVOS_LOTE = 500;
+
+/** Intervalos padrão de repetição espaçada: dias antes da prova. */
+export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;
+/** Teto defensivo de intervalos distintos aceitos por prova. */
+export const INTERVALOS_MAX = 10;
+/** Maior "dias antes" aceito (defesa contra valores absurdos). */
+export const DIAS_ANTES_MAX = 365;
