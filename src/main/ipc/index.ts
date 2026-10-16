@@ -2,8 +2,11 @@ import { dialog, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import { montarCaderno } from "@shared/notebooks";
+import { calcularDicaDoDia } from "@shared/agenda";
 import type {
   ArquivoImportado,
+  CadernoEmFoco,
+  DicaDoDia,
   DocumentoSalvo,
   Exercicio,
   Flashcard,
@@ -13,10 +16,13 @@ import type {
   ModoResumo,
   NoMapaMental,
   OllamaStatus,
+  Prova,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
+  ResumoProva,
   ResultadoImportacaoPasta,
+  SessaoRevisao,
 } from "@shared/types";
 import {
   ArquivoMuitoGrandeError,
@@ -56,6 +62,20 @@ import {
   salvarMapaMental,
   salvarResumo,
 } from "../services/storage.js";
+import {
+  DadosProvaInvalidosError,
+  ProvaNaoEncontradaError,
+  carregarProva,
+  criarProva,
+  editarProva,
+  hojeLocal,
+  listarProvas,
+  regerarAgenda,
+  removerProva,
+  salvarSessoes,
+} from "../services/provas.js";
+import type { MudancasProva, NovaProva } from "../services/provas.js";
+import { gerarDicaIa } from "../services/dica.js";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -158,6 +178,77 @@ function mensagemAmigavelPersistencia(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível salvar ou carregar os dados. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos das provas (persistência e dica) em mensagens
+ * amigáveis. Prova inexistente e dados inválidos devolvem a `message` tipada
+ * (frase pronta); o restante cai na genérica de persistência das provas.
+ */
+function mensagemAmigavelProva(erro: unknown): string {
+  if (erro instanceof ProvaNaoEncontradaError) {
+    return erro.message;
+  }
+  if (erro instanceof DadosProvaInvalidosError) {
+    return erro.message;
+  }
+  return "Não foi possível salvar ou carregar a prova. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da geração da dica de IA em mensagens amigáveis.
+ * Trata `OllamaIndisponivelError` e `ProvaNaoEncontradaError`/
+ * `DadosProvaInvalidosError` (devolve a `message` tipada); o restante cai na
+ * genérica da dica.
+ */
+function mensagemAmigavelDica(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof ProvaNaoEncontradaError) {
+    return erro.message;
+  }
+  if (erro instanceof DadosProvaInvalidosError) {
+    return erro.message;
+  }
+  return "Não foi possível gerar a dica da IA. Tente novamente.";
+}
+
+/**
+ * Monta `CadernoEmFoco[]` ordenado por `cadernoId` ascendente, agregando as
+ * flags de artefato (`temResumo`/`temFlashcards`) por caderno a partir de
+ * `listarDocumentos()` e o `totalDocumentos` de `listarCadernos()`. A ORDEM
+ * estável por `cadernoId` é essencial para a rotação da dica ser determinística
+ * (design §5.2/§6.3): `listarCadernos()` ordena por `atualizadoEm` desc, que
+ * NÃO serve à rotação; por isso reordenamos aqui, no dono da ordem.
+ */
+async function cadernosEmFocoDisponiveis(
+  baseDir?: string,
+): Promise<CadernoEmFoco[]> {
+  const cadernos = await listarCadernos(baseDir);
+  const docs = await listarDocumentos(undefined, baseDir);
+  const porCaderno = new Map<
+    string,
+    { temResumo: boolean; temFlashcards: boolean }
+  >();
+  for (const d of docs) {
+    const acc = porCaderno.get(d.cadernoId) ?? {
+      temResumo: false,
+      temFlashcards: false,
+    };
+    acc.temResumo = acc.temResumo || d.temResumo;
+    acc.temFlashcards = acc.temFlashcards || d.temFlashcards;
+    porCaderno.set(d.cadernoId, acc);
+  }
+  return cadernos
+    .map((c) => ({
+      cadernoId: c.cadernoId,
+      cadernoNome: c.cadernoNome,
+      totalDocumentos: c.totalDocumentos,
+      temResumo: porCaderno.get(c.cadernoId)?.temResumo ?? false,
+      temFlashcards: porCaderno.get(c.cadernoId)?.temFlashcards ?? false,
+    }))
+    .sort((a, b) => a.cadernoId.localeCompare(b.cadernoId));
 }
 
 /**
@@ -519,6 +610,129 @@ export function registerIpcHandlers(): void {
         await removerDocumento(id);
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.criarProva,
+    async (_event, dados: NovaProva): Promise<Prova> => {
+      try {
+        return await criarProva(dados, hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.listarProvas,
+    async (): Promise<ResumoProva[]> => {
+      try {
+        return await listarProvas(hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.carregarProva,
+    async (_event, id: string): Promise<Prova> => {
+      try {
+        return await carregarProva(id);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.editarProva,
+    async (_event, id: string, mudancas: MudancasProva): Promise<Prova> => {
+      try {
+        return await editarProva(id, mudancas, hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarSessoes,
+    async (
+      _event,
+      id: string,
+      sessoes: SessaoRevisao[],
+    ): Promise<Prova> => {
+      try {
+        return await salvarSessoes(id, sessoes, hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.regerarAgenda,
+    async (_event, id: string): Promise<Prova> => {
+      try {
+        return await regerarAgenda(id, hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.removerProva,
+    async (_event, id: string): Promise<void> => {
+      try {
+        await removerProva(id);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.dicaDoDia,
+    async (_event, id: string): Promise<DicaDoDia> => {
+      try {
+        const prova = await carregarProva(id);
+        const cadernosDisponiveis = await cadernosEmFocoDisponiveis();
+        return calcularDicaDoDia({
+          prova,
+          hoje: hojeLocal(),
+          cadernosDisponiveis,
+        });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.dicaDaIa,
+    async (_event, id: string): Promise<string> => {
+      try {
+        const prova = await carregarProva(id);
+        const cadernosDisponiveis = await cadernosEmFocoDisponiveis();
+        const dica = calcularDicaDoDia({
+          prova,
+          hoje: hojeLocal(),
+          cadernosDisponiveis,
+        });
+        // Resolve um modelo que exista agora (evita "model not found"); NUNCA
+        // manda o modelo cru.
+        const model = await modeloParaGeracao();
+        return await gerarDicaIa({
+          prova,
+          dica,
+          gerar: (prompt) => generate({ prompt, model }),
+        });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelDica(erro));
       }
     },
   );

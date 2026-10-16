@@ -7,6 +7,7 @@
 
 import type {
   ArquivoImportado,
+  DicaDoDia,
   DocumentoSalvo,
   Exercicio,
   Flashcard,
@@ -16,10 +17,14 @@ import type {
   ModoResumo,
   NoMapaMental,
   OllamaStatus,
+  Prova,
   Resumo,
   ResumoCaderno,
   ResumoDocumentoSalvo,
+  ResumoProva,
   ResultadoImportacaoPasta,
+  SessaoRevisao,
+  VinculoProva,
 } from "./types";
 
 /** Nomes dos canais de IPC. */
@@ -60,6 +65,24 @@ export const IPC_CHANNELS = {
   carregarDocumento: "documento:carregar",
   /** Remove um documento salvo pelo id. */
   removerDocumento: "documento:remover",
+  /** Cria e salva uma nova prova (gera a 1ª agenda automática). */
+  criarProva: "prova:criar",
+  /** Lista as provas como resumos leves (contagem regressiva), ordenadas. */
+  listarProvas: "prova:listar",
+  /** Carrega uma prova completa (com sessões) pelo id. */
+  carregarProva: "prova:carregar",
+  /** Edita campos da prova (título/data/vínculo/intervalos) e recomputa a agenda. */
+  editarProva: "prova:editar",
+  /** Substitui as sessões da prova (edição manual add/remove/mover/concluir). */
+  salvarSessoes: "prova:salvar-sessoes",
+  /** Regera as sugestões preservando edições manuais (recomputar explícito). */
+  regerarAgenda: "prova:regerar-agenda",
+  /** Remove uma prova pelo id. */
+  removerProva: "prova:remover",
+  /** Calcula a dica MECÂNICA do dia de uma prova (sem IA, instantânea). */
+  dicaDoDia: "prova:dica-do-dia",
+  /** Gera a dica da IA (opcional) para uma prova via Ollama local. */
+  dicaDaIa: "prova:dica-da-ia",
 } as const;
 
 /**
@@ -188,4 +211,65 @@ export interface AppApi {
   carregarDocumento: (id: string) => Promise<DocumentoSalvo>;
   /** Remove um documento salvo pelo `id`. */
   removerDocumento: (id: string) => Promise<void>;
+  /**
+   * Cria uma prova com os dados informados e gera a 1ª agenda automática
+   * (repetição espaçada, nunca no passado). `intervalos` ausente → default
+   * [7,3,1]. Resolve com a prova salva (com sessões e id gerado) ou rejeita
+   * com mensagem amigável se os dados forem inválidos.
+   */
+  criarProva: (dados: {
+    titulo: string;
+    data: string;
+    vinculo: VinculoProva;
+    intervalos?: number[];
+  }) => Promise<Prova>;
+  /**
+   * Lista as provas como resumos leves, da mais próxima para a mais distante,
+   * com `diasRestantes`/`estado` relativos ao hoje local. Nunca rejeita por
+   * disco ausente (diretório vazio → `[]`).
+   */
+  listarProvas: () => Promise<ResumoProva[]>;
+  /**
+   * Carrega a prova completa (com sessões) pelo `id`. Rejeita com mensagem
+   * amigável se a prova não existir.
+   */
+  carregarProva: (id: string) => Promise<Prova>;
+  /**
+   * Edita título/data/vínculo/intervalos de uma prova e RECOMPUTA a agenda
+   * (preservando edições manuais) quando data/intervalos mudam. Campos
+   * omitidos ficam como estão. `mudancas.vinculo`, quando presente, SUBSTITUI
+   * integralmente o vínculo anterior (sem merge raso; `cadernoId` re-derivado
+   * no main). Resolve com a prova atualizada ou rejeita com mensagem amigável
+   * (prova inexistente ou dados inválidos).
+   */
+  editarProva: (
+    id: string,
+    mudancas: Partial<
+      Pick<Prova, "titulo" | "data" | "vinculo" | "intervalos">
+    >,
+  ) => Promise<Prova>;
+  /**
+   * Substitui a lista de sessões (edição manual) e resolve com a prova
+   * atualizada. As sessões recebidas são saneadas/ordenadas e re-id-adas no
+   * main. Rejeita com mensagem amigável se a prova não existir.
+   */
+  salvarSessoes: (id: string, sessoes: SessaoRevisao[]) => Promise<Prova>;
+  /**
+   * Regera as sugestões preservando manuais; resolve com a prova atualizada ou
+   * rejeita com mensagem amigável se a prova não existir.
+   */
+  regerarAgenda: (id: string) => Promise<Prova>;
+  /** Remove a prova pelo `id` (no-op se já não existe). */
+  removerProva: (id: string) => Promise<void>;
+  /**
+   * Dica mecânica do dia (sem IA): o que revisar hoje para a prova. Rejeita
+   * com mensagem amigável se a prova não existir.
+   */
+  dicaDoDia: (id: string) => Promise<DicaDoDia>;
+  /**
+   * Dica da IA (opcional) para a prova, via Ollama local. Texto livre em
+   * português. Resolve com a string ou rejeita com mensagem amigável se o
+   * Ollama estiver indisponível (ou a prova não existir).
+   */
+  dicaDaIa: (id: string) => Promise<string>;
 }

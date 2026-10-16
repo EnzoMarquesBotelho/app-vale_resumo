@@ -50,6 +50,17 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.carregarDocumento, id),
   removerDocumento: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.removerDocumento, id),
+  criarProva: (dados) => ipcRenderer.invoke(IPC_CHANNELS.criarProva, dados),
+  listarProvas: () => ipcRenderer.invoke(IPC_CHANNELS.listarProvas),
+  carregarProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.carregarProva, id),
+  editarProva: (id, mudancas) =>
+    ipcRenderer.invoke(IPC_CHANNELS.editarProva, id, mudancas),
+  salvarSessoes: (id, sessoes) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarSessoes, id, sessoes),
+  regerarAgenda: (id) => ipcRenderer.invoke(IPC_CHANNELS.regerarAgenda, id),
+  removerProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.removerProva, id),
+  dicaDoDia: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDoDia, id),
+  dicaDaIa: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDaIa, id),
 };
 
 contextBridge.exposeInMainWorld("api", api);

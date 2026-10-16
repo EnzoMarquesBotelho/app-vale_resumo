@@ -1,0 +1,468 @@
+/**
+ * Serviço de persistência local das PROVAS: salva e carrega cada prova (com a
+ * sua agenda de revisão embutida) como um arquivo JSON em disco.
+ *
+ * Roda no processo main (acesso a disco). Análogo e INDEPENDENTE de
+ * `storage.ts` (documentos e provas são domínios distintos): cada prova vira
+ * um arquivo `<id>.json` dentro de `app.getPath('userData')/provas`. Tudo
+ * local, inspecionável e simples; os resultados reabrem após fechar/reabrir.
+ *
+ * O diretório base é injetável (`baseDir`) e o "hoje" (data-calendário local)
+ * é injetável (`hoje`) para os testes rodarem num diretório temporário e com
+ * datas fixas, sem depender do Electron nem do relógio real. Em produção, o
+ * default de `baseDir` vem de `app.getPath('userData')` e o de `hoje` de
+ * `hojeLocal()`.
+ */
+import { app } from "electron";
+import { readdir, readFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import {
+  INTERVALOS_REVISAO_PADRAO,
+} from "@shared/constants";
+import { montarCaderno } from "@shared/notebooks";
+import {
+  diaParaNumero,
+  diasRestantes,
+  diferencaDias,
+  estadoProva,
+  gerarAgenda,
+  normalizarIntervalos,
+  numeroParaDia,
+  recomputarAgenda,
+} from "@shared/agenda";
+import type {
+  Prova,
+  ResumoProva,
+  SessaoRevisao,
+  VinculoProva,
+} from "@shared/types";
+
+/** Nome da subpasta, dentro do `userData`, onde as provas ficam salvas. */
+const SUBPASTA_PROVAS = "provas";
+
+/** Comprimento máximo do título de uma prova (truncado, não é erro). */
+const TITULO_MAX = 200;
+
+/** Casa estritamente "YYYY-MM-DD" (validação sintática antes da semântica). */
+const PADRAO_DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `hojeLocal()`: ÚNICO leitor do relógio real nesta fatia. Compõe a data-
+ * calendário local "YYYY-MM-DD" a partir de `getFullYear`/`getMonth()+1`/
+ * `getDate` com zero-padding — NÃO usa `toLocaleDateString` (que depende de
+ * dados de locale ICU que podem ser enxutos no app empacotado). Define a
+ * meia-noite local de forma determinística. Nunca é chamado pelas funções
+ * puras (elas recebem `hoje` como parâmetro); os handlers o resolvem uma vez.
+ */
+export function hojeLocal(): string {
+  const agora = new Date();
+  const ano = agora.getFullYear().toString().padStart(4, "0");
+  const mes = (agora.getMonth() + 1).toString().padStart(2, "0");
+  const dia = agora.getDate().toString().padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+/** Erro lançado quando uma prova solicitada não existe em disco. */
+export class ProvaNaoEncontradaError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "PROVA_NAO_ENCONTRADA" as const;
+  constructor(public readonly id: string) {
+    super("Prova não encontrada. Ela pode ter sido removida.");
+    this.name = "ProvaNaoEncontradaError";
+  }
+}
+
+/** Erro lançado quando os dados informados para uma prova são inválidos. */
+export class DadosProvaInvalidosError extends Error {
+  /** Código estável para a UI reconhecer o caso sem depender do texto. */
+  readonly code = "DADOS_PROVA_INVALIDOS" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "DadosProvaInvalidosError";
+  }
+}
+
+/** Retorna o diretório onde as provas são salvas. */
+function diretorioProvas(baseDir?: string): string {
+  const base = baseDir ?? app.getPath("userData");
+  return join(base, SUBPASTA_PROVAS);
+}
+
+/** Caminho do arquivo JSON de uma prova pelo seu id. */
+function caminhoProva(id: string, baseDir?: string): string {
+  return join(diretorioProvas(baseDir), `${id}.json`);
+}
+
+/** Garante que o diretório de provas existe antes de ler/escrever. */
+async function garantirDiretorio(baseDir?: string): Promise<string> {
+  const dir = diretorioProvas(baseDir);
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Grava a prova crua em disco como JSON, de forma atômica. Escreve em
+ * `<id>.json.tmp` e renomeia para `<id>.json` (rename é atômico no mesmo
+ * volume), evitando um arquivo meio-escrito se o processo morrer no meio.
+ */
+async function escreverProva(prova: Prova, baseDir?: string): Promise<void> {
+  await garantirDiretorio(baseDir);
+  const destino = caminhoProva(prova.id, baseDir);
+  const temporario = `${destino}.tmp`;
+  await writeFile(temporario, JSON.stringify(prova, null, 2), "utf-8");
+  await rename(temporario, destino);
+}
+
+/**
+ * Valida uma data "YYYY-MM-DD": casa o regex E é uma data real (round-trip
+ * exato por `numeroParaDia(diaParaNumero(data)) === data`). Datas inexistentes
+ * (ex.: "2026-02-30") ou mal formatadas são rejeitadas.
+ */
+function dataValida(data: unknown): data is string {
+  if (typeof data !== "string" || !PADRAO_DATA.test(data)) return false;
+  try {
+    return numeroParaDia(diaParaNumero(data)) === data;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Valida/sanea um título: `trim` 1–200 (vazio → erro; >200 → trunca em 200).
+ */
+function sanearTitulo(titulo: unknown): string {
+  if (typeof titulo !== "string" || titulo.trim().length === 0) {
+    throw new DadosProvaInvalidosError("Informe um título para a prova.");
+  }
+  return titulo.trim().slice(0, TITULO_MAX);
+}
+
+/**
+ * Valida/normaliza um vínculo recebido do renderer. SUBSTITUI integralmente o
+ * vínculo anterior (sem merge raso na união discriminada): para `caderno`,
+ * `cadernoId` é RE-DERIVADO server-side via `montarCaderno` a partir do
+ * `cadernoNome`; para `abrangente`, exige `modoDistribuicao` válido e nunca
+ * deixa `cadernoId` órfão. Entradas inconsistentes com o `tipo` → erro.
+ */
+function sanearVinculo(vinculo: unknown): VinculoProva {
+  if (typeof vinculo !== "object" || vinculo === null) {
+    throw new DadosProvaInvalidosError("Informe um vínculo válido para a prova.");
+  }
+  const v = vinculo as { tipo?: unknown } & Record<string, unknown>;
+  if (v.tipo === "caderno") {
+    const nomeBruto = typeof v.cadernoNome === "string" ? v.cadernoNome : "";
+    if (nomeBruto.trim().length === 0) {
+      throw new DadosProvaInvalidosError(
+        "Informe o caderno ao qual a prova está ligada.",
+      );
+    }
+    const { cadernoId, cadernoNome } = montarCaderno(nomeBruto);
+    return { tipo: "caderno", cadernoId, cadernoNome };
+  }
+  if (v.tipo === "abrangente") {
+    if (v.modoDistribuicao !== "rotacao" && v.modoDistribuicao !== "intercalado") {
+      throw new DadosProvaInvalidosError(
+        "Informe o modo de distribuição (rotação ou intercalado).",
+      );
+    }
+    return { tipo: "abrangente", modoDistribuicao: v.modoDistribuicao };
+  }
+  throw new DadosProvaInvalidosError("Informe um vínculo válido para a prova.");
+}
+
+/** Dados para criar uma nova prova (como chegam do renderer). */
+export interface NovaProva {
+  /** Título da prova. */
+  titulo: string;
+  /** Data da prova "YYYY-MM-DD". */
+  data: string;
+  /** Vínculo: caderno único ou abrangente com modo de distribuição. */
+  vinculo: VinculoProva;
+  /** Intervalos de repetição espaçada; ausente → default [7,3,1]. */
+  intervalos?: number[];
+}
+
+/**
+ * Cria e salva uma nova prova e devolve o registro criado.
+ *
+ * Gera `id` (`randomUUID`), valida/sanea os dados (§8.2), deriva o vínculo
+ * (re-derivando `cadernoId` via `montarCaderno`), sanea os intervalos
+ * (default `INTERVALOS_REVISAO_PADRAO` quando vazios), gera a 1ª agenda via
+ * `gerarAgenda` com o `hoje` injetado e carimba `criadoEm`/`atualizadoEm`.
+ *
+ * @throws {DadosProvaInvalidosError} se título/data/vínculo forem inválidos.
+ */
+export async function criarProva(
+  dados: NovaProva,
+  hoje: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const titulo = sanearTitulo(dados.titulo);
+  if (!dataValida(dados.data)) {
+    throw new DadosProvaInvalidosError("Informe uma data válida (ano-mês-dia).");
+  }
+  const vinculo = sanearVinculo(dados.vinculo);
+  const intervalos = normalizarIntervalos(
+    Array.isArray(dados.intervalos)
+      ? dados.intervalos
+      : [...INTERVALOS_REVISAO_PADRAO],
+  );
+  const agora = new Date().toISOString();
+  const prova: Prova = {
+    id: randomUUID(),
+    titulo,
+    data: dados.data,
+    vinculo,
+    intervalos,
+    sessoes: gerarAgenda({ dataProva: dados.data, intervalos, hoje }),
+    criadoEm: agora,
+    atualizadoEm: agora,
+  };
+  await escreverProva(prova, baseDir);
+  return prova;
+}
+
+/**
+ * Carrega uma prova completa (com sessões) pelo id.
+ * @throws {ProvaNaoEncontradaError} se o arquivo não existir.
+ */
+export async function carregarProva(
+  id: string,
+  baseDir?: string,
+): Promise<Prova> {
+  try {
+    const conteudo = await readFile(caminhoProva(id, baseDir), "utf-8");
+    return JSON.parse(conteudo) as Prova;
+  } catch (erro) {
+    if (
+      typeof erro === "object" &&
+      erro !== null &&
+      "code" in erro &&
+      (erro as { code: unknown }).code === "ENOENT"
+    ) {
+      throw new ProvaNaoEncontradaError(id);
+    }
+    throw erro;
+  }
+}
+
+/**
+ * Carrega todas as provas válidas do diretório, de forma tolerante: pula
+ * arquivos corrompidos e trata o diretório ausente como "nenhuma prova".
+ * Ignora `.json.tmp` órfãos (filtra por `.endsWith(".json")`).
+ */
+async function carregarTodas(baseDir?: string): Promise<Prova[]> {
+  const dir = diretorioProvas(baseDir);
+  let arquivos: string[];
+  try {
+    arquivos = await readdir(dir);
+  } catch (erro) {
+    if (
+      typeof erro === "object" &&
+      erro !== null &&
+      "code" in erro &&
+      (erro as { code: unknown }).code === "ENOENT"
+    ) {
+      return [];
+    }
+    throw erro;
+  }
+
+  const provas: Prova[] = [];
+  for (const arquivo of arquivos) {
+    if (!arquivo.endsWith(".json")) continue;
+    const id = arquivo.slice(0, -".json".length);
+    try {
+      provas.push(await carregarProva(id, baseDir));
+    } catch {
+      continue;
+    }
+  }
+  return provas;
+}
+
+/**
+ * Lista as provas como resumos leves (contagem regressiva), calculando
+ * `diasRestantes`/`estado` em relação ao `hoje` injetado. Ordena por `data`
+ * crescente (mais próxima primeiro); empate pelo `titulo`. Leitura tolerante;
+ * diretório ausente → `[]`.
+ */
+export async function listarProvas(
+  hoje: string,
+  baseDir?: string,
+): Promise<ResumoProva[]> {
+  const provas = await carregarTodas(baseDir);
+  const resumos: ResumoProva[] = provas.map((prova) => {
+    const dias = diasRestantes(prova.data, hoje);
+    return {
+      id: prova.id,
+      titulo: prova.titulo,
+      data: prova.data,
+      diasRestantes: dias,
+      estado: estadoProva(dias),
+      tipoVinculo: prova.vinculo.tipo,
+      ...(prova.vinculo.tipo === "caderno"
+        ? { cadernoNome: prova.vinculo.cadernoNome }
+        : {}),
+    };
+  });
+  resumos.sort((a, b) => {
+    if (a.data < b.data) return -1;
+    if (a.data > b.data) return 1;
+    return a.titulo.localeCompare(b.titulo);
+  });
+  return resumos;
+}
+
+/** Mudanças aceitas por `editarProva` (campos omitidos ficam como estão). */
+export type MudancasProva = Partial<
+  Pick<Prova, "titulo" | "data" | "vinculo" | "intervalos">
+>;
+
+/**
+ * Edita campos de uma prova. `vinculo`, quando presente, SUBSTITUI
+ * integralmente o anterior (re-derivando `cadernoId` via `montarCaderno`, sem
+ * merge raso). A agenda é RECOMPUTADA (preservando manuais) APENAS quando
+ * `data` ou `intervalos` mudam — mudar só o vínculo não recomputa datas.
+ * Recarimba `atualizadoEm`.
+ *
+ * @throws {ProvaNaoEncontradaError} se a prova não existir.
+ * @throws {DadosProvaInvalidosError} se algum campo informado for inválido.
+ */
+export async function editarProva(
+  id: string,
+  mudancas: MudancasProva,
+  hoje: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+
+  const titulo =
+    mudancas.titulo !== undefined ? sanearTitulo(mudancas.titulo) : prova.titulo;
+
+  let data = prova.data;
+  let dataMudou = false;
+  if (mudancas.data !== undefined) {
+    if (!dataValida(mudancas.data)) {
+      throw new DadosProvaInvalidosError(
+        "Informe uma data válida (ano-mês-dia).",
+      );
+    }
+    dataMudou = mudancas.data !== prova.data;
+    data = mudancas.data;
+  }
+
+  const vinculo =
+    mudancas.vinculo !== undefined
+      ? sanearVinculo(mudancas.vinculo)
+      : prova.vinculo;
+
+  let intervalos = prova.intervalos;
+  let intervalosMudaram = false;
+  if (mudancas.intervalos !== undefined) {
+    intervalos = normalizarIntervalos(mudancas.intervalos);
+    intervalosMudaram =
+      JSON.stringify(intervalos) !== JSON.stringify(prova.intervalos);
+  }
+
+  // Recomputa SÓ quando data/intervalos mudam; mudar só o vínculo não mexe nas
+  // datas (as sessões são agnósticas de caderno — ver design §3).
+  const sessoes =
+    dataMudou || intervalosMudaram
+      ? recomputarAgenda({
+          dataProva: data,
+          intervalos,
+          hoje,
+          sessoesAtuais: prova.sessoes,
+        })
+      : prova.sessoes;
+
+  const atualizada: Prova = {
+    ...prova,
+    titulo,
+    data,
+    vinculo,
+    intervalos,
+    sessoes,
+    atualizadoEm: new Date().toISOString(),
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Substitui as sessões de uma prova (edição manual). Sanea as sessões
+ * recebidas: descarta datas fora de "YYYY-MM-DD" ou passadas (`data < hoje`),
+ * PRESERVA o flag `manual` recebido (não força `true`), PRESERVA o flag
+ * `concluida` (spread condicional — ausente/`false` → chave omitida),
+ * RECALCULA `diasAntes = diferencaDias(prova.data, data)` para cada sessão,
+ * reordena por data crescente e reatribui ids `s0..sN`. Saneamento silencioso
+ * (datas inválidas/passadas são descartadas, não geram erro).
+ *
+ * @throws {ProvaNaoEncontradaError} se a prova não existir.
+ */
+export async function salvarSessoes(
+  id: string,
+  sessoes: SessaoRevisao[],
+  hoje: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+
+  const saneadas = (Array.isArray(sessoes) ? sessoes : [])
+    .filter((s) => dataValida(s?.data) && s.data >= hoje)
+    .map((s) => ({
+      data: s.data,
+      diasAntes: diferencaDias(prova.data, s.data),
+      manual: s.manual === true,
+      ...(s.concluida === true ? { concluida: true } : {}),
+    }));
+
+  saneadas.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+  const novasSessoes: SessaoRevisao[] = saneadas.map((s, i) => ({
+    id: `s${i}`,
+    ...s,
+  }));
+
+  const atualizada: Prova = {
+    ...prova,
+    sessoes: novasSessoes,
+    atualizadoEm: new Date().toISOString(),
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Regera as sugestões preservando as edições manuais (recomputar explícito).
+ * @throws {ProvaNaoEncontradaError} se a prova não existir.
+ */
+export async function regerarAgenda(
+  id: string,
+  hoje: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  const sessoes = recomputarAgenda({
+    dataProva: prova.data,
+    intervalos: prova.intervalos,
+    hoje,
+    sessoesAtuais: prova.sessoes,
+  });
+  const atualizada: Prova = {
+    ...prova,
+    sessoes,
+    atualizadoEm: new Date().toISOString(),
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Remove uma prova pelo id. Remover algo inexistente é um no-op (não lança),
+ * para a UI poder apagar sem corrida de estado.
+ */
+export async function removerProva(id: string, baseDir?: string): Promise<void> {
+  await rm(caminhoProva(id, baseDir), { force: true });
+}

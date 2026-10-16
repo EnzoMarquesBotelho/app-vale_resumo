@@ -7,7 +7,7 @@
  */
 
 import { MAPA_PROFUNDIDADE_MAXIMA } from "./constants";
-import type { ModoConteudo, ModoResumo } from "./types";
+import type { CadernoEmFoco, ModoConteudo, ModoResumo } from "./types";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "./types";
 
 /** Instrução de tamanho/profundidade por modo de resumo. */
@@ -170,6 +170,48 @@ export function montarPromptCorrigirMapaMental(
     "",
     "Resposta anterior a corrigir:",
     respostaAnterior,
+  ].join("\n");
+}
+
+/**
+ * Descreve um caderno em foco para o prompt da dica: nome, contagem de
+ * documentos e os artefatos disponíveis (resumo/flashcards). Texto curto, em
+ * português, para o modelo saber do que o usuário dispõe para estudar.
+ */
+function descreverCadernoParaDica(c: CadernoEmFoco): string {
+  const docs = c.totalDocumentos === 1 ? "1 documento" : `${c.totalDocumentos} documentos`;
+  const artefatos: string[] = [];
+  if (c.temResumo) artefatos.push("resumo");
+  if (c.temFlashcards) artefatos.push("flashcards");
+  const sufixo = artefatos.length > 0 ? `; tem ${artefatos.join(" e ")}` : "";
+  return `«${c.cadernoNome}» (${docs}${sufixo})`;
+}
+
+/**
+ * Monta o prompt da DICA DA IA do dia para uma prova (design §5.4), no estilo
+ * de `montarPromptResumo`: recebe o contexto mecânico já calculado — título da
+ * prova, dias restantes e os cadernos em foco de hoje — e pede uma dica CURTA
+ * de estudo em português. Saída em TEXTO LIVRE (sem JSON, sem `format`), como o
+ * resumo: a dica é prosa curta, não estrutura.
+ */
+export function montarPromptDicaDoDia(
+  titulo: string,
+  diasRestantes: number,
+  cadernosEmFoco: CadernoEmFoco[],
+): string {
+  const foco =
+    cadernosEmFoco.length === 0
+      ? "Nenhum caderno de material em foco para hoje."
+      : `Cadernos em foco hoje: ${cadernosEmFoco
+          .map((c) => descreverCadernoParaDica(c))
+          .join(", ")}.`;
+  return [
+    "Você é um assistente de estudos. Dê uma dica CURTA e prática de estudo " +
+      "em português para o aluno aproveitar o dia de revisão.",
+    `Prova: «${titulo}». Faltam ${diasRestantes} dias.`,
+    foco,
+    "Responda em poucas frases, em texto corrido (sem listas longas e sem " +
+      "comentários sobre a tarefa).",
   ].join("\n");
 }
 

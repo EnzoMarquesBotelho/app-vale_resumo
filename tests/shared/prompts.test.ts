@@ -3,11 +3,13 @@ import {
   montarPromptCombinarResumos,
   montarPromptCorrigirFlashcards,
   montarPromptCorrigirMapaMental,
+  montarPromptDicaDoDia,
   montarPromptFlashcards,
   montarPromptMapaMental,
   montarPromptResumo,
   normalizarQuantidade,
 } from "@shared/prompts";
+import type { CadernoEmFoco } from "@shared/types";
 
 describe("montarPromptResumo", () => {
   it("inclui o texto e instrui modo CURTO", () => {
@@ -117,5 +119,40 @@ describe("montarPromptCorrigirMapaMental", () => {
     expect(prompt).toContain("não era um JSON válido");
     expect(prompt).toContain("resposta ruim");
     expect(prompt).toContain('"raiz"');
+  });
+});
+
+describe("montarPromptDicaDoDia", () => {
+  const cadernos: CadernoEmFoco[] = [
+    {
+      cadernoId: "calculo",
+      cadernoNome: "Cálculo",
+      totalDocumentos: 3,
+      temResumo: true,
+      temFlashcards: true,
+    },
+  ];
+
+  it("inclui título, dias restantes e os cadernos em foco", () => {
+    const prompt = montarPromptDicaDoDia("P1 de Cálculo", 5, cadernos);
+    expect(prompt).toContain("P1 de Cálculo");
+    expect(prompt).toContain("5 dias");
+    expect(prompt).toContain("Cálculo");
+    expect(prompt).toContain("3 documentos");
+    expect(prompt).toContain("resumo e flashcards");
+  });
+
+  it("pede resposta curta em português e texto livre (sem JSON)", () => {
+    const prompt = montarPromptDicaDoDia("Prova", 2, cadernos);
+    expect(prompt.toLowerCase()).toContain("português");
+    expect(prompt.toLowerCase()).toContain("curta");
+    expect(prompt).not.toContain("JSON");
+    expect(prompt).not.toContain('{"');
+  });
+
+  it("sem cadernos em foco descreve a ausência sem quebrar", () => {
+    const prompt = montarPromptDicaDoDia("Prova", 1, []);
+    expect(prompt).toContain("Nenhum caderno");
+    expect(prompt).toContain("1 dias");
   });
 });
