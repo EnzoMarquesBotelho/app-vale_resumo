@@ -24,12 +24,19 @@ function mensagemDeErro(e: unknown): string {
  */
 /** Props da tela de importação. */
 interface ImportarProps {
+  /**
+   * Arquivo atualmente ativo (ex.: reaberto do histórico), controlado pelo
+   * App. Quando informado, a tela exibe esse arquivo; `null` limpa a exibição.
+   */
+  arquivo: ArquivoImportado | null;
   /** Notifica o componente pai sobre o arquivo importado (ou `null`). */
   onImportado?: (arquivo: ArquivoImportado | null) => void;
 }
 
-export function Importar({ onImportado }: ImportarProps): React.JSX.Element {
-  const [arquivo, setArquivo] = useState<ArquivoImportado | null>(null);
+export function Importar({
+  arquivo,
+  onImportado,
+}: ImportarProps): React.JSX.Element {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -40,11 +47,9 @@ export function Importar({ onImportado }: ImportarProps): React.JSX.Element {
       const resultado = await window.api?.importarArquivo();
       // `null` = usuário cancelou a seleção: mantém o estado anterior.
       if (resultado) {
-        setArquivo(resultado);
         onImportado?.(resultado);
       }
     } catch (e) {
-      setArquivo(null);
       setErro(mensagemDeErro(e));
       onImportado?.(null);
     } finally {

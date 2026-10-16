@@ -7,11 +7,15 @@
 
 import type {
   ArquivoImportado,
+  DocumentoSalvo,
   Exercicio,
   Flashcard,
+  FormatoArquivo,
   ModoConteudo,
   ModoResumo,
   OllamaStatus,
+  Resumo,
+  ResumoDocumentoSalvo,
 } from "./types";
 
 /** Nomes dos canais de IPC. */
@@ -30,6 +34,20 @@ export const IPC_CHANNELS = {
   gerarFlashcards: "flashcards:gerar",
   /** Gera exercícios (modo teórica/prática/mista, 5–100) a partir de um texto. */
   gerarExercicios: "exercicios:gerar",
+  /** Cria e salva um novo documento (sem artefatos) a partir de um arquivo. */
+  criarDocumento: "documento:criar",
+  /** Salva o resumo gerado em um documento existente. */
+  salvarResumo: "documento:salvar-resumo",
+  /** Salva os flashcards gerados em um documento existente. */
+  salvarFlashcards: "documento:salvar-flashcards",
+  /** Salva os exercícios gerados em um documento existente. */
+  salvarExercicios: "documento:salvar-exercicios",
+  /** Lista os documentos salvos (resumos leves) para o Histórico. */
+  listarDocumentos: "documento:listar",
+  /** Carrega um documento salvo completo (texto + artefatos) pelo id. */
+  carregarDocumento: "documento:carregar",
+  /** Remove um documento salvo pelo id. */
+  removerDocumento: "documento:remover",
 } as const;
 
 /**
@@ -90,4 +108,46 @@ export interface AppApi {
     modo: ModoConteudo,
     quantidade: number,
   ) => Promise<Exercicio[]>;
+  /**
+   * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
+   * importado, para que os artefatos gerados possam ser anexados e persistidos.
+   * @returns o documento salvo criado (com `id` gerado).
+   */
+  criarDocumento: (
+    nome: string,
+    formato: FormatoArquivo,
+    texto: string,
+  ) => Promise<DocumentoSalvo>;
+  /**
+   * Salva o resumo gerado no documento `id` e devolve o registro atualizado.
+   */
+  salvarResumo: (id: string, resumo: Resumo) => Promise<DocumentoSalvo>;
+  /**
+   * Salva os flashcards gerados no documento `id` e devolve o registro
+   * atualizado.
+   */
+  salvarFlashcards: (
+    id: string,
+    flashcards: Flashcard[],
+  ) => Promise<DocumentoSalvo>;
+  /**
+   * Salva os exercícios gerados no documento `id` e devolve o registro
+   * atualizado.
+   */
+  salvarExercicios: (
+    id: string,
+    exercicios: Exercicio[],
+  ) => Promise<DocumentoSalvo>;
+  /**
+   * Lista os documentos salvos como resumos leves, do mais recente para o mais
+   * antigo. Usado pela tela de Histórico.
+   */
+  listarDocumentos: () => Promise<ResumoDocumentoSalvo[]>;
+  /**
+   * Carrega um documento salvo completo (texto + artefatos) pelo `id`, para
+   * reabrir resultados anteriores.
+   */
+  carregarDocumento: (id: string) => Promise<DocumentoSalvo>;
+  /** Remove um documento salvo pelo `id`. */
+  removerDocumento: (id: string) => Promise<void>;
 }

@@ -151,12 +151,12 @@ estruturado; UI de lista.
 no `userData`; UI para reabrir resultados anteriores.
 
 **Acceptance criteria:**
-- [ ] Resultados gerados persistem e reabrem após fechar/reabrir o app.
-- [ ] Cada documento guarda seus próprios resumo/flashcards/exercícios.
+- [x] Resultados gerados persistem e reabrem após fechar/reabrir o app.
+- [x] Cada documento guarda seus próprios resumo/flashcards/exercícios.
 
 **Verification:**
-- [ ] Testes: `npm test` (salvar/carregar round-trip)
-- [ ] Manual: fechar e reabrir mantém os dados
+- [x] Testes: `npm test` (salvar/carregar round-trip)
+- [x] Manual: fechar e reabrir mantém os dados
 
 **Dependencies:** Task 5, 6, 7
 **Files likely touched:** `src/main/services/storage.ts`, `src/main/ipc/`, `src/renderer/views/Historico.tsx`, `tests/storage.test.ts`

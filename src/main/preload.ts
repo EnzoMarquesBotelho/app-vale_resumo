@@ -23,6 +23,19 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarFlashcards, texto, quantidade),
   gerarExercicios: (texto, modo, quantidade) =>
     ipcRenderer.invoke(IPC_CHANNELS.gerarExercicios, texto, modo, quantidade),
+  criarDocumento: (nome, formato, texto) =>
+    ipcRenderer.invoke(IPC_CHANNELS.criarDocumento, nome, formato, texto),
+  salvarResumo: (id, resumo) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarResumo, id, resumo),
+  salvarFlashcards: (id, flashcards) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarFlashcards, id, flashcards),
+  salvarExercicios: (id, exercicios) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarExercicios, id, exercicios),
+  listarDocumentos: () => ipcRenderer.invoke(IPC_CHANNELS.listarDocumentos),
+  carregarDocumento: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.carregarDocumento, id),
+  removerDocumento: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.removerDocumento, id),
 };
 
 contextBridge.exposeInMainWorld("api", api);

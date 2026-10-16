@@ -3,11 +3,15 @@ import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import type {
   ArquivoImportado,
+  DocumentoSalvo,
   Exercicio,
   Flashcard,
+  FormatoArquivo,
   ModoConteudo,
   ModoResumo,
   OllamaStatus,
+  Resumo,
+  ResumoDocumentoSalvo,
 } from "@shared/types";
 import {
   ArquivoMuitoGrandeError,
@@ -29,6 +33,16 @@ import {
   gerarExercicios,
   gerarFlashcards,
 } from "../services/parse.js";
+import {
+  DocumentoNaoEncontradoError,
+  carregarDocumento,
+  criarDocumento,
+  listarDocumentos,
+  removerDocumento,
+  salvarExercicios,
+  salvarFlashcards,
+  salvarResumo,
+} from "../services/storage.js";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -93,6 +107,17 @@ function mensagemAmigavelExercicios(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar os exercícios. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da persistência em mensagens amigáveis.
+ * Como nas demais, o texto vai direto para a UI.
+ */
+function mensagemAmigavelPersistencia(erro: unknown): string {
+  if (erro instanceof DocumentoNaoEncontradoError) {
+    return erro.message;
+  }
+  return "Não foi possível salvar ou carregar os dados. Tente novamente.";
 }
 
 /**
@@ -216,6 +241,96 @@ export function registerIpcHandlers(): void {
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelExercicios(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.criarDocumento,
+    async (
+      _event,
+      nome: string,
+      formato: FormatoArquivo,
+      texto: string,
+    ): Promise<DocumentoSalvo> => {
+      try {
+        return await criarDocumento({ nome, formato, texto });
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarResumo,
+    async (_event, id: string, resumo: Resumo): Promise<DocumentoSalvo> => {
+      try {
+        return await salvarResumo(id, resumo);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarFlashcards,
+    async (
+      _event,
+      id: string,
+      flashcards: Flashcard[],
+    ): Promise<DocumentoSalvo> => {
+      try {
+        return await salvarFlashcards(id, flashcards);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarExercicios,
+    async (
+      _event,
+      id: string,
+      exercicios: Exercicio[],
+    ): Promise<DocumentoSalvo> => {
+      try {
+        return await salvarExercicios(id, exercicios);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.listarDocumentos,
+    async (): Promise<ResumoDocumentoSalvo[]> => {
+      try {
+        return await listarDocumentos();
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.carregarDocumento,
+    async (_event, id: string): Promise<DocumentoSalvo> => {
+      try {
+        return await carregarDocumento(id);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.removerDocumento,
+    async (_event, id: string): Promise<void> => {
+      try {
+        await removerDocumento(id);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
       }
     },
   );

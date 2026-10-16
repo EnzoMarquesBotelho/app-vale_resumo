@@ -20,6 +20,13 @@ function mensagemDeErro(e: unknown): string {
 interface FlashcardsProps {
   /** Arquivo importado cujo texto será usado (ou `null` se nenhum). */
   arquivo: ArquivoImportado | null;
+  /**
+   * Flashcards já salvos deste documento, para reabrir resultados anteriores.
+   * `null`/ausente quando ainda não há flashcards salvos.
+   */
+  flashcardsSalvos?: Flashcard[] | null;
+  /** Chamado quando novos flashcards são gerados, para o App persistir. */
+  onGerado?: (flashcards: Flashcard[]) => void;
 }
 
 /** Quantidade inicial sugerida de flashcards. */
@@ -30,9 +37,18 @@ const QUANTIDADE_PADRAO = 10;
  * partir do texto importado via IA local. Os cards são navegáveis (anterior/
  * próximo) e viram ao clicar (pergunta ↔ resposta).
  */
-export function Flashcards({ arquivo }: FlashcardsProps): React.JSX.Element {
+export function Flashcards({
+  arquivo,
+  flashcardsSalvos,
+  onGerado,
+}: FlashcardsProps): React.JSX.Element {
   const [quantidade, setQuantidade] = useState<number>(QUANTIDADE_PADRAO);
-  const [cards, setCards] = useState<Flashcard[] | null>(null);
+  // Estado inicializado a partir do que está salvo. O App remonta esta tela
+  // (via `key` por documento) ao reabrir/importar outro, então a inicialização
+  // reflete o documento ativo sem precisar sincronizar via efeito.
+  const [cards, setCards] = useState<Flashcard[] | null>(
+    flashcardsSalvos ?? null,
+  );
   const [indice, setIndice] = useState(0);
   const [virado, setVirado] = useState(false);
   const [gerando, setGerando] = useState(false);
@@ -58,6 +74,9 @@ export function Flashcards({ arquivo }: FlashcardsProps): React.JSX.Element {
         quantidade,
       );
       setCards(resultado ?? null);
+      if (resultado != null && onGerado) {
+        onGerado(resultado);
+      }
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {

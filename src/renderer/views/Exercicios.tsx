@@ -20,6 +20,13 @@ function mensagemDeErro(e: unknown): string {
 interface ExerciciosProps {
   /** Arquivo importado cujo texto será usado (ou `null` se nenhum). */
   arquivo: ArquivoImportado | null;
+  /**
+   * Exercícios já salvos deste documento, para reabrir resultados anteriores.
+   * `null`/ausente quando ainda não há exercícios salvos.
+   */
+  exerciciosSalvos?: Exercicio[] | null;
+  /** Chamado quando novos exercícios são gerados, para o App persistir. */
+  onGerado?: (exercicios: Exercicio[]) => void;
 }
 
 /** Quantidade inicial sugerida de exercícios. */
@@ -37,10 +44,21 @@ const ROTULO_MODO: Record<ModoConteudo, string> = {
  * quantos exercícios gerar (5–100), e gera a partir do texto importado via IA
  * local. A lista é exibida de forma legível, com enunciado e gabarito.
  */
-export function Exercicios({ arquivo }: ExerciciosProps): React.JSX.Element {
-  const [modo, setModo] = useState<ModoConteudo>("mista");
+export function Exercicios({
+  arquivo,
+  exerciciosSalvos,
+  onGerado,
+}: ExerciciosProps): React.JSX.Element {
+  // Estado inicializado a partir do que está salvo. O App remonta esta tela
+  // (via `key` por documento) ao reabrir/importar outro, então a inicialização
+  // reflete o documento ativo sem precisar sincronizar via efeito.
+  const [modo, setModo] = useState<ModoConteudo>(
+    exerciciosSalvos?.[0]?.modo ?? "mista",
+  );
   const [quantidade, setQuantidade] = useState<number>(QUANTIDADE_PADRAO);
-  const [exercicios, setExercicios] = useState<Exercicio[] | null>(null);
+  const [exercicios, setExercicios] = useState<Exercicio[] | null>(
+    exerciciosSalvos ?? null,
+  );
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -68,6 +86,9 @@ export function Exercicios({ arquivo }: ExerciciosProps): React.JSX.Element {
         quantidade,
       );
       setExercicios(resultado ?? null);
+      if (resultado != null && onGerado) {
+        onGerado(resultado);
+      }
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {

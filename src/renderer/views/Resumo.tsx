@@ -1,5 +1,9 @@
 import { useState } from "react";
-import type { ArquivoImportado, ModoResumo } from "@shared/types";
+import type {
+  ArquivoImportado,
+  ModoResumo,
+  Resumo as ResumoArtefato,
+} from "@shared/types";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -19,6 +23,15 @@ function mensagemDeErro(e: unknown): string {
 interface ResumoProps {
   /** Arquivo importado cujo texto será resumido (ou `null` se nenhum). */
   arquivo: ArquivoImportado | null;
+  /**
+   * Resumo já salvo deste documento, para reabrir resultados anteriores.
+   * `null`/ausente quando ainda não há resumo salvo.
+   */
+  resumoSalvo?: ResumoArtefato | null;
+  /**
+   * Chamado quando um novo resumo é gerado, para o App persistir o artefato.
+   */
+  onGerado?: (resumo: ResumoArtefato) => void;
 }
 
 /** Rótulos em português para cada modo de resumo. */
@@ -31,9 +44,18 @@ const ROTULOS_MODO: Record<ModoResumo, string> = {
  * Tela de resumo: o usuário escolhe o modo (curto/longo) e gera um resumo do
  * texto importado via IA local. Mostra o resumo ou uma mensagem de erro clara.
  */
-export function Resumo({ arquivo }: ResumoProps): React.JSX.Element {
-  const [modo, setModo] = useState<ModoResumo>("curto");
-  const [resumo, setResumo] = useState<string | null>(null);
+export function Resumo({
+  arquivo,
+  resumoSalvo,
+  onGerado,
+}: ResumoProps): React.JSX.Element {
+  // Estado inicializado a partir do que está salvo. O App remonta esta tela
+  // (via `key` por documento) ao reabrir/importar outro, então a inicialização
+  // reflete o documento ativo sem precisar sincronizar via efeito.
+  const [modo, setModo] = useState<ModoResumo>(resumoSalvo?.modo ?? "curto");
+  const [resumo, setResumo] = useState<string | null>(
+    resumoSalvo?.conteudo ?? null,
+  );
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -48,6 +70,14 @@ export function Resumo({ arquivo }: ResumoProps): React.JSX.Element {
     try {
       const resultado = await window.api?.gerarResumo(arquivo.texto, modo);
       setResumo(resultado ?? null);
+      if (resultado != null && onGerado) {
+        onGerado({
+          documentoId: "",
+          modo,
+          conteudo: resultado,
+          geradoEm: new Date().toISOString(),
+        });
+      }
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {
