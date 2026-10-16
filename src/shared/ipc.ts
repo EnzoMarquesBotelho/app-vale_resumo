@@ -15,6 +15,7 @@ import type {
   ModoResumo,
   OllamaStatus,
   Resumo,
+  ResumoCaderno,
   ResumoDocumentoSalvo,
 } from "./types";
 
@@ -44,6 +45,8 @@ export const IPC_CHANNELS = {
   salvarExercicios: "documento:salvar-exercicios",
   /** Lista os documentos salvos (resumos leves) para o Histórico. */
   listarDocumentos: "documento:listar",
+  /** Lista os cadernos agregados (derivados dos documentos) para o Histórico. */
+  listarCadernos: "caderno:listar",
   /** Carrega um documento salvo completo (texto + artefatos) pelo id. */
   carregarDocumento: "documento:carregar",
   /** Remove um documento salvo pelo id. */
@@ -111,12 +114,16 @@ export interface AppApi {
   /**
    * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
    * importado, para que os artefatos gerados possam ser anexados e persistidos.
+   * O `cadernoNome` é a grafia escolhida/editada na importação; o main deriva
+   * o `cadernoId` server-side via `montarCaderno`.
    * @returns o documento salvo criado (com `id` gerado).
    */
   criarDocumento: (
     nome: string,
     formato: FormatoArquivo,
     texto: string,
+    cadernoNome: string,
+    caminhoOrigem?: string,
   ) => Promise<DocumentoSalvo>;
   /**
    * Salva o resumo gerado no documento `id` e devolve o registro atualizado.
@@ -140,9 +147,15 @@ export interface AppApi {
   ) => Promise<DocumentoSalvo>;
   /**
    * Lista os documentos salvos como resumos leves, do mais recente para o mais
-   * antigo. Usado pela tela de Histórico.
+   * antigo. Usado pela tela de Histórico. Sem `cadernoId`, devolve todos; com
+   * `cadernoId`, só os daquele caderno.
    */
-  listarDocumentos: () => Promise<ResumoDocumentoSalvo[]>;
+  listarDocumentos: (cadernoId?: string) => Promise<ResumoDocumentoSalvo[]>;
+  /**
+   * Lista os cadernos agregados (derivados dos documentos), do mais recente
+   * para o mais antigo. Usado pelo primeiro nível da tela de Histórico.
+   */
+  listarCadernos: () => Promise<ResumoCaderno[]>;
   /**
    * Carrega um documento salvo completo (texto + artefatos) pelo `id`, para
    * reabrir resultados anteriores.

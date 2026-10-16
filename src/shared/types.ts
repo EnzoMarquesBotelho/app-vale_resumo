@@ -27,6 +27,12 @@ export interface Documento {
   texto: string;
   /** Data de importação em formato ISO 8601. */
   importadoEm: string;
+  /** Id normalizado do caderno a que o documento pertence. */
+  cadernoId: string;
+  /** Nome de exibição do caderno (grafia escolhida pelo usuário). */
+  cadernoNome: string;
+  /** Caminho de origem no disco, quando conhecido (best-effort). */
+  caminhoOrigem?: string;
 }
 
 /** Resumo gerado a partir de um documento. */
@@ -75,6 +81,12 @@ export interface ArquivoImportado {
    * Nesse caso a UI exibe o aviso "sem texto extraível".
    */
   semTextoExtraivel: boolean;
+  /** Caminho de origem no disco, quando conhecido (fluxo de import). */
+  caminhoOrigem?: string;
+  /** Id do caderno sugerido a partir da pasta-mãe (fluxo de import). */
+  cadernoIdSugerido?: string;
+  /** Nome do caderno sugerido a partir da pasta-mãe (fluxo de import). */
+  cadernoNomeSugerido?: string;
 }
 
 /**
@@ -98,6 +110,12 @@ export interface DocumentoSalvo {
   importadoEm: string;
   /** Data da última atualização (nova geração salva) em ISO 8601. */
   atualizadoEm: string;
+  /** Id normalizado do caderno a que o documento pertence. */
+  cadernoId: string;
+  /** Nome de exibição do caderno (grafia escolhida pelo usuário). */
+  cadernoNome: string;
+  /** Caminho de origem no disco, quando conhecido (best-effort). */
+  caminhoOrigem?: string;
   /** Resumo gerado, se houver. */
   resumo?: Resumo;
   /** Flashcards gerados, se houver. */
@@ -121,12 +139,28 @@ export interface ResumoDocumentoSalvo {
   importadoEm: string;
   /** Data da última atualização em ISO 8601. */
   atualizadoEm: string;
+  /** Id normalizado do caderno a que o documento pertence. */
+  cadernoId: string;
+  /** Nome de exibição do caderno (grafia escolhida pelo usuário). */
+  cadernoNome: string;
   /** `true` se o documento tem um resumo salvo. */
   temResumo: boolean;
   /** `true` se o documento tem flashcards salvos. */
   temFlashcards: boolean;
   /** `true` se o documento tem exercícios salvos. */
   temExercicios: boolean;
+}
+
+/** Um caderno agregado para a tela de Histórico (derivado dos documentos). */
+export interface ResumoCaderno {
+  /** Id normalizado do caderno. */
+  cadernoId: string;
+  /** Nome de exibição (grafia do documento mais recente do caderno). */
+  cadernoNome: string;
+  /** Quantos documentos pertencem a este caderno. */
+  totalDocumentos: number;
+  /** `atualizadoEm` (ISO) do documento mais recente, para ordenar os cadernos. */
+  atualizadoEm: string;
 }
 
 /** Limites de quantidade para flashcards e exercícios (inclusivos). */
