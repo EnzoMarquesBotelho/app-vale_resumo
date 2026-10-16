@@ -377,6 +377,29 @@ select {
   font-size: 0.9rem;
 }
 
+.importar-caderno {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.importar-caderno-rotulo {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+.importar-caderno-input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: 0.5rem;
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+}
+
 .resumo {
   display: flex;
   flex-direction: column;
@@ -726,6 +749,10 @@ select {
 .historico-acoes {
   display: flex;
   gap: 0.5rem;
+}
+
+.historico-voltar {
+  font-weight: 600;
 }
 
 .historico-remover {

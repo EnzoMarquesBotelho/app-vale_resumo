@@ -8,6 +8,7 @@ import type {
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
+import { getApi } from "./api";
 import { Importar } from "./views/Importar";
 import { Resumo } from "./views/Resumo";
 import { Flashcards } from "./views/Flashcards";
@@ -53,30 +54,38 @@ export function App(): React.JSX.Element {
   // preservando o resultado exibido. Sem documento, uma chave estável.
   const chaveDocumento = documento?.id ?? "sem-documento";
 
-  /** Ao importar um novo arquivo, cria o documento salvo correspondente. */
-  async function aoImportar(importado: ArquivoImportado | null): Promise<void> {
+  /**
+   * Ao importar um novo arquivo, apenas exibe o texto e reseta o documento
+   * ativo. A criação do documento acontece só quando o usuário confirma o
+   * caderno (em `aoConfirmarCaderno`).
+   */
+  function aoImportar(importado: ArquivoImportado | null): void {
     setArquivo(importado);
     setDocumento(null);
-    if (
-      importado === null ||
-      importado.semTextoExtraivel ||
-      importado.texto.length === 0
-    ) {
-      return;
-    }
+  }
+
+  /**
+   * Cria o documento salvo com o caderno escolhido na importação e avança para
+   * a aba de geração. Só é chamado pelo fluxo de importação (nunca na
+   * reabertura, que não passa esta função a `Importar`).
+   */
+  async function aoConfirmarCaderno(
+    arquivo: ArquivoImportado,
+    cadernoNome: string,
+  ): Promise<void> {
     try {
-      const salvo = await window.api?.criarDocumento(
-        importado.nome,
-        importado.formato,
-        importado.texto,
+      const salvo = await getApi().criarDocumento(
+        arquivo.nome,
+        arquivo.formato,
+        arquivo.texto,
+        cadernoNome,
+        arquivo.caminhoOrigem,
       );
-      if (salvo) {
-        setDocumento(salvo);
-        setVersaoHistorico((v) => v + 1);
-        setAvisoPersistencia(null);
-        // Com texto importado, leva o usuário ao próximo passo do fluxo.
-        setAbaAtiva("resumo");
-      }
+      setDocumento(salvo);
+      setVersaoHistorico((v) => v + 1);
+      setAvisoPersistencia(null);
+      // Com o caderno confirmado, leva o usuário ao próximo passo do fluxo.
+      setAbaAtiva("resumo");
     } catch {
       // Falha ao criar o registro não bloqueia a geração: o texto continua
       // disponível nesta sessão, mas sem salvar no histórico. Avisa o usuário.
@@ -98,6 +107,9 @@ export function App(): React.JSX.Element {
       formato: salvo.formato,
       texto: salvo.texto,
       semTextoExtraivel: false,
+      caminhoOrigem: salvo.caminhoOrigem,
+      cadernoIdSugerido: salvo.cadernoId,
+      cadernoNomeSugerido: salvo.cadernoNome,
     });
     // Mostra o resumo do documento reaberto; o usuário navega pelas abas.
     setAbaAtiva("resumo");
@@ -121,16 +133,14 @@ export function App(): React.JSX.Element {
    */
   async function persistirArtefato(
     rotulo: string,
-    operacao: () => Promise<DocumentoSalvo | undefined>,
+    operacao: () => Promise<DocumentoSalvo>,
   ): Promise<void> {
     if (documento === null) return;
     try {
       const atualizado = await operacao();
-      if (atualizado) {
-        setDocumento(atualizado);
-        setVersaoHistorico((v) => v + 1);
-        setAvisoPersistencia(null);
-      }
+      setDocumento(atualizado);
+      setVersaoHistorico((v) => v + 1);
+      setAvisoPersistencia(null);
     } catch {
       setAvisoPersistencia(
         `O ${rotulo} foi gerado, mas não foi possível salvá-lo no histórico. ` +
@@ -142,7 +152,7 @@ export function App(): React.JSX.Element {
   async function salvarResumo(resumo: ResumoArtefato): Promise<void> {
     if (documento === null) return;
     await persistirArtefato("resumo", () =>
-      window.api?.salvarResumo(documento.id, {
+      getApi().salvarResumo(documento.id, {
         ...resumo,
         documentoId: documento.id,
       }),
@@ -152,14 +162,14 @@ export function App(): React.JSX.Element {
   async function salvarFlashcards(flashcards: Flashcard[]): Promise<void> {
     if (documento === null) return;
     await persistirArtefato("conjunto de flashcards", () =>
-      window.api?.salvarFlashcards(documento.id, flashcards),
+      getApi().salvarFlashcards(documento.id, flashcards),
     );
   }
 
   async function salvarExercicios(exercicios: Exercicio[]): Promise<void> {
     if (documento === null) return;
     await persistirArtefato("conjunto de exercícios", () =>
-      window.api?.salvarExercicios(documento.id, exercicios),
+      getApi().salvarExercicios(documento.id, exercicios),
     );
   }
 
@@ -235,7 +245,16 @@ export function App(): React.JSX.Element {
 
       <main className="app-conteudo">
         {abaExibida === "importar" && (
-          <Importar arquivo={arquivo} onImportado={(a) => void aoImportar(a)} />
+          <Importar
+            arquivo={arquivo}
+            onImportado={aoImportar}
+            {...(documento === null
+              ? {
+                  onConfirmarCaderno: (a, nome) =>
+                    void aoConfirmarCaderno(a, nome),
+                }
+              : {})}
+          />
         )}
         {abaExibida === "resumo" && (
           <Resumo

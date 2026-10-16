@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import type { DocumentoSalvo, ResumoDocumentoSalvo } from "@shared/types";
+import type {
+  DocumentoSalvo,
+  ResumoCaderno,
+  ResumoDocumentoSalvo,
+} from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -29,7 +34,7 @@ function formatarData(iso: string): string {
 interface HistoricoProps {
   /**
    * Sinal para recarregar a lista (ex.: muda quando um artefato é salvo).
-   * Qualquer mudança de valor dispara um novo carregamento.
+   * Qualquer mudança de valor dispara um novo carregamento do nível atual.
    */
   recarregar: number;
   /** Id do documento atualmente aberto, para destacá-lo na lista. */
@@ -47,29 +52,44 @@ function etiquetas(resumo: ResumoDocumentoSalvo): string {
   return partes.length > 0 ? partes.join(" · ") : "Sem artefatos ainda";
 }
 
+/** Pluraliza a contagem de documentos de um caderno. */
+function rotuloDocumentos(total: number): string {
+  return total === 1 ? "1 documento" : `${total} documentos`;
+}
+
 /**
- * Tela de histórico: lista os documentos salvos localmente e permite reabrir
- * resultados anteriores (resumo/flashcards/exercícios). Os dados persistem
- * entre sessões, então o histórico reaparece após fechar e reabrir o app.
+ * Tela de histórico em dois níveis: primeiro lista os cadernos (um por
+ * matéria), e ao abrir um caderno lista os documentos daquele caderno com as
+ * ações de reabrir/remover. Os dados persistem entre sessões, então o
+ * histórico reaparece após fechar e reabrir o app.
  */
 export function Historico({
   recarregar,
   documentoAtivoId,
   onReabrir,
 }: HistoricoProps): React.JSX.Element {
+  // `null` = nível 1 (lista de cadernos); um id = nível 2 (documentos do
+  // caderno aberto).
+  const [cadernoAberto, setCadernoAberto] = useState<string | null>(null);
+  const [cadernos, setCadernos] = useState<ResumoCaderno[]>([]);
   const [itens, setItens] = useState<ResumoDocumentoSalvo[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Carrega a lista do disco. Usado pelo efeito (ao montar e quando `recarregar`
-  // muda) e pelos botões. O estado só é atualizado após a chamada assíncrona
-  // resolver, com um guarda `ativo` para ignorar respostas após desmontar.
+  // Carrega o nível atual do disco: cadernos (nível 1) ou documentos do
+  // caderno aberto (nível 2). Usado pelo efeito (ao montar, ao mudar de nível
+  // e quando `recarregar` muda) e pelos botões.
   async function carregar(): Promise<void> {
     setErro(null);
     setCarregando(true);
     try {
-      const lista = await window.api?.listarDocumentos();
-      setItens(lista ?? []);
+      if (cadernoAberto === null) {
+        const lista = await getApi().listarCadernos();
+        setCadernos(lista);
+      } else {
+        const lista = await getApi().listarDocumentos(cadernoAberto);
+        setItens(lista);
+      }
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {
@@ -81,8 +101,13 @@ export function Historico({
     let ativo = true;
     void (async () => {
       try {
-        const lista = await window.api?.listarDocumentos();
-        if (ativo) setItens(lista ?? []);
+        if (cadernoAberto === null) {
+          const lista = await getApi().listarCadernos();
+          if (ativo) setCadernos(lista);
+        } else {
+          const lista = await getApi().listarDocumentos(cadernoAberto);
+          if (ativo) setItens(lista);
+        }
       } catch (e) {
         if (ativo) setErro(mensagemDeErro(e));
       }
@@ -90,13 +115,13 @@ export function Historico({
     return () => {
       ativo = false;
     };
-  }, [recarregar]);
+  }, [recarregar, cadernoAberto]);
 
   async function reabrir(id: string): Promise<void> {
     setErro(null);
     try {
-      const documento = await window.api?.carregarDocumento(id);
-      if (documento) onReabrir(documento);
+      const documento = await getApi().carregarDocumento(id);
+      onReabrir(documento);
     } catch (e) {
       setErro(mensagemDeErro(e));
     }
@@ -105,7 +130,7 @@ export function Historico({
   async function remover(id: string): Promise<void> {
     setErro(null);
     try {
-      await window.api?.removerDocumento(id);
+      await getApi().removerDocumento(id);
       await carregar();
     } catch (e) {
       setErro(mensagemDeErro(e));
@@ -115,7 +140,20 @@ export function Historico({
   return (
     <section className="historico">
       <header className="historico-header">
-        <h2>Histórico</h2>
+        {cadernoAberto === null ? (
+          <h2>Histórico</h2>
+        ) : (
+          <button
+            type="button"
+            className="historico-voltar"
+            onClick={() => {
+              setErro(null);
+              setCadernoAberto(null);
+            }}
+          >
+            ← Cadernos
+          </button>
+        )}
         <button type="button" onClick={() => void carregar()} disabled={carregando}>
           {carregando ? "Atualizando…" : "Atualizar"}
         </button>
@@ -127,10 +165,44 @@ export function Historico({
         </p>
       )}
 
-      {itens.length === 0 ? (
+      {cadernoAberto === null ? (
+        cadernos.length === 0 ? (
+          <p className="app-meta">
+            Nenhum documento salvo ainda. Importe um arquivo e gere resumo,
+            flashcards ou exercícios para que fiquem salvos aqui.
+          </p>
+        ) : (
+          <ul className="historico-lista">
+            {cadernos.map((caderno) => (
+              <li key={caderno.cadernoId} className="historico-item">
+                <div className="historico-info">
+                  <span className="historico-nome">{caderno.cadernoNome}</span>
+                  <span className="app-meta">
+                    {rotuloDocumentos(caderno.totalDocumentos)}
+                  </span>
+                  <span className="app-meta">
+                    Atualizado em {formatarData(caderno.atualizadoEm)}
+                  </span>
+                </div>
+                <div className="historico-acoes">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErro(null);
+                      setCadernoAberto(caderno.cadernoId);
+                    }}
+                  >
+                    Abrir
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : itens.length === 0 ? (
         <p className="app-meta">
-          Nenhum documento salvo ainda. Importe um arquivo e gere resumo,
-          flashcards ou exercícios para que fiquem salvos aqui.
+          Este caderno não tem documentos. Ele pode ter ficado vazio após uma
+          remoção; volte para a lista de cadernos.
         </p>
       ) : (
         <ul className="historico-lista">
