@@ -39,6 +39,11 @@ export function App(): React.JSX.Element {
   const [versaoHistorico, setVersaoHistorico] = useState(0);
   // Aba atualmente visível. Começa em "Importar", o primeiro passo do fluxo.
   const [abaAtiva, setAbaAtiva] = useState<Aba>("importar");
+  // Aviso exibido quando uma operação de persistência falha. O resultado
+  // continua visível na tela; apenas não foi salvo em disco. `null` = sem aviso.
+  const [avisoPersistencia, setAvisoPersistencia] = useState<string | null>(
+    null,
+  );
 
   const temTexto =
     arquivo !== null && !arquivo.semTextoExtraivel && arquivo.texto.length > 0;
@@ -68,12 +73,20 @@ export function App(): React.JSX.Element {
       if (salvo) {
         setDocumento(salvo);
         setVersaoHistorico((v) => v + 1);
+        setAvisoPersistencia(null);
         // Com texto importado, leva o usuário ao próximo passo do fluxo.
         setAbaAtiva("resumo");
       }
     } catch {
-      // Falha ao criar o registro não bloqueia a geração; sem persistência
-      // nesta sessão. O erro de IPC já é tratado onde for relevante.
+      // Falha ao criar o registro não bloqueia a geração: o texto continua
+      // disponível nesta sessão, mas sem salvar no histórico. Avisa o usuário.
+      setAvisoPersistencia(
+        "Não foi possível salvar este documento no histórico. Você pode " +
+          "continuar usando o app normalmente, mas os resultados não serão " +
+          "guardados ao fechar.",
+      );
+      // Vai para o resumo mesmo assim: a geração funciona sem persistência.
+      setAbaAtiva("resumo");
     }
   }
 
@@ -100,52 +113,54 @@ export function App(): React.JSX.Element {
     abaAtiva === "exercicios";
   const abaExibida: Aba = ehAbaGeracao && !temTexto ? "importar" : abaAtiva;
 
-  async function salvarResumo(resumo: ResumoArtefato): Promise<void> {
+  /**
+   * Executa um save de artefato tratando sucesso e falha de forma uniforme:
+   * em sucesso atualiza o documento, recarrega o histórico e limpa o aviso;
+   * em falha mostra um aviso não-intrusivo (o resultado segue visível na tela,
+   * só não foi salvo). `rotulo` identifica o artefato na mensagem.
+   */
+  async function persistirArtefato(
+    rotulo: string,
+    operacao: () => Promise<DocumentoSalvo | undefined>,
+  ): Promise<void> {
     if (documento === null) return;
     try {
-      const atualizado = await window.api?.salvarResumo(documento.id, {
-        ...resumo,
-        documentoId: documento.id,
-      });
+      const atualizado = await operacao();
       if (atualizado) {
         setDocumento(atualizado);
         setVersaoHistorico((v) => v + 1);
+        setAvisoPersistencia(null);
       }
     } catch {
-      // Geração já exibida ao usuário; falha de persistência é silenciosa aqui.
+      setAvisoPersistencia(
+        `O ${rotulo} foi gerado, mas não foi possível salvá-lo no histórico. ` +
+          "Ele continua visível agora, mas pode não estar disponível ao reabrir o app.",
+      );
     }
+  }
+
+  async function salvarResumo(resumo: ResumoArtefato): Promise<void> {
+    if (documento === null) return;
+    await persistirArtefato("resumo", () =>
+      window.api?.salvarResumo(documento.id, {
+        ...resumo,
+        documentoId: documento.id,
+      }),
+    );
   }
 
   async function salvarFlashcards(flashcards: Flashcard[]): Promise<void> {
     if (documento === null) return;
-    try {
-      const atualizado = await window.api?.salvarFlashcards(
-        documento.id,
-        flashcards,
-      );
-      if (atualizado) {
-        setDocumento(atualizado);
-        setVersaoHistorico((v) => v + 1);
-      }
-    } catch {
-      // idem
-    }
+    await persistirArtefato("conjunto de flashcards", () =>
+      window.api?.salvarFlashcards(documento.id, flashcards),
+    );
   }
 
   async function salvarExercicios(exercicios: Exercicio[]): Promise<void> {
     if (documento === null) return;
-    try {
-      const atualizado = await window.api?.salvarExercicios(
-        documento.id,
-        exercicios,
-      );
-      if (atualizado) {
-        setDocumento(atualizado);
-        setVersaoHistorico((v) => v + 1);
-      }
-    } catch {
-      // idem
-    }
+    await persistirArtefato("conjunto de exercícios", () =>
+      window.api?.salvarExercicios(documento.id, exercicios),
+    );
   }
 
   // Abas de geração ficam desabilitadas enquanto não há texto importado.
@@ -177,6 +192,23 @@ export function App(): React.JSX.Element {
       </header>
 
       <OllamaStatus />
+
+      {avisoPersistencia !== null && (
+        <div className="app-aviso-persistencia" role="alert">
+          <span className="app-aviso-icone" aria-hidden="true">
+            ⚠️
+          </span>
+          <span className="app-aviso-texto">{avisoPersistencia}</span>
+          <button
+            type="button"
+            className="app-aviso-fechar"
+            onClick={() => setAvisoPersistencia(null)}
+            aria-label="Dispensar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <nav className="app-nav" aria-label="Navegação principal">
         {ABAS.map((aba) => (

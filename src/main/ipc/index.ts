@@ -127,10 +127,48 @@ function mensagemAmigavelPersistencia(erro: unknown): string {
  */
 let modeloSelecionado = defaultModel;
 
+/**
+ * Indica se o usuário já escolheu um modelo manualmente pelo seletor da UI.
+ * Enquanto `false`, o app pode reconciliar automaticamente o default com os
+ * modelos realmente instalados (ver `escolherModeloDisponivel`). Depois de uma
+ * escolha manual, a preferência do usuário é respeitada e não é sobrescrita.
+ */
+let modeloEscolhidoManualmente = false;
+
+/**
+ * Escolhe um modelo que realmente exista entre os instalados, dado o modelo
+ * atualmente desejado. Regras, em ordem de preferência:
+ *  1. Se o desejado já está instalado, mantém.
+ *  2. Senão, prefere uma variante da mesma família (mesmo prefixo antes do
+ *     `:`), ex.: desejado `llama3.1:8b` → casa com `llama3.1:latest`.
+ *  3. Senão, usa o primeiro modelo instalado.
+ *  4. Se não há nenhum instalado, mantém o desejado (a UI mostra o estado).
+ */
+export function escolherModeloDisponivel(
+  desejado: string,
+  instalados: string[],
+): string {
+  if (instalados.length === 0) return desejado;
+  if (instalados.includes(desejado)) return desejado;
+
+  const familia = desejado.split(":")[0];
+  const mesmaFamilia = instalados.find((m) => m.split(":")[0] === familia);
+  if (mesmaFamilia) return mesmaFamilia;
+
+  return instalados[0];
+}
+
 /** Monta o status atual do Ollama consultando disponibilidade e modelos. */
 async function obterStatusOllama(): Promise<OllamaStatus> {
   const disponivel = await isOllamaRunning();
   const modelos = disponivel ? await listModels() : [];
+  // Reconcilia o default com o que está de fato instalado, a menos que o
+  // usuário já tenha feito uma escolha manual. Assim, quando a máquina só tem
+  // `llama3.1:latest` e o default é `llama3.1:8b`, o app seleciona a tag que
+  // existe em vez de falhar na geração.
+  if (!modeloEscolhidoManualmente && modelos.length > 0) {
+    modeloSelecionado = escolherModeloDisponivel(modeloSelecionado, modelos);
+  }
   return { disponivel, modelos, modeloSelecionado };
 }
 
@@ -155,6 +193,8 @@ export function registerIpcHandlers(): void {
       // Ignora valores vazios: mantém o modelo atual em vez de ficar sem modelo.
       if (typeof modelo === "string" && modelo.trim().length > 0) {
         modeloSelecionado = modelo.trim();
+        // A partir de agora é escolha explícita do usuário: não reconciliar.
+        modeloEscolhidoManualmente = true;
       }
       return obterStatusOllama();
     },

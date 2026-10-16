@@ -112,6 +112,44 @@ body {
 
 /* ---------- Navegação por abas ---------- */
 
+.app-aviso-persistencia {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-aviso-fundo);
+  color: var(--cor-aviso-texto);
+  font-size: 0.9rem;
+}
+
+.app-aviso-icone {
+  flex: none;
+  line-height: 1.4;
+}
+
+.app-aviso-texto {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.app-aviso-fechar {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-aviso-texto);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.app-aviso-fechar:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .app-nav {
   display: flex;
   gap: 0.4rem;
