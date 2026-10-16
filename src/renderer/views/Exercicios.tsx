@@ -47,7 +47,12 @@ export function Exercicios({ arquivo }: ExerciciosProps): React.JSX.Element {
   const temTexto =
     arquivo !== null && !arquivo.semTextoExtraivel && arquivo.texto.length > 0;
 
-  // Mantém a quantidade dentro dos limites do MVP (5–100).
+  // Convenção dos limites 5–100 (decisão herdada da revisão da Task 6):
+  // o serviço (`normalizarQuantidade`) é a fonte da verdade e sempre faz
+  // clamp — essa é a garantia. A UI apenas antecipa o feedback, bloqueando o
+  // botão e avisando enquanto o valor está fora da faixa, para o usuário não
+  // ter a impressão de que o número digitado foi ignorado. As duas camadas são
+  // intencionais e consistentes (nunca sai pedido fora de 5–100).
   const quantidadeValida =
     quantidade >= QUANTIDADE_MINIMA && quantidade <= QUANTIDADE_MAXIMA;
 
