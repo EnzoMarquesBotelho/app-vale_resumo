@@ -93,6 +93,58 @@ export interface Exercicio {
   modo: ModoConteudo;
 }
 
+/** Natureza de uma pergunta do quiz: múltipla escolha ou aberta. */
+export type TipoPergunta = "multipla" | "aberta";
+
+/** Uma alternativa de uma pergunta de múltipla escolha. */
+export interface AlternativaQuiz {
+  /** Texto da alternativa (em português). */
+  texto: string;
+  /** `true` se esta é a alternativa correta. */
+  correta: boolean;
+}
+
+/**
+ * Uma pergunta do quiz. União discriminada por `tipo` (no estilo de
+ * `VinculoProva`): múltipla escolha carrega as `alternativas`; aberta carrega o
+ * `gabarito` esperado. Trata os dois casos sem campos ambíguos/opcionais soltos.
+ */
+export type PerguntaQuiz =
+  | {
+      /** Pergunta de múltipla escolha. */
+      tipo: "multipla";
+      /** Enunciado da pergunta (em português). */
+      enunciado: string;
+      /** Alternativas; exatamente uma com `correta: true`. */
+      alternativas: AlternativaQuiz[];
+    }
+  | {
+      /** Pergunta aberta (resposta discursiva). */
+      tipo: "aberta";
+      /** Enunciado da pergunta (em português). */
+      enunciado: string;
+      /** Resposta/gabarito esperado, para a correção por IA. */
+      gabarito: string;
+    };
+
+/** Modos de geração de quiz (próprio; não reusa `ModoConteudo`). */
+export type ModoQuiz = "multipla" | "aberta" | "misto";
+
+/**
+ * Quiz gerado a partir de um documento: o modo pedido mais as perguntas e os
+ * metadados de geração, análogo a `Resumo`/`MapaMental`.
+ */
+export interface Quiz {
+  /** Documento de origem. */
+  documentoId: string;
+  /** Modo usado para gerar o quiz. */
+  modo: ModoQuiz;
+  /** Perguntas do quiz (múltiplas e/ou abertas, conforme o modo). */
+  perguntas: PerguntaQuiz[];
+  /** Data de geração em formato ISO 8601. */
+  geradoEm: string;
+}
+
 /**
  * Resultado de importar e extrair o texto de um arquivo.
  * Produzido pelo serviço `files.ts` e devolvido ao renderer via IPC.
@@ -152,6 +204,8 @@ export interface DocumentoSalvo {
   exercicios?: Exercicio[];
   /** Mapa mental gerado, se houver. */
   mapaMental?: MapaMental;
+  /** Quiz gerado, se houver. */
+  quiz?: Quiz;
 }
 
 /**
@@ -181,6 +235,8 @@ export interface ResumoDocumentoSalvo {
   temExercicios: boolean;
   /** `true` se o documento tem um mapa mental salvo. */
   temMapaMental: boolean;
+  /** `true` se o documento tem um quiz salvo. */
+  temQuiz: boolean;
 }
 
 /** Um caderno agregado para a tela de Histórico (derivado dos documentos). */

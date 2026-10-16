@@ -6,8 +6,12 @@
  * Nomes de identificadores em inglês, conforme o estilo do projeto.
  */
 
-import { MAPA_PROFUNDIDADE_MAXIMA } from "./constants";
-import type { CadernoEmFoco, ModoConteudo, ModoResumo } from "./types";
+import {
+  MAPA_PROFUNDIDADE_MAXIMA,
+  QUIZ_ALTERNATIVAS_MAXIMO,
+  QUIZ_ALTERNATIVAS_MINIMO,
+} from "./constants";
+import type { CadernoEmFoco, ModoConteudo, ModoQuiz, ModoResumo } from "./types";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "./types";
 
 /** Instrução de tamanho/profundidade por modo de resumo. */
@@ -271,6 +275,84 @@ export function montarPromptCorrigirExercicios(
     `Corrija e responda APENAS com um JSON válido com ${n} exercícios, sem ` +
       "nenhum texto fora do JSON, no formato:",
     '{"exercicios": [{"enunciado": "...", "resposta": "..."}]}',
+    "",
+    "Resposta anterior a corrigir:",
+    respostaAnterior,
+  ].join("\n");
+}
+
+/** Instrução de natureza das perguntas por modo de quiz. */
+const INSTRUCOES_QUIZ: Record<ModoQuiz, string> = {
+  multipla:
+    "Gere APENAS perguntas OBJETIVAS (de múltipla escolha): cada uma com " +
+    "alternativas e exatamente uma correta.",
+  aberta:
+    "Gere APENAS perguntas ABERTAS (discursivas): cada uma com um gabarito " +
+    "esperado, sem alternativas.",
+  misto:
+    "Gere um quiz MISTO: combine perguntas objetivas (múltipla escolha) e " +
+    "abertas (discursivas), equilibrando os dois tipos.",
+};
+
+/**
+ * Formato (JSON) do quiz pedido ao modelo: uma lista de perguntas em que cada
+ * item é de `tipo` "multipla" (com `alternativas`, uma `correta: true`) ou
+ * "aberta" (com `gabarito`). Reusado no prompt normal e no corretivo.
+ */
+const FORMATO_QUIZ =
+  '{"perguntas": [' +
+  '{"tipo": "multipla", "enunciado": "...", "alternativas": ' +
+  '[{"texto": "...", "correta": true}, {"texto": "...", "correta": false}]}, ' +
+  '{"tipo": "aberta", "enunciado": "...", "gabarito": "..."}]}';
+
+/**
+ * Monta o prompt que pede um quiz com `quantidade` perguntas em JSON a partir
+ * do conteúdo, no `modo` escolhido (multipla/aberta/misto). A saída estruturada
+ * permite que a UI monte o quiz interativo; o parser (`quiz.ts`) é tolerante
+ * caso o modelo adicione texto ao redor do JSON. A `quantidade` é normalizada
+ * aos limites do MVP (5–100).
+ */
+export function montarPromptQuiz(
+  modo: ModoQuiz,
+  quantidade: number,
+  texto: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "Você é um assistente de estudos. Crie um quiz em português a partir do " +
+      "conteúdo abaixo.",
+    INSTRUCOES_QUIZ[modo],
+    `Gere exatamente ${n} perguntas cobrindo os pontos mais importantes do conteúdo.`,
+    `Cada pergunta de múltipla escolha deve ter entre ${QUIZ_ALTERNATIVAS_MINIMO} e ` +
+      `${QUIZ_ALTERNATIVAS_MAXIMO} alternativas, com exatamente uma marcada como ` +
+      '"correta": true.',
+    "Cada pergunta aberta deve ter um gabarito correto e conciso.",
+    "Responda APENAS com um JSON válido, sem comentários nem texto fora do JSON, " +
+      "no formato:",
+    FORMATO_QUIZ,
+    "",
+    "Conteúdo:",
+    texto,
+  ].join("\n");
+}
+
+/**
+ * Monta o prompt corretivo usado quando o modelo devolve um JSON malformado
+ * para o quiz. Reapresenta o formato esperado e a resposta anterior, pedindo
+ * somente o JSON corrigido. Usado pela re-tentativa única em `quiz.ts`.
+ */
+export function montarPromptCorrigirQuiz(
+  modo: ModoQuiz,
+  quantidade: number,
+  respostaAnterior: string,
+): string {
+  const n = normalizarQuantidade(quantidade);
+  return [
+    "A resposta anterior não era um JSON válido no formato pedido.",
+    INSTRUCOES_QUIZ[modo],
+    `Corrija e responda APENAS com um JSON válido com ${n} perguntas, sem ` +
+      "nenhum texto fora do JSON, no formato:",
+    FORMATO_QUIZ,
     "",
     "Resposta anterior a corrigir:",
     respostaAnterior,

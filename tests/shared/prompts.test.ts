@@ -3,9 +3,11 @@ import {
   montarPromptCombinarResumos,
   montarPromptCorrigirFlashcards,
   montarPromptCorrigirMapaMental,
+  montarPromptCorrigirQuiz,
   montarPromptDicaDoDia,
   montarPromptFlashcards,
   montarPromptMapaMental,
+  montarPromptQuiz,
   montarPromptResumo,
   normalizarQuantidade,
 } from "@shared/prompts";
@@ -154,5 +156,49 @@ describe("montarPromptDicaDoDia", () => {
     const prompt = montarPromptDicaDoDia("Prova", 1, []);
     expect(prompt).toContain("Nenhum caderno");
     expect(prompt).toContain("1 dias");
+  });
+});
+
+describe("montarPromptQuiz", () => {
+  it("inclui o conteúdo, a quantidade normalizada e o formato JSON", () => {
+    const prompt = montarPromptQuiz("misto", 8, "conteúdo de teste");
+    expect(prompt).toContain("conteúdo de teste");
+    expect(prompt).toContain("8 perguntas");
+    expect(prompt).toContain('"perguntas"');
+    expect(prompt).toContain('"tipo": "multipla"');
+    expect(prompt).toContain('"tipo": "aberta"');
+    expect(prompt.toLowerCase()).toContain("português");
+  });
+
+  it("instrui o modo múltipla (só objetivas)", () => {
+    const prompt = montarPromptQuiz("multipla", 5, "x");
+    expect(prompt).toContain("OBJETIVAS");
+    expect(prompt).not.toContain("APENAS perguntas ABERTAS");
+  });
+
+  it("instrui o modo aberta (só abertas)", () => {
+    const prompt = montarPromptQuiz("aberta", 5, "x");
+    expect(prompt).toContain("ABERTAS");
+    expect(prompt).not.toContain("APENAS perguntas OBJETIVAS");
+  });
+
+  it("instrui o modo misto (combinar os dois tipos)", () => {
+    const prompt = montarPromptQuiz("misto", 5, "x");
+    expect(prompt).toContain("MISTO");
+  });
+
+  it("normaliza a quantidade pedida aos limites (5–100)", () => {
+    expect(montarPromptQuiz("multipla", 2, "x")).toContain("5 perguntas");
+    expect(montarPromptQuiz("multipla", 200, "x")).toContain("100 perguntas");
+  });
+});
+
+describe("montarPromptCorrigirQuiz", () => {
+  it("reapresenta o formato e inclui a resposta anterior", () => {
+    const prompt = montarPromptCorrigirQuiz("misto", 10, "resposta ruim");
+    expect(prompt).toContain("não era um JSON válido");
+    expect(prompt).toContain("10 perguntas");
+    expect(prompt).toContain("resposta ruim");
+    expect(prompt).toContain('"perguntas"');
   });
 });

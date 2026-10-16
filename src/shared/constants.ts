@@ -51,6 +51,11 @@ export const PASTA_PROFUNDIDADE_MAXIMA = 10;
 /** Máximo de arquivos suportados aceitos em um único lote de importação. */
 export const PASTA_MAX_ARQUIVOS_LOTE = 500;
 
+/** Mínimo de alternativas em uma pergunta de múltipla escolha (poda defensiva). */
+export const QUIZ_ALTERNATIVAS_MINIMO = 2;
+/** Máximo de alternativas em uma pergunta de múltipla escolha (poda defensiva). */
+export const QUIZ_ALTERNATIVAS_MAXIMO = 6;
+
 /** Intervalos padrão de repetição espaçada: dias antes da prova. */
 export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;
 /** Teto defensivo de intervalos distintos aceitos por prova. */

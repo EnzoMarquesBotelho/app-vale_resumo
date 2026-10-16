@@ -269,6 +269,7 @@ export async function listarDocumentos(
         documento.exercicios !== undefined &&
         documento.exercicios.length > 0,
       temMapaMental: documento.mapaMental !== undefined,
+      temQuiz: documento.quiz !== undefined,
     });
   }
 
