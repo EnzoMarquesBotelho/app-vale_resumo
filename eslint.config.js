@@ -6,7 +6,11 @@ import reactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
   {
-    ignores: ["out", "dist", "node_modules"],
+    // `.worktrees` isola worktrees temporários criados durante o
+    // desenvolvimento; sem ignorá-los, `eslint .` desce neles e linta os
+    // arquivos buildados (out/) de lá, gerando centenas de erros fantasmas.
+    // `**/out` cobre o out/ de qualquer worktree, não só o da raiz.
+    ignores: ["out", "**/out", "dist", "node_modules", ".worktrees"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
