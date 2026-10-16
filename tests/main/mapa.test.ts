@@ -204,6 +204,20 @@ describe("gerarMapaMental", () => {
     const mapa = await gerarMapaMental({ texto: "conteúdo", gerar });
     expect(mapa.raiz.rotulo).toBe("Tema");
     expect(gerar).toHaveBeenCalledTimes(2);
+    // As gerações estruturadas passam "json" como 2º argumento.
+    expect(gerar.mock.calls[0][1]).toBe("json");
+    expect(gerar.mock.calls[1][1]).toBe("json");
+  });
+
+  it("re-tenta duas vezes: falha, falha, sucesso (3 chamadas)", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce("lixo")
+      .mockResolvedValueOnce("ainda lixo")
+      .mockResolvedValueOnce(arvoreValida);
+    const mapa = await gerarMapaMental({ texto: "conteúdo", gerar });
+    expect(mapa.raiz.rotulo).toBe("Tema");
+    expect(gerar).toHaveBeenCalledTimes(3);
   });
 
   it("lança MapaMentalInvalidoError após falha persistente", async () => {
@@ -211,7 +225,14 @@ describe("gerarMapaMental", () => {
     await expect(
       gerarMapaMental({ texto: "conteúdo", gerar }),
     ).rejects.toBeInstanceOf(MapaMentalInvalidoError);
-    expect(gerar).toHaveBeenCalledTimes(2);
+    expect(gerar).toHaveBeenCalledTimes(3);
+  });
+
+  it("a mensagem de erro orienta a usar um modelo de texto", () => {
+    const mensagem = new MapaMentalInvalidoError().message;
+    expect(mensagem).toMatch(/modelo de texto/);
+    expect(mensagem).toMatch(/llama3.1/);
+    expect(mensagem).toMatch(/moondream/);
   });
 
   it("propaga o erro do gerador (ex.: Ollama offline)", async () => {

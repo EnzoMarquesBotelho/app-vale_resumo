@@ -21,8 +21,16 @@ import {
 import type { Exercicio, Flashcard, ModoConteudo } from "@shared/types";
 import { generate as generatePadrao } from "./ollama.js";
 
-/** Função que gera texto a partir de um prompt (Ollama por padrão). */
-export type GerarTexto = (prompt: string) => Promise<string>;
+/**
+ * Função que gera texto a partir de um prompt (Ollama por padrão).
+ *
+ * O 2º parâmetro `format` é opcional: as gerações estruturadas passam `"json"`
+ * para forçar JSON nativo do Ollama. Mesma assinatura de `resumo.ts`.
+ */
+export type GerarTexto = (
+  prompt: string,
+  format?: "json" | Record<string, unknown>,
+) => Promise<string>;
 
 /** Erro lançado quando não há texto para gerar flashcards. */
 export class SemTextoParaFlashcardsError extends Error {
@@ -45,7 +53,9 @@ export class FlashcardsInvalidosError extends Error {
   readonly code = "FLASHCARDS_INVALIDOS" as const;
   constructor() {
     super(
-      "A IA não devolveu flashcards em um formato válido. Tente gerar novamente.",
+      "A IA não devolveu flashcards em um formato válido. Tente gerar novamente. " +
+        "Para melhores resultados, use um modelo de texto (ex.: llama3.1, qwen2.5, gemma2) " +
+        "e evite modelos de visão ou de embedding (moondream, minicpm-v, nomic-embed-text).",
     );
     this.name = "FlashcardsInvalidosError";
   }
@@ -197,15 +207,15 @@ export async function gerarFlashcards({
   }
   const n = normalizarQuantidade(quantidade);
 
-  // 1ª tentativa: prompt normal.
-  const primeira = await gerar(montarPromptFlashcards(n, texto));
+  // 1ª tentativa: prompt normal (JSON nativo do Ollama via format: "json").
+  const primeira = await gerar(montarPromptFlashcards(n, texto), "json");
   const flashcards = parseFlashcards(primeira);
   if (flashcards !== null) {
     return flashcards.slice(0, n);
   }
 
   // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
-  const segunda = await gerar(montarPromptCorrigirFlashcards(n, primeira));
+  const segunda = await gerar(montarPromptCorrigirFlashcards(n, primeira), "json");
   const corrigidos = parseFlashcards(segunda);
   if (corrigidos !== null) {
     return corrigidos.slice(0, n);
@@ -235,7 +245,9 @@ export class ExerciciosInvalidosError extends Error {
   readonly code = "EXERCICIOS_INVALIDOS" as const;
   constructor() {
     super(
-      "A IA não devolveu exercícios em um formato válido. Tente gerar novamente.",
+      "A IA não devolveu exercícios em um formato válido. Tente gerar novamente. " +
+        "Para melhores resultados, use um modelo de texto (ex.: llama3.1, qwen2.5, gemma2) " +
+        "e evite modelos de visão ou de embedding (moondream, minicpm-v, nomic-embed-text).",
     );
     this.name = "ExerciciosInvalidosError";
   }
@@ -342,15 +354,15 @@ export async function gerarExercicios({
   }
   const n = normalizarQuantidade(quantidade);
 
-  // 1ª tentativa: prompt normal.
-  const primeira = await gerar(montarPromptExercicios(modo, n, texto));
+  // 1ª tentativa: prompt normal (JSON nativo do Ollama via format: "json").
+  const primeira = await gerar(montarPromptExercicios(modo, n, texto), "json");
   const exercicios = parseExercicios(primeira, modo);
   if (exercicios !== null) {
     return exercicios.slice(0, n);
   }
 
   // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
-  const segunda = await gerar(montarPromptCorrigirExercicios(n, primeira));
+  const segunda = await gerar(montarPromptCorrigirExercicios(n, primeira), "json");
   const corrigidos = parseExercicios(segunda, modo);
   if (corrigidos !== null) {
     return corrigidos.slice(0, n);

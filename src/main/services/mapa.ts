@@ -5,8 +5,9 @@
  * devolve uma árvore em JSON (possivelmente "suja"), `extrairBlocoJson` extrai
  * o bloco, uma sanitização recursiva normaliza/valida a árvore (poda
  * profundidade/leque/tamanho, descarta nós sem rótulo, trunca rótulos longos) e
- * atribui ids densos, e há UMA re-tentativa corretiva antes de falhar com
- * mensagem amigável. Textos grandes são primeiro condensados via `gerarResumo`
+ * atribui ids densos, e há até DUAS re-tentativas corretivas (3 chamadas no
+ * total) antes de falhar com mensagem amigável. Textos grandes são primeiro
+ * condensados via `gerarResumo`
  * (como no resumo) para não estourar a janela de contexto.
  *
  * A chamada ao modelo é injetável (`gerar`) para os testes mockarem o Ollama.
@@ -49,7 +50,9 @@ export class MapaMentalInvalidoError extends Error {
   readonly code = "MAPA_MENTAL_INVALIDO" as const;
   constructor() {
     super(
-      "A IA não devolveu um mapa mental em um formato válido. Tente gerar novamente.",
+      "A IA não devolveu um mapa mental em um formato válido. Tente gerar novamente. " +
+        "Para melhores resultados, use um modelo de texto (ex.: llama3.1, qwen2.5, gemma2) " +
+        "e evite modelos de visão ou de embedding (moondream, minicpm-v, nomic-embed-text).",
     );
     this.name = "MapaMentalInvalidoError";
   }
@@ -187,7 +190,8 @@ export interface GerarMapaMentalParams {
  *     com o mesmo `tamanhoChunk`, e usa o resumo inteiro como base (passo único,
  *     sem re-chunk);
  *  3. 1ª tentativa: pede a árvore e tenta interpretar; se malformada, dispara
- *     UMA re-tentativa corretiva;
+ *     até DUAS re-tentativas corretivas (3 chamadas no total), cada uma
+ *     alimentada pela resposta crua anterior;
  *  4. se ainda falhar → `MapaMentalInvalidoError`.
  *
  * @throws {SemTextoParaMapaMentalError} se o texto estiver vazio.
@@ -210,22 +214,31 @@ export async function gerarMapaMental({
       ? await gerarResumo({ texto, modo: "longo", gerar, tamanhoChunk })
       : texto;
 
-  // 1ª tentativa: prompt normal.
-  const primeira = await gerar(montarPromptMapaMental(base));
+  // 1ª tentativa: prompt normal (JSON nativo do Ollama via format: "json").
+  const primeira = await gerar(montarPromptMapaMental(base), "json");
   const raiz = parseMapaMental(primeira);
   if (raiz !== null) {
     return { documentoId: "", raiz, geradoEm: new Date().toISOString() };
   }
 
-  // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
-  const segunda = await gerar(montarPromptCorrigirMapaMental(primeira));
-  const corrigida = parseMapaMental(segunda);
-  if (corrigida !== null) {
-    return {
-      documentoId: "",
-      raiz: corrigida,
-      geradoEm: new Date().toISOString(),
-    };
+  // Até DUAS re-tentativas corretivas (3 chamadas no total): cada corretiva
+  // reapresenta o formato e a resposta crua anterior. Retorna no 1º sucesso.
+  let ultimaRespostaCrua = primeira;
+  const MAX_RETENTATIVAS = 2;
+  for (let tentativa = 0; tentativa < MAX_RETENTATIVAS; tentativa += 1) {
+    const corretiva = await gerar(
+      montarPromptCorrigirMapaMental(ultimaRespostaCrua),
+      "json",
+    );
+    const corrigida = parseMapaMental(corretiva);
+    if (corrigida !== null) {
+      return {
+        documentoId: "",
+        raiz: corrigida,
+        geradoEm: new Date().toISOString(),
+      };
+    }
+    ultimaRespostaCrua = corretiva;
   }
 
   throw new MapaMentalInvalidoError();

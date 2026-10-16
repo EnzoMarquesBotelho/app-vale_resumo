@@ -21,12 +21,22 @@ vi.mock("electron", () => ({
 
 // Ollama mockado no nível do serviço: `generate` não chama modelo real.
 const generate =
-  vi.fn<(p: { prompt: string; model?: string }) => Promise<string>>();
+  vi.fn<
+    (p: {
+      prompt: string;
+      model?: string;
+      format?: "json" | Record<string, unknown>;
+    }) => Promise<string>
+  >();
 vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
   },
-  generate: (params: { prompt: string; model?: string }) => generate(params),
+  generate: (params: {
+    prompt: string;
+    model?: string;
+    format?: "json" | Record<string, unknown>;
+  }) => generate(params),
   isOllamaRunning: vi.fn(),
   listModels: vi.fn(),
 }));
@@ -70,6 +80,8 @@ describe("IPC: gerar flashcards", () => {
     const params = generate.mock.calls[0][0];
     expect(params.prompt).toContain("texto base");
     expect(params.model).toBe("llama3.1:8b");
+    // A geração estruturada força JSON nativo do Ollama.
+    expect(params.format).toBe("json");
   });
 
   it("re-tenta quando o 1º JSON vem malformado, sem quebrar", async () => {

@@ -24,8 +24,17 @@ import {
 import type { ModoResumo } from "@shared/types";
 import { generate as generatePadrao } from "./ollama.js";
 
-/** Função que gera texto a partir de um prompt (Ollama por padrão). */
-export type GerarTexto = (prompt: string) => Promise<string>;
+/**
+ * Função que gera texto a partir de um prompt (Ollama por padrão).
+ *
+ * O 2º parâmetro `format` é opcional: as gerações estruturadas (mapa mental,
+ * flashcards, exercícios) passam `"json"` para forçar JSON nativo do Ollama; o
+ * resumo não o usa (texto livre).
+ */
+export type GerarTexto = (
+  prompt: string,
+  format?: "json" | Record<string, unknown>,
+) => Promise<string>;
 
 /** Parâmetros para gerar um resumo. */
 export interface GerarResumoParams {

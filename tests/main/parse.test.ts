@@ -134,6 +134,13 @@ describe("gerarFlashcards", () => {
     expect(gerar).toHaveBeenCalledTimes(2);
   });
 
+  it("a mensagem de erro orienta a usar um modelo de texto", () => {
+    const mensagem = new FlashcardsInvalidosError().message;
+    expect(mensagem).toMatch(/modelo de texto/);
+    expect(mensagem).toMatch(/llama3.1/);
+    expect(mensagem).toMatch(/moondream/);
+  });
+
   it("limita a quantidade de flashcards devolvidos ao máximo pedido", async () => {
     const resposta = JSON.stringify({
       flashcards: Array.from({ length: 10 }, (_, i) => ({

@@ -20,13 +20,24 @@ vi.mock("electron", () => ({
 }));
 
 // Ollama mockado no nível do serviço: `generate` não chama modelo real.
-const generate = vi.fn<(p: { prompt: string; model?: string }) => Promise<string>>();
+const generate =
+  vi.fn<
+    (p: {
+      prompt: string;
+      model?: string;
+      format?: "json" | Record<string, unknown>;
+    }) => Promise<string>
+  >();
 const listModels = vi.fn<() => Promise<string[]>>();
 vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
   },
-  generate: (params: { prompt: string; model?: string }) => generate(params),
+  generate: (params: {
+    prompt: string;
+    model?: string;
+    format?: "json" | Record<string, unknown>;
+  }) => generate(params),
   isOllamaRunning: vi.fn(),
   listModels: () => listModels(),
 }));
@@ -71,6 +82,8 @@ describe("IPC: gerar resumo", () => {
     const params = generate.mock.calls[0][0];
     expect(params.prompt).toContain("texto para resumir");
     expect(params.model).toBe("llama3.1:8b");
+    // O resumo é texto livre: nunca envia format.
+    expect(params.format).toBeUndefined();
   });
 
   it("resolve o modelo para uma variante instalada quando o default não existe", async () => {

@@ -119,6 +119,32 @@ describe("generate", () => {
     expect(corpo.model).toBe("qwen2.5:7b");
   });
 
+  it("inclui format no corpo quando fornecido", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respostaFake({ ok: true, json: { response: "ok" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generate({ prompt: "x", format: "json" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const corpo = JSON.parse(init.body as string) as { format?: string };
+    expect(corpo.format).toBe("json");
+  });
+
+  it("omite format do corpo quando não fornecido", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respostaFake({ ok: true, json: { response: "ok" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generate({ prompt: "x" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const corpo = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(Object.keys(corpo)).not.toContain("format");
+  });
+
   it("lança OllamaIndisponivelError quando o fetch rejeita (offline)", async () => {
     vi.stubGlobal(
       "fetch",

@@ -19,6 +19,13 @@ export interface GenerateParams {
   prompt: string;
   /** Modelo a usar. Default: `defaultModel` (`llama3.1:8b`). */
   model?: string;
+  /**
+   * Formato de saída nativo do Ollama. Quando presente (`"json"` ou um
+   * JSON-schema), instrui o modelo a devolver JSON — usado nas gerações
+   * estruturadas (mapa mental, flashcards, exercícios). Quando ausente, a
+   * geração permanece em texto livre (ex.: resumo), mantendo compat retroativa.
+   */
+  format?: "json" | Record<string, unknown>;
 }
 
 /**
@@ -84,13 +91,21 @@ interface GenerateResponse {
 export async function generate({
   prompt,
   model = defaultModel,
+  format,
 }: GenerateParams): Promise<string> {
   let res: Response;
   try {
     res = await fetch(`${ollamaBaseUrl}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, stream: false }),
+      // `format` só entra no corpo quando definido: sem ele, o corpo é idêntico
+      // ao anterior (texto livre), preservando compat retroativa.
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+        ...(format !== undefined ? { format } : {}),
+      }),
     });
   } catch {
     // Falha de rede = Ollama não está rodando.

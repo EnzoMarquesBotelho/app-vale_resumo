@@ -315,7 +315,7 @@ export function registerIpcHandlers(): void {
         return await gerarFlashcards({
           texto,
           quantidade,
-          gerar: (prompt) => generate({ prompt, model }),
+          gerar: (prompt, format) => generate({ prompt, model, format }),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelFlashcards(erro));
@@ -338,7 +338,7 @@ export function registerIpcHandlers(): void {
           texto,
           modo,
           quantidade,
-          gerar: (prompt) => generate({ prompt, model }),
+          gerar: (prompt, format) => generate({ prompt, model, format }),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelExercicios(erro));
@@ -354,7 +354,7 @@ export function registerIpcHandlers(): void {
         const model = await modeloParaGeracao();
         const mapa = await gerarMapaMental({
           texto,
-          gerar: (prompt) => generate({ prompt, model }),
+          gerar: (prompt, format) => generate({ prompt, model, format }),
         });
         return mapa.raiz;
       } catch (erro) {

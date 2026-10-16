@@ -22,13 +22,23 @@ vi.mock("electron", () => ({
 // Ollama mockado no nível do serviço: `generate` não chama modelo real.
 // `listModels` devolve uma lista para exercitar a resolução via modeloParaGeracao.
 const generate =
-  vi.fn<(p: { prompt: string; model?: string }) => Promise<string>>();
+  vi.fn<
+    (p: {
+      prompt: string;
+      model?: string;
+      format?: "json" | Record<string, unknown>;
+    }) => Promise<string>
+  >();
 const listModels = vi.fn<() => Promise<string[]>>();
 vi.mock("../../src/main/services/ollama.js", () => ({
   OllamaIndisponivelError: class OllamaIndisponivelError extends Error {
     readonly code = "OLLAMA_INDISPONIVEL" as const;
   },
-  generate: (params: { prompt: string; model?: string }) => generate(params),
+  generate: (params: {
+    prompt: string;
+    model?: string;
+    format?: "json" | Record<string, unknown>;
+  }) => generate(params),
   isOllamaRunning: vi.fn(),
   listModels: () => listModels(),
 }));
@@ -76,6 +86,8 @@ describe("IPC: gerar mapa mental", () => {
     expect(params.prompt).toContain("texto base");
     // Sem modelo instalado, cai no default (modeloParaGeracao → selecionado).
     expect(params.model).toBe("llama3.1:8b");
+    // A geração estruturada força JSON nativo do Ollama.
+    expect(params.format).toBe("json");
   });
 
   it("resolve o modelo via modeloParaGeracao (reconcilia a família instalada)", async () => {
