@@ -1,6 +1,7 @@
 import { dialog, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
+import { montarCaderno } from "@shared/notebooks";
 import type {
   ArquivoImportado,
   DocumentoSalvo,
@@ -11,6 +12,7 @@ import type {
   ModoResumo,
   OllamaStatus,
   Resumo,
+  ResumoCaderno,
   ResumoDocumentoSalvo,
 } from "@shared/types";
 import {
@@ -37,6 +39,7 @@ import {
   DocumentoNaoEncontradoError,
   carregarDocumento,
   criarDocumento,
+  listarCadernos,
   listarDocumentos,
   removerDocumento,
   salvarExercicios,
@@ -325,9 +328,21 @@ export function registerIpcHandlers(): void {
       nome: string,
       formato: FormatoArquivo,
       texto: string,
+      cadernoNome: string,
+      caminhoOrigem?: string,
     ): Promise<DocumentoSalvo> => {
       try {
-        return await criarDocumento({ nome, formato, texto });
+        // O id do caderno é derivado server-side a partir da grafia escolhida.
+        const { cadernoId, cadernoNome: nomeMontado } =
+          montarCaderno(cadernoNome);
+        return await criarDocumento({
+          nome,
+          formato,
+          texto,
+          cadernoId,
+          cadernoNome: nomeMontado,
+          caminhoOrigem,
+        });
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));
       }
@@ -377,9 +392,20 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.listarDocumentos,
-    async (): Promise<ResumoDocumentoSalvo[]> => {
+    async (_event, cadernoId?: string): Promise<ResumoDocumentoSalvo[]> => {
       try {
-        return await listarDocumentos();
+        return await listarDocumentos(cadernoId);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelPersistencia(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.listarCadernos,
+    async (): Promise<ResumoCaderno[]> => {
+      try {
+        return await listarCadernos();
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));
       }

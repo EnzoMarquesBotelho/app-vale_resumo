@@ -46,6 +46,15 @@ describe("importarArquivo: texto puro", () => {
     expect(r.texto).toContain("ção, ã, é");
   });
 
+  it("devolve caminhoOrigem e a sugestão de caderno da pasta-mãe", async () => {
+    const caminho = fixture("amostra.txt");
+    const r = await importarArquivo(caminho);
+    expect(r.caminhoOrigem).toBe(caminho);
+    // Pasta-mãe dos fixtures: "fixtures" → id "fixtures".
+    expect(r.cadernoIdSugerido).toBe("fixtures");
+    expect(r.cadernoNomeSugerido).toBe("fixtures");
+  });
+
   it("lê .md preservando o conteúdo markdown", async () => {
     const r = await importarArquivo(fixture("amostra.md"));
     expect(r.formato).toBe("md");
@@ -68,11 +77,16 @@ describe("importarArquivo: texto puro", () => {
 
 describe("importarArquivo: PDF", () => {
   it("extrai o texto de um PDF com conteúdo", async () => {
-    const r = await importarArquivo(fixture("com-texto.pdf"));
+    const caminho = fixture("com-texto.pdf");
+    const r = await importarArquivo(caminho);
     expect(r.formato).toBe("pdf");
     expect(r.semTextoExtraivel).toBe(false);
     expect(r.texto).toContain("Resumo de Biologia Celular");
     expect(r.texto).toContain("mitocondria");
+    // A sugestão de caderno também vem no ramo PDF.
+    expect(r.caminhoOrigem).toBe(caminho);
+    expect(r.cadernoIdSugerido).toBe("fixtures");
+    expect(r.cadernoNomeSugerido).toBe("fixtures");
   });
 
   it("marca PDF sem texto extraível (escaneado/vazio)", async () => {

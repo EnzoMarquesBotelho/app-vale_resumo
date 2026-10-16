@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { app, BrowserWindow } from "electron";
 import { registerIpcHandlers } from "./ipc/index.js";
+import { migrarCadernos } from "./services/storage.js";
 
 const isDev = !app.isPackaged;
 
@@ -31,7 +32,11 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Migra documentos legados para o modelo de cadernos ANTES de registrar os
+  // handlers de IPC e abrir a janela. É best-effort e nunca lança, então não
+  // impede o app de abrir.
+  await migrarCadernos();
   registerIpcHandlers();
   createWindow();
 

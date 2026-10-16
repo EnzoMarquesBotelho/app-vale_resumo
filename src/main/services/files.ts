@@ -11,6 +11,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extensoesSuportadas, tamanhoMaximoArquivoBytes } from "@shared/constants";
+import { derivarCadernoDeCaminho } from "@shared/notebooks";
 import type { ArquivoImportado, FormatoArquivo } from "@shared/types";
 
 /** Erro lançado quando o formato do arquivo não é suportado no MVP. */
@@ -87,6 +88,10 @@ export async function importarArquivo(
   const formato = detectarFormato(caminho);
   const nome = basename(caminho);
 
+  // Sugestão de caderno derivada da pasta-mãe (palpite literal, editável na UI).
+  const { cadernoId: cadernoIdSugerido, cadernoNome: cadernoNomeSugerido } =
+    derivarCadernoDeCaminho(caminho);
+
   // Guarda de tamanho: evita carregar arquivos enormes inteiros na memória.
   const { size } = await stat(caminho);
   if (size > tamanhoMaximoArquivoBytes) {
@@ -97,10 +102,26 @@ export async function importarArquivo(
     const buffer = await readFile(caminho);
     const texto = await extrairTextoPdf(new Uint8Array(buffer));
     const semTextoExtraivel = texto.length === 0;
-    return { nome, formato, texto, semTextoExtraivel };
+    return {
+      nome,
+      formato,
+      texto,
+      semTextoExtraivel,
+      caminhoOrigem: caminho,
+      cadernoIdSugerido,
+      cadernoNomeSugerido,
+    };
   }
 
   // .txt e .md: texto puro em UTF-8.
   const texto = (await readFile(caminho, "utf-8")).trim();
-  return { nome, formato, texto, semTextoExtraivel: false };
+  return {
+    nome,
+    formato,
+    texto,
+    semTextoExtraivel: false,
+    caminhoOrigem: caminho,
+    cadernoIdSugerido,
+    cadernoNomeSugerido,
+  };
 }
