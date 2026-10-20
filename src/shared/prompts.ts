@@ -358,3 +358,61 @@ export function montarPromptCorrigirQuiz(
     respostaAnterior,
   ].join("\n");
 }
+
+/**
+ * Formato (JSON) da avaliação pedida ao modelo: um único objeto com o veredito
+ * (um dos três níveis) e um comentário curto. Reusado no prompt normal e no
+ * corretivo. Um único prompt serve exercícios e perguntas abertas do quiz.
+ */
+const FORMATO_AVALIACAO =
+  '{"veredito": "correto|parcial|incorreto", "comentario": "..."}';
+
+/**
+ * Monta o prompt que pede a correção de UMA resposta de aluno em JSON, dado o
+ * enunciado, o gabarito esperado e a resposta dada. Define o papel de corretor
+ * e os três níveis de veredito explicitamente; pede um comentário curto (1–2
+ * frases em português). A saída estruturada permite que a UI mostre o selo e o
+ * comentário; o parser (`avaliacao.ts`) é tolerante caso o modelo adicione
+ * texto ao redor do JSON. Um único prompt serve exercícios e quiz.
+ */
+export function montarPromptAvaliacao(
+  enunciado: string,
+  gabarito: string,
+  resposta: string,
+): string {
+  return [
+    "Você é um corretor de estudos. Avalie em português a resposta do aluno " +
+      "comparando-a com o gabarito, e classifique em um dos três níveis:",
+    '- "correto": a resposta está certa e cobre o que o gabarito pede;',
+    '- "parcial": a resposta está parcialmente certa (incompleta ou com ' +
+      "imprecisões);",
+    '- "incorreto": a resposta está errada ou não responde ao que foi pedido.',
+    "Escreva um comentário CURTO (1 a 2 frases em português) justificando o " +
+      "veredito.",
+    "Responda APENAS com um JSON válido, sem comentários nem texto fora do " +
+      "JSON, no formato:",
+    FORMATO_AVALIACAO,
+    "",
+    `Enunciado: ${enunciado}`,
+    `Gabarito: ${gabarito}`,
+    `Resposta do aluno: ${resposta}`,
+  ].join("\n");
+}
+
+/**
+ * Monta o prompt corretivo usado quando o modelo devolve um JSON malformado
+ * para a avaliação. Reapresenta o formato esperado e a resposta anterior,
+ * pedindo somente o JSON corrigido. Usado pela re-tentativa única em
+ * `avaliacao.ts`.
+ */
+export function montarPromptCorrigirAvaliacao(respostaAnterior: string): string {
+  return [
+    "A resposta anterior não era um JSON válido no formato pedido.",
+    "Corrija e responda APENAS com um JSON válido da avaliação, sem nenhum " +
+      "texto fora do JSON, no formato:",
+    FORMATO_AVALIACAO,
+    "",
+    "Resposta anterior a corrigir:",
+    respostaAnterior,
+  ].join("\n");
+}

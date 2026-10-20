@@ -5,9 +5,11 @@ import { montarCaderno } from "@shared/notebooks";
 import { calcularDicaDoDia } from "@shared/agenda";
 import type {
   ArquivoImportado,
+  AvaliacaoResposta,
   CadernoEmFoco,
   DicaDoDia,
   DocumentoSalvo,
+  EntradaAvaliacao,
   Exercicio,
   Flashcard,
   FormatoArquivo,
@@ -51,6 +53,7 @@ import {
   SemTextoParaQuizError,
   gerarQuiz,
 } from "../services/quiz.js";
+import { avaliarLote } from "../services/avaliacao.js";
 import {
   ExerciciosInvalidosError,
   FlashcardsInvalidosError,
@@ -209,6 +212,22 @@ function mensagemAmigavelQuiz(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar o quiz. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da avaliação por IA em mensagens amigáveis.
+ * Só há erros de infra a mapear (`OllamaIndisponivelError`/`GeracaoFalhouError`,
+ * devolvendo a `message` tipada); veredito inválido é resultado por-item, não
+ * exceção. O restante cai na genérica.
+ */
+function mensagemAmigavelAvaliacao(erro: unknown): string {
+  if (erro instanceof OllamaIndisponivelError) {
+    return erro.message;
+  }
+  if (erro instanceof GeracaoFalhouError) {
+    return erro.message;
+  }
+  return "Não foi possível avaliar as respostas. Tente novamente.";
 }
 
 /**
@@ -551,6 +570,25 @@ export function registerIpcHandlers(): void {
         return quiz.perguntas;
       } catch (erro) {
         throw new Error(mensagemAmigavelQuiz(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.avaliarRespostas,
+    async (
+      _event,
+      entradas: EntradaAvaliacao[],
+    ): Promise<AvaliacaoResposta[]> => {
+      try {
+        // Resolve um modelo que exista agora (evita "model not found").
+        const model = await modeloParaGeracao();
+        const { avaliacoes } = await avaliarLote(entradas, (prompt, format) =>
+          generate({ prompt, model, format }),
+        );
+        return avaliacoes;
+      } catch (erro) {
+        throw new Error(mensagemAmigavelAvaliacao(erro));
       }
     },
   );

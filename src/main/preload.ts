@@ -28,6 +28,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarMapaMental, texto),
   gerarQuiz: (texto, modo, quantidade) =>
     ipcRenderer.invoke(IPC_CHANNELS.gerarQuiz, texto, modo, quantidade),
+  avaliarRespostas: (entradas) =>
+    ipcRenderer.invoke(IPC_CHANNELS.avaliarRespostas, entradas),
   criarDocumento: (nome, formato, texto, cadernoNome, caminhoOrigem) =>
     ipcRenderer.invoke(
       IPC_CHANNELS.criarDocumento,

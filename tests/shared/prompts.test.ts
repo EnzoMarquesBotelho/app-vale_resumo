@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  montarPromptAvaliacao,
   montarPromptCombinarResumos,
+  montarPromptCorrigirAvaliacao,
   montarPromptCorrigirFlashcards,
   montarPromptCorrigirMapaMental,
   montarPromptCorrigirQuiz,
@@ -200,5 +202,41 @@ describe("montarPromptCorrigirQuiz", () => {
     expect(prompt).toContain("10 perguntas");
     expect(prompt).toContain("resposta ruim");
     expect(prompt).toContain('"perguntas"');
+  });
+});
+
+describe("montarPromptAvaliacao", () => {
+  it("inclui enunciado, gabarito e resposta do aluno", () => {
+    const prompt = montarPromptAvaliacao(
+      "O que é fotossíntese?",
+      "Processo que converte luz em energia química.",
+      "É quando a planta faz comida.",
+    );
+    expect(prompt).toContain("O que é fotossíntese?");
+    expect(prompt).toContain("Processo que converte luz em energia química.");
+    expect(prompt).toContain("É quando a planta faz comida.");
+    expect(prompt).toContain("Enunciado:");
+    expect(prompt).toContain("Gabarito:");
+    expect(prompt).toContain("Resposta do aluno:");
+  });
+
+  it("pede o formato JSON com os três níveis de veredito", () => {
+    const prompt = montarPromptAvaliacao("e", "g", "r");
+    expect(prompt).toContain('"veredito"');
+    expect(prompt).toContain('"comentario"');
+    expect(prompt).toContain("correto");
+    expect(prompt).toContain("parcial");
+    expect(prompt).toContain("incorreto");
+    expect(prompt.toLowerCase()).toContain("português");
+  });
+});
+
+describe("montarPromptCorrigirAvaliacao", () => {
+  it("reapresenta o formato e inclui a resposta anterior", () => {
+    const prompt = montarPromptCorrigirAvaliacao("resposta ruim");
+    expect(prompt).toContain("não era um JSON válido");
+    expect(prompt).toContain("resposta ruim");
+    expect(prompt).toContain('"veredito"');
+    expect(prompt).toContain('"comentario"');
   });
 });

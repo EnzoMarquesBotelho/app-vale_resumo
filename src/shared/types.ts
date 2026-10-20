@@ -131,6 +131,41 @@ export type PerguntaQuiz =
 export type ModoQuiz = "multipla" | "aberta" | "misto";
 
 /**
+ * Veredito de uma resposta corrigida pela IA: certa, parcialmente certa ou
+ * errada. Os três níveis são o contrato fechado que o serviço aceita do
+ * modelo; qualquer outro valor é rejeitado no parsing.
+ */
+export type Veredito = "correto" | "parcial" | "incorreto";
+
+/**
+ * Resultado da correção por IA de uma resposta. `veredito` carrega o valor
+ * extra `"nao_avaliado"` como o estado seguro (resposta vazia ou a IA não
+ * conseguiu avaliar) — modelado como um valor explícito, NÃO como `null`, para
+ * a UI tratar sempre um veredito concreto. `comentario` é um feedback curto em
+ * português (podado de forma defensiva no serviço).
+ */
+export interface AvaliacaoResposta {
+  /** Veredito do modelo, ou `"nao_avaliado"` quando não há avaliação. */
+  veredito: Veredito | "nao_avaliado";
+  /** Comentário curto em português explicando o veredito. */
+  comentario: string;
+}
+
+/**
+ * Entrada para avaliar uma única resposta: o enunciado da questão, o gabarito
+ * esperado e a resposta dada pelo aluno. Serve tanto para exercícios quanto
+ * para as perguntas abertas do quiz — a mesma fronteira para os dois.
+ */
+export interface EntradaAvaliacao {
+  /** Enunciado da questão (exercício ou pergunta aberta). */
+  enunciado: string;
+  /** Resposta esperada/gabarito usado como referência pela IA. */
+  gabarito: string;
+  /** Resposta dada pelo aluno, a ser avaliada. */
+  resposta: string;
+}
+
+/**
  * Quiz gerado a partir de um documento: o modo pedido mais as perguntas e os
  * metadados de geração, análogo a `Resumo`/`MapaMental`.
  */

@@ -7,8 +7,10 @@
 
 import type {
   ArquivoImportado,
+  AvaliacaoResposta,
   DicaDoDia,
   DocumentoSalvo,
+  EntradaAvaliacao,
   Exercicio,
   Flashcard,
   FormatoArquivo,
@@ -52,6 +54,8 @@ export const IPC_CHANNELS = {
   gerarMapaMental: "mapamental:gerar",
   /** Gera um quiz (múltipla/aberta/misto, 5–100) a partir de um texto. */
   gerarQuiz: "quiz:gerar",
+  /** Avalia por IA um lote de respostas (exercícios e perguntas abertas). */
+  avaliarRespostas: "avaliacao:avaliar",
   /** Cria e salva um novo documento (sem artefatos) a partir de um arquivo. */
   criarDocumento: "documento:criar",
   /** Salva o resumo gerado em um documento existente. */
@@ -177,6 +181,18 @@ export interface AppApi {
     modo: ModoQuiz,
     quantidade: number,
   ) => Promise<PerguntaQuiz[]>;
+  /**
+   * Avalia por IA um lote de respostas (enunciado + gabarito + resposta do
+   * aluno), servindo exercícios e perguntas abertas do quiz. Devolve as
+   * avaliações na MESMA ordem das entradas (alinhadas por índice). Respostas
+   * vazias não vão ao modelo (viram `"nao_avaliado"`); vereditos inválidos
+   * viram `"nao_avaliado"` por item, sem quebrar o lote. Lança uma mensagem
+   * amigável se o Ollama estiver indisponível ou a geração falhar.
+   * @returns a lista de avaliações, uma por entrada, na ordem recebida.
+   */
+  avaliarRespostas: (
+    entradas: EntradaAvaliacao[],
+  ) => Promise<AvaliacaoResposta[]>;
   /**
    * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
    * importado, para que os artefatos gerados possam ser anexados e persistidos.

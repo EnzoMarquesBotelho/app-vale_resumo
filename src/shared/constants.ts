@@ -66,6 +66,14 @@ export const QUIZ_ALTERNATIVAS_MINIMO = 2;
 /** Máximo de alternativas em uma pergunta de múltipla escolha (poda defensiva). */
 export const QUIZ_ALTERNATIVAS_MAXIMO = 6;
 
+/**
+ * Comprimento máximo (em caracteres) do comentário de uma avaliação por IA;
+ * truncado com reticência na fronteira de palavra no serviço (`avaliacao.ts`),
+ * espelhando a poda defensiva de `MAPA_ROTULO_MAX`. Defende a UI contra
+ * comentários gigantes que o modelo às vezes devolve.
+ */
+export const AVALIACAO_COMENTARIO_MAX = 600;
+
 /** Intervalos padrão de repetição espaçada: dias antes da prova. */
 export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;
 /** Teto defensivo de intervalos distintos aceitos por prova. */
