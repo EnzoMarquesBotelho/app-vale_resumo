@@ -2,7 +2,14 @@ import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
 import { calcularPontuacao } from "@shared/quizScore";
 import type { RespostaUsuarioPura } from "@shared/quizScore";
-import type { ArquivoImportado, ModoQuiz, PerguntaQuiz, Quiz as QuizArtefato } from "@shared/types";
+import type {
+  ArquivoImportado,
+  AvaliacaoResposta,
+  EntradaAvaliacao,
+  ModoQuiz,
+  PerguntaQuiz,
+  Quiz as QuizArtefato,
+} from "@shared/types";
 import { getApi } from "../api";
 
 /**
@@ -21,6 +28,23 @@ function mensagemDeErro(e: unknown): string {
 
 /** Alias local da resposta do usuário (forma pura compartilhada). */
 type RespostaUsuario = RespostaUsuarioPura;
+
+/**
+ * Como as perguntas abertas são corrigidas na revisão: `autoavaliacao` mostra
+ * o gabarito e deixa o aluno se autoavaliar (comportamento padrão); `ia`
+ * envia as abertas à IA local para um veredito automático. As objetivas são
+ * SEMPRE corrigidas pelo gabarito (`calcularPontuacao`), independentemente do
+ * modo escolhido.
+ */
+type ModoCorrecao = "autoavaliacao" | "ia";
+
+/** Rótulo em português para cada veredito exibido no selo. */
+const ROTULO_VEREDITO: Record<AvaliacaoResposta["veredito"], string> = {
+  correto: "Correto",
+  parcial: "Parcial",
+  incorreto: "Incorreto",
+  nao_avaliado: "Não avaliado",
+};
 
 /** Props da tela de quiz. */
 interface QuizProps {
@@ -76,6 +100,13 @@ export function Quiz({
   const [enviado, setEnviado] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Correção das abertas: o modo escolhido mais a tentativa efêmera (avaliações
+  // da IA alinhadas por índice global às perguntas — objetivas ficam `null`).
+  // Nada persiste no DocumentoSalvo; remontar a view zera tudo.
+  const [modoCorrecao, setModoCorrecao] = useState<ModoCorrecao>("autoavaliacao");
+  const [avaliacoes, setAvaliacoes] = useState<(AvaliacaoResposta | null)[]>([]);
+  const [avaliando, setAvaliando] = useState(false);
+  const [erroAvaliacao, setErroAvaliacao] = useState<string | null>(null);
 
   const temTexto =
     arquivo !== null && !arquivo.semTextoExtraivel && arquivo.texto.length > 0;
@@ -92,6 +123,9 @@ export function Quiz({
     setPerguntas(null);
     setRespostas([]);
     setEnviado(false);
+    setAvaliacoes([]);
+    setErroAvaliacao(null);
+    setAvaliando(false);
     setGerando(true);
     try {
       const perguntasGeradas = await getApi().gerarQuiz(
@@ -137,8 +171,47 @@ export function Quiz({
     );
   }
 
-  /** Envia as respostas: passa ao modo revisão e rola ao topo. */
-  function enviar(): void {
+  /**
+   * Envia as respostas: passa ao modo revisão e rola ao topo. No modo `ia`,
+   * manda SÓ as perguntas abertas à IA local e re-espalha o resultado por
+   * índice global (objetivas ficam `null`, seguem o gabarito). Uma falha da IA
+   * NÃO trava a revisão: entra em revisão mesmo assim, com o gabarito como
+   * fallback. As objetivas nunca passam pela IA.
+   */
+  async function enviar(): Promise<void> {
+    if (perguntas === null) return;
+    if (modoCorrecao === "ia") {
+      setErroAvaliacao(null);
+      setAvaliando(true);
+      try {
+        const indicesAbertas: number[] = [];
+        const entradas: EntradaAvaliacao[] = [];
+        perguntas.forEach((pergunta, indice) => {
+          if (pergunta.tipo !== "aberta") return;
+          const resposta = respostas[indice];
+          indicesAbertas.push(indice);
+          entradas.push({
+            enunciado: pergunta.enunciado,
+            gabarito: pergunta.gabarito,
+            resposta: resposta?.tipo === "aberta" ? resposta.texto : "",
+          });
+        });
+        const resultado = await getApi().avaliarRespostas(entradas);
+        const porIndice: (AvaliacaoResposta | null)[] = perguntas.map(
+          () => null,
+        );
+        indicesAbertas.forEach((indiceGlobal, i) => {
+          porIndice[indiceGlobal] = resultado[i] ?? null;
+        });
+        setAvaliacoes(porIndice);
+      } catch (e) {
+        // Fallback de gabarito: registra o erro mas AINDA entra em revisão.
+        setErroAvaliacao(mensagemDeErro(e));
+        setAvaliacoes([]);
+      } finally {
+        setAvaliando(false);
+      }
+    }
     setEnviado(true);
     window.scrollTo({ top: 0 });
   }
@@ -147,6 +220,9 @@ export function Quiz({
   function refazer(): void {
     if (perguntas !== null) setRespostas(respostasVazias(perguntas));
     setEnviado(false);
+    setAvaliacoes([]);
+    setErroAvaliacao(null);
+    setAvaliando(false);
   }
 
   return (
@@ -209,15 +285,21 @@ export function Quiz({
           <Revisao
             perguntas={perguntas}
             respostas={respostas}
+            modoCorrecao={modoCorrecao}
+            avaliacoes={avaliacoes}
+            erroAvaliacao={erroAvaliacao}
             onRefazer={refazer}
           />
         ) : (
           <Responder
             perguntas={perguntas}
             respostas={respostas}
+            modoCorrecao={modoCorrecao}
+            avaliando={avaliando}
             onEscolher={escolher}
             onResponderAberta={responderAberta}
-            onEnviar={enviar}
+            onModoCorrecao={setModoCorrecao}
+            onEnviar={() => void enviar()}
           />
         ))}
     </section>
@@ -228,21 +310,28 @@ export function Quiz({
 interface ResponderProps {
   perguntas: PerguntaQuiz[];
   respostas: RespostaUsuario[];
+  modoCorrecao: ModoCorrecao;
+  avaliando: boolean;
   onEscolher: (indice: number, escolhidaIndice: number) => void;
   onResponderAberta: (indice: number, texto: string) => void;
+  onModoCorrecao: (modo: ModoCorrecao) => void;
   onEnviar: () => void;
 }
 
 /**
  * Modo RESPONDER: lista as perguntas para o usuário responder sem nenhum
  * feedback de certo/errado. Objetivas usam um grupo de rádios; abertas usam
- * um textarea. O botão Enviar fica ao fim.
+ * um textarea. Junto ao botão Enviar há o toggle de como corrigir as abertas
+ * (autoavaliação pelo gabarito ou correção pela IA).
  */
 function Responder({
   perguntas,
   respostas,
+  modoCorrecao,
+  avaliando,
   onEscolher,
   onResponderAberta,
+  onModoCorrecao,
   onEnviar,
 }: ResponderProps): React.JSX.Element {
   return (
@@ -289,8 +378,35 @@ function Responder({
         })}
       </ol>
       <div className="quiz-acoes">
-        <button type="button" onClick={onEnviar} disabled={perguntas.length === 0}>
-          Enviar respostas
+        <fieldset className="quiz-correcao">
+          <legend>Como corrigir</legend>
+          <label className="quiz-correcao-opcao">
+            <input
+              type="radio"
+              name="modo-correcao"
+              checked={modoCorrecao === "autoavaliacao"}
+              onChange={() => onModoCorrecao("autoavaliacao")}
+              disabled={avaliando}
+            />
+            Autoavaliação (gabarito)
+          </label>
+          <label className="quiz-correcao-opcao">
+            <input
+              type="radio"
+              name="modo-correcao"
+              checked={modoCorrecao === "ia"}
+              onChange={() => onModoCorrecao("ia")}
+              disabled={avaliando}
+            />
+            Correção pela IA
+          </label>
+        </fieldset>
+        <button
+          type="button"
+          onClick={onEnviar}
+          disabled={perguntas.length === 0 || avaliando}
+        >
+          {avaliando ? "Avaliando…" : "Enviar respostas"}
         </button>
       </div>
     </div>
@@ -301,6 +417,9 @@ function Responder({
 interface RevisaoProps {
   perguntas: PerguntaQuiz[];
   respostas: RespostaUsuario[];
+  modoCorrecao: ModoCorrecao;
+  avaliacoes: (AvaliacaoResposta | null)[];
+  erroAvaliacao: string | null;
   onRefazer: () => void;
 }
 
@@ -308,11 +427,17 @@ interface RevisaoProps {
  * Modo REVISÃO: mostra a pontuação das objetivas no topo e, por questão, a
  * correção na própria questão — nas objetivas, a alternativa correta destacada
  * e a escolha do usuário marcada certa/errada com um selo textual; nas abertas,
- * a resposta do usuário ao lado do gabarito.
+ * a resposta do usuário ao lado do gabarito. No modo IA, as abertas com
+ * veredito mostram o selo + comentário da IA além do gabarito; se a IA falhou
+ * (ou não há veredito), cai no comportamento de autoavaliação (gabarito).
+ * As objetivas são inalteradas em ambos os modos.
  */
 function Revisao({
   perguntas,
   respostas,
+  modoCorrecao,
+  avaliacoes,
+  erroAvaliacao,
   onRefazer,
 }: RevisaoProps): React.JSX.Element {
   const pontuacao = calcularPontuacao(perguntas, respostas);
@@ -326,6 +451,11 @@ function Revisao({
       <p className="quiz-pontuacao" aria-live="polite">
         {resumoPontuacao}
       </p>
+      {erroAvaliacao !== null && (
+        <p className="exercicios-erro" role="alert">
+          {erroAvaliacao}
+        </p>
+      )}
       <ol className="quiz-lista">
         {perguntas.map((pergunta, indice) => {
           const resposta = respostas[indice];
@@ -373,6 +503,8 @@ function Revisao({
 
           const textoUsuario =
             resposta?.tipo === "aberta" ? resposta.texto.trim() : "";
+          const avaliacao = avaliacoes[indice] ?? null;
+          const mostrarIa = modoCorrecao === "ia" && avaliacao !== null;
           return (
             <li key={indice} className="quiz-item">
               <p className="exercicio-enunciado">{pergunta.enunciado}</p>
@@ -380,6 +512,16 @@ function Revisao({
               <p className="quiz-resposta-usuario">
                 {textoUsuario.length > 0 ? textoUsuario : "Você não respondeu."}
               </p>
+              {mostrarIa && (
+                <>
+                  <span
+                    className={`avaliacao-selo avaliacao-selo-${avaliacao.veredito}`}
+                  >
+                    {ROTULO_VEREDITO[avaliacao.veredito]}
+                  </span>
+                  <p className="avaliacao-comentario">{avaliacao.comentario}</p>
+                </>
+              )}
               <p className="quiz-aberta-rotulo">Gabarito</p>
               <p className="quiz-gabarito">{pergunta.gabarito}</p>
             </li>

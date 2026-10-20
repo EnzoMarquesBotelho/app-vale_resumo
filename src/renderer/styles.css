@@ -670,6 +670,9 @@ select {
   border: 1px solid var(--cor-borda-forte);
   border-radius: var(--raio-md);
   background: var(--cor-superficie-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .exercicio-enunciado {
@@ -677,6 +680,35 @@ select {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Campo de resposta do exercício: mesmo visual da aberta do quiz. */
+.exercicio-aberta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.exercicio-aberta-rotulo {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.exercicio-aberta textarea {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  resize: vertical;
+}
+
+.exercicios-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .exercicio-resposta summary {
@@ -815,6 +847,74 @@ select {
 .quiz-selo-erro {
   background: var(--cor-erro-fundo);
   color: var(--cor-erro-texto);
+}
+
+/* Toggle de como corrigir as abertas (autoavaliação ⇆ IA), no estilo dos
+ * demais controles agrupados. */
+.quiz-correcao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-sm);
+}
+
+.quiz-correcao legend {
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.quiz-correcao-opcao {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Selo textual do veredito da correção por IA (exercícios e quiz). O texto
+ * carrega o significado — a cor é apenas reforço (WCAG 1.4.1). */
+.avaliacao-selo {
+  align-self: flex-start;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--raio-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-suave);
+}
+
+.avaliacao-selo-correto {
+  background: var(--cor-ok-fundo);
+  color: var(--cor-ok-texto);
+}
+
+.avaliacao-selo-incorreto {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro-texto);
+}
+
+.avaliacao-selo-parcial {
+  background: var(--cor-aviso-fundo);
+  color: var(--cor-aviso-texto);
+}
+
+.avaliacao-selo-nao_avaliado {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+
+.avaliacao-comentario {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-suave);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .quiz-pontuacao {
