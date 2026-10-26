@@ -55,12 +55,193 @@ body {
 
 .app-shell {
   min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ---------- Barra lateral ---------- */
+
+.sidebar {
+  flex: none;
+  width: 14rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+}
+
+.sidebar-secoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sidebar-item {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.sidebar-item:hover:not(.ativo) {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+}
+
+.sidebar-item.ativo {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria-forte);
+  color: #fff;
+}
+
+.sidebar-icone {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sidebar-rodape {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ---------- Seletor de tema ---------- */
+
+.seletor-tema {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.seletor-tema-opcao {
+  flex: 1;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  padding: 0.4rem 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.seletor-tema-opcao:hover:not(.ativo) {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+}
+
+.seletor-tema-opcao.ativo {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria-forte);
+  color: #fff;
+}
+
+/* ---------- Área principal ---------- */
+
+.app-principal {
+  flex: 1;
+  min-width: 0;
   max-width: 980px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   padding: 1.5rem 2rem 2.5rem;
+}
+
+/* ---------- Biblioteca / Tela do documento ---------- */
+
+.biblioteca {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.biblioteca-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.biblioteca-acoes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tela-documento {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tela-documento-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tela-documento-voltar {
+  background: transparent;
+  border: 1px solid var(--cor-borda-forte);
+  color: var(--cor-texto);
+}
+
+.tela-documento-export {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.tela-documento-abas {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.35rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.tela-documento-aba {
+  border: 1px solid transparent;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+}
+
+.tela-documento-aba:hover:not(:disabled):not(.ativo) {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+}
+
+.tela-documento-aba.ativo {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria-forte);
+  color: #fff;
+}
+
+.tela-documento-conteudo {
+  display: flex;
+  flex-direction: column;
+}
+
+.tela-documento-texto h3 {
+  margin: 0 0 0.6rem;
 }
 
 /* ---------- Cabeçalho ---------- */

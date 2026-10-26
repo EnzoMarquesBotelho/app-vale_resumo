@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { defaultModel } from "@shared/constants";
 import type { OllamaStatus as OllamaStatusDados } from "@shared/types";
+import { getApi } from "../api";
 
 /**
  * Instruções passo a passo exibidas quando o Ollama está ausente/offline.
@@ -25,10 +26,13 @@ export function OllamaStatus(): React.JSX.Element {
   async function verificar(): Promise<void> {
     setVerificando(true);
     try {
-      const resultado = await window.api?.ollamaStatus();
+      const resultado = await getApi().ollamaStatus();
       if (resultado) {
         setStatus(resultado);
       }
+    } catch {
+      // A ponte pode estar indisponível; não derruba a UI. O finally libera o
+      // botão para que o usuário possa tentar novamente.
     } finally {
       setVerificando(false);
     }
@@ -39,9 +43,13 @@ export function OllamaStatus(): React.JSX.Element {
   useEffect(() => {
     let ativo = true;
     void (async () => {
-      const resultado = await window.api?.ollamaStatus();
-      if (ativo && resultado) {
-        setStatus(resultado);
+      try {
+        const resultado = await getApi().ollamaStatus();
+        if (ativo && resultado) {
+          setStatus(resultado);
+        }
+      } catch {
+        // Ponte indisponível ao montar: mantém o estado inicial sem quebrar.
       }
     })();
     return () => {
@@ -50,9 +58,13 @@ export function OllamaStatus(): React.JSX.Element {
   }, []);
 
   async function selecionarModelo(modelo: string): Promise<void> {
-    const resultado = await window.api?.ollamaSelecionarModelo(modelo);
-    if (resultado) {
-      setStatus(resultado);
+    try {
+      const resultado = await getApi().ollamaSelecionarModelo(modelo);
+      if (resultado) {
+        setStatus(resultado);
+      }
+    } catch {
+      // Falha ao trocar de modelo mantém o status atual, sem quebrar a UI.
     }
   }
 

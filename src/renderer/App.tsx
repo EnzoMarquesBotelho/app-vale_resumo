@@ -10,55 +10,33 @@ import type {
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
-import { ExportarControles } from "./components/ExportarControles";
+import { Sidebar, type Secao } from "./components/Sidebar";
 import { artefatosPresentes } from "@shared/export/markdown";
 import type { DocumentoExportavel } from "@shared/export/types";
 import { getApi } from "./api";
-import { Importar } from "./views/Importar";
-import { Resumo } from "./views/Resumo";
-import { Flashcards } from "./views/Flashcards";
-import { Exercicios } from "./views/Exercicios";
-import { MapaMental } from "./views/MapaMental";
-import { Quiz } from "./views/Quiz";
+import { useTema } from "./useTema";
 import { Agenda } from "./views/Agenda";
-import { Historico } from "./views/Historico";
-
-/** Abas de navegação do app, na ordem em que aparecem. */
-type Aba =
-  | "importar"
-  | "resumo"
-  | "flashcards"
-  | "exercicios"
-  | "mapa"
-  | "quiz"
-  | "agenda"
-  | "historico";
-
-/** Rótulos (em português) e ícone de cada aba. */
-const ABAS: readonly { id: Aba; rotulo: string; icone: string }[] = [
-  { id: "importar", rotulo: "Importar", icone: "📄" },
-  { id: "resumo", rotulo: "Resumo", icone: "📝" },
-  { id: "flashcards", rotulo: "Flashcards", icone: "🃏" },
-  { id: "exercicios", rotulo: "Exercícios", icone: "✏️" },
-  { id: "mapa", rotulo: "Mapa mental", icone: "🗺️" },
-  { id: "quiz", rotulo: "Quiz", icone: "❓" },
-  { id: "agenda", rotulo: "Agenda", icone: "📅" },
-  { id: "historico", rotulo: "Histórico", icone: "🗂️" },
-];
+import { Biblioteca, type VisaoBiblioteca } from "./views/Biblioteca";
 
 /**
- * Casca principal do app. Orquestra o fluxo: importar um arquivo cria um
- * documento salvo; os artefatos gerados (resumo/flashcards/exercícios) são
- * persistidos nesse documento e reaparecem ao reabri-lo pelo Histórico, mesmo
- * após fechar e reabrir o app.
+ * Casca principal do app. A navegação acontece por uma barra lateral com duas
+ * seções (Biblioteca e Agenda). Dentro da Biblioteca, uma visão (`lista`,
+ * `importar` ou `documento`) decide o que exibir. Importar um arquivo cria um
+ * documento salvo; os artefatos gerados são persistidos nesse documento e
+ * reaparecem ao reabri-lo, mesmo após fechar e reabrir o app.
  */
 export function App(): React.JSX.Element {
+  const tema = useTema();
+
   const [arquivo, setArquivo] = useState<ArquivoImportado | null>(null);
   const [documento, setDocumento] = useState<DocumentoSalvo | null>(null);
   // Incrementado a cada save para o Histórico recarregar a lista.
   const [versaoHistorico, setVersaoHistorico] = useState(0);
-  // Aba atualmente visível. Começa em "Importar", o primeiro passo do fluxo.
-  const [abaAtiva, setAbaAtiva] = useState<Aba>("importar");
+  // Seção da barra lateral. Começa na Biblioteca, o ponto de entrada do fluxo.
+  const [secaoAtiva, setSecaoAtiva] = useState<Secao>("biblioteca");
+  // Visão dentro da Biblioteca. Começa na lista (Histórico de cadernos).
+  const [visaoBiblioteca, setVisaoBiblioteca] =
+    useState<VisaoBiblioteca>("lista");
   // Aviso exibido quando uma operação de persistência falha. O resultado
   // continua visível na tela; apenas não foi salvo em disco. `null` = sem aviso.
   const [avisoPersistencia, setAvisoPersistencia] = useState<string | null>(
@@ -81,12 +59,13 @@ export function App(): React.JSX.Element {
   function aoImportar(importado: ArquivoImportado | null): void {
     setArquivo(importado);
     setDocumento(null);
+    setVisaoBiblioteca("importar");
   }
 
   /**
-   * Cria o documento salvo com o caderno escolhido na importação e avança para
-   * a aba de geração. Só é chamado pelo fluxo de importação (nunca na
-   * reabertura, que não passa esta função a `Importar`).
+   * Cria o documento salvo com o caderno escolhido na importação e abre a tela
+   * do documento. Só é chamado pelo fluxo de importação (nunca na reabertura,
+   * que não passa esta função a `Importar`).
    */
   async function aoConfirmarCaderno(
     arquivo: ArquivoImportado,
@@ -103,8 +82,8 @@ export function App(): React.JSX.Element {
       setDocumento(salvo);
       setVersaoHistorico((v) => v + 1);
       setAvisoPersistencia(null);
-      // Com o caderno confirmado, leva o usuário ao próximo passo do fluxo.
-      setAbaAtiva("resumo");
+      // Com o caderno confirmado, abre a tela do documento.
+      setVisaoBiblioteca("documento");
     } catch {
       // Falha ao criar o registro não bloqueia a geração: o texto continua
       // disponível nesta sessão, mas sem salvar no histórico. Avisa o usuário.
@@ -113,8 +92,8 @@ export function App(): React.JSX.Element {
           "continuar usando o app normalmente, mas os resultados não serão " +
           "guardados ao fechar.",
       );
-      // Vai para o resumo mesmo assim: a geração funciona sem persistência.
-      setAbaAtiva("resumo");
+      // Abre a tela do documento mesmo assim: a geração funciona sem persistência.
+      setVisaoBiblioteca("documento");
     }
   }
 
@@ -130,21 +109,10 @@ export function App(): React.JSX.Element {
       cadernoIdSugerido: salvo.cadernoId,
       cadernoNomeSugerido: salvo.cadernoNome,
     });
-    // Mostra o resumo do documento reaberto; o usuário navega pelas abas.
-    setAbaAtiva("resumo");
+    // Abre a tela do documento reaberto na Biblioteca.
+    setSecaoAtiva("biblioteca");
+    setVisaoBiblioteca("documento");
   }
-
-  // Aba efetivamente exibida: se o arquivo ativo ficar sem texto (ex.: erro ao
-  // importar limpou o arquivo), uma aba de geração não faz sentido, então
-  // caímos de volta para "Importar". Derivado em render — sem efeito/estado
-  // extra para corrigir a seleção.
-  const ehAbaGeracao =
-    abaAtiva === "resumo" ||
-    abaAtiva === "flashcards" ||
-    abaAtiva === "exercicios" ||
-    abaAtiva === "mapa" ||
-    abaAtiva === "quiz";
-  const abaExibida: Aba = ehAbaGeracao && !temTexto ? "importar" : abaAtiva;
 
   /**
    * Executa um save de artefato tratando sucesso e falha de forma uniforme:
@@ -238,155 +206,81 @@ export function App(): React.JSX.Element {
   const semArtefatos =
     docExportavel !== null && artefatosPresentes(docExportavel).length === 0;
 
-  // Abas de geração ficam desabilitadas enquanto não há texto importado.
-  function abaDesabilitada(id: Aba): boolean {
-    const ehGeracao =
-      id === "resumo" ||
-      id === "flashcards" ||
-      id === "exercicios" ||
-      id === "mapa" ||
-      id === "quiz";
-    return ehGeracao && !temTexto;
-  }
-
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-titulo">
-          <span className="app-logo" aria-hidden="true">
-            🎓
-          </span>
-          <div>
-            <h1>{appName}</h1>
-            <p className="app-subtitulo">
-              Resumos, flashcards e exercícios gerados localmente com IA
-            </p>
-          </div>
-        </div>
-        {documento !== null && docExportavel !== null && (
-          <div className="app-header-export">
-            <p className="app-documento-ativo" title={documento.nome}>
-              Documento: <strong>{documento.nome}</strong>
-            </p>
-            <ExportarControles
-              alvo={{ escopo: "documento", documento: docExportavel }}
-              desabilitado={semArtefatos}
-              dicaDesabilitado="Gere ao menos um artefato para exportar o documento."
-            />
-          </div>
-        )}
-      </header>
+      <Sidebar
+        secaoAtiva={secaoAtiva}
+        onSelecionarSecao={setSecaoAtiva}
+        preferenciaTema={tema.preferencia}
+        onDefinirTema={(p) => void tema.definir(p)}
+      />
 
-      <OllamaStatus />
-
-      {avisoPersistencia !== null && (
-        <div className="app-aviso-persistencia" role="alert">
-          <span className="app-aviso-icone" aria-hidden="true">
-            ⚠️
-          </span>
-          <span className="app-aviso-texto">{avisoPersistencia}</span>
-          <button
-            type="button"
-            className="app-aviso-fechar"
-            onClick={() => setAvisoPersistencia(null)}
-            aria-label="Dispensar aviso"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      <nav className="app-nav" aria-label="Navegação principal">
-        {ABAS.map((aba) => (
-          <button
-            key={aba.id}
-            type="button"
-            className={`app-nav-item ${abaExibida === aba.id ? "ativo" : ""}`}
-            onClick={() => setAbaAtiva(aba.id)}
-            disabled={abaDesabilitada(aba.id)}
-            aria-current={abaExibida === aba.id ? "page" : undefined}
-            title={
-              abaDesabilitada(aba.id)
-                ? "Importe um arquivo com texto primeiro"
-                : undefined
-            }
-          >
-            <span className="app-nav-icone" aria-hidden="true">
-              {aba.icone}
+      <div className="app-principal">
+        <header className="app-header">
+          <div className="app-header-titulo">
+            <span className="app-logo" aria-hidden="true">
+              🎓
             </span>
-            {aba.rotulo}
-          </button>
-        ))}
-      </nav>
+            <div>
+              <h1>{appName}</h1>
+              <p className="app-subtitulo">
+                Resumos, flashcards e exercícios gerados localmente com IA
+              </p>
+            </div>
+          </div>
+        </header>
 
-      <main className="app-conteudo">
-        {abaExibida === "importar" && (
-          <Importar
-            arquivo={arquivo}
-            onImportado={aoImportar}
-            onLoteImportado={() => setVersaoHistorico((v) => v + 1)}
-            {...(documento === null
-              ? {
-                  onConfirmarCaderno: (a, nome) =>
-                    void aoConfirmarCaderno(a, nome),
-                }
-              : {})}
-          />
+        <OllamaStatus />
+
+        {avisoPersistencia !== null && (
+          <div className="app-aviso-persistencia" role="alert">
+            <span className="app-aviso-icone" aria-hidden="true">
+              ⚠️
+            </span>
+            <span className="app-aviso-texto">{avisoPersistencia}</span>
+            <button
+              type="button"
+              className="app-aviso-fechar"
+              onClick={() => setAvisoPersistencia(null)}
+              aria-label="Dispensar aviso"
+            >
+              ✕
+            </button>
+          </div>
         )}
-        {abaExibida === "resumo" && (
-          <Resumo
-            key={`resumo-${chaveDocumento}`}
-            arquivo={arquivo}
-            resumoSalvo={documento?.resumo ?? null}
-            onGerado={temTexto ? (r) => void salvarResumo(r) : undefined}
-            nomeDocumento={documento?.nome}
-          />
-        )}
-        {abaExibida === "flashcards" && (
-          <Flashcards
-            key={`flashcards-${chaveDocumento}`}
-            arquivo={arquivo}
-            flashcardsSalvos={documento?.flashcards ?? null}
-            onGerado={temTexto ? (f) => void salvarFlashcards(f) : undefined}
-            nomeDocumento={documento?.nome}
-          />
-        )}
-        {abaExibida === "exercicios" && (
-          <Exercicios
-            key={`exercicios-${chaveDocumento}`}
-            arquivo={arquivo}
-            exerciciosSalvos={documento?.exercicios ?? null}
-            onGerado={temTexto ? (e) => void salvarExercicios(e) : undefined}
-            nomeDocumento={documento?.nome}
-          />
-        )}
-        {abaExibida === "mapa" && (
-          <MapaMental
-            key={`mapa-${chaveDocumento}`}
-            arquivo={arquivo}
-            mapaMentalSalvo={documento?.mapaMental ?? null}
-            onGerado={temTexto ? (m) => void salvarMapaMental(m) : undefined}
-            nomeDocumento={documento?.nome}
-          />
-        )}
-        {abaExibida === "quiz" && (
-          <Quiz
-            key={`quiz-${chaveDocumento}`}
-            arquivo={arquivo}
-            quizSalvo={documento?.quiz ?? null}
-            onGerado={temTexto ? (q) => void salvarQuiz(q) : undefined}
-            nomeDocumento={documento?.nome}
-          />
-        )}
-        {abaExibida === "agenda" && <Agenda />}
-        {abaExibida === "historico" && (
-          <Historico
-            recarregar={versaoHistorico}
-            documentoAtivoId={documento?.id ?? null}
-            onReabrir={aoReabrir}
-          />
-        )}
-      </main>
+
+        <main className="app-conteudo">
+          {secaoAtiva === "biblioteca" ? (
+            <Biblioteca
+              visao={visaoBiblioteca}
+              onDefinirVisao={setVisaoBiblioteca}
+              arquivo={arquivo}
+              documento={documento}
+              chaveDocumento={chaveDocumento}
+              temTexto={temTexto}
+              docExportavel={docExportavel}
+              semArtefatos={semArtefatos}
+              versaoHistorico={versaoHistorico}
+              onReabrir={aoReabrir}
+              onImportado={aoImportar}
+              onLoteImportado={() => setVersaoHistorico((v) => v + 1)}
+              {...(documento === null
+                ? {
+                    onConfirmarCaderno: (a, nome) =>
+                      void aoConfirmarCaderno(a, nome),
+                  }
+                : {})}
+              onSalvarResumo={(r) => void salvarResumo(r)}
+              onSalvarFlashcards={(f) => void salvarFlashcards(f)}
+              onSalvarExercicios={(e) => void salvarExercicios(e)}
+              onSalvarMapaMental={(m) => void salvarMapaMental(m)}
+              onSalvarQuiz={(q) => void salvarQuiz(q)}
+            />
+          ) : (
+            <Agenda />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
