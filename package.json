@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && electron-vite build",
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --win --config electron-builder.yml",
+    "release": "electron-vite build && electron-builder --win --publish always --config electron-builder.yml",
     "lint": "eslint .",
     "test": "vitest run"
   },

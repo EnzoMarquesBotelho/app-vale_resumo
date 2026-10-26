@@ -34,3 +34,12 @@ nsis:
 # Evita tentar baixar/assinar binários online durante o empacotamento local.
 # O app é 100% offline; não há assinatura de código configurada.
 npmRebuild: false
+
+# Destino de publicação dos artefatos de release (GitHub Releases).
+# O electron-builder usa este bloco para enviar o instalador ao Release da tag
+# quando chamado com `--publish always`. Também faz o builder gerar o manifesto
+# `latest.yml`, que o electron-updater lerá futuramente para detectar updates.
+publish:
+  - provider: github
+    owner: EnzoMarquesBotelho
+    repo: app-vale_resumo

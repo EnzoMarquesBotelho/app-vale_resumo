@@ -1,0 +1,39 @@
+# Workflow de release: ao enviar uma tag `v*` (ex.: v0.1.0), o GitHub Actions
+# compila o instalador Windows (NSIS) e publica no GitHub Release da tag,
+# usando o GITHUB_TOKEN fornecido pelo proprio Actions (sem token pessoal na
+# maquina do usuario). Tambem pode ser disparado manualmente pela UI do GitHub.
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Permissao necessaria para o workflow criar/atualizar o GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Build do instalador e publicacao no GitHub Release
+        run: npx electron-builder --win --publish always --config electron-builder.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
