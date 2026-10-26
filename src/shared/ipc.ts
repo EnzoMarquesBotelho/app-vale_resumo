@@ -32,6 +32,7 @@ import type {
   VinculoProva,
 } from "./types";
 import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
+import type { EstadoTema, ThemePreference } from "./theme";
 
 /** Nomes dos canais de IPC. */
 export const IPC_CHANNELS = {
@@ -99,6 +100,19 @@ export const IPC_CHANNELS = {
   exportarMarkdown: "export:markdown",
   /** Exporta um artefato ou o documento inteiro para PDF (.pdf). */
   exportarPdf: "export:pdf",
+  /**
+   * Grupo ANINHADO dos canais de tema (os demais canais são planos). Seguro de
+   * aninhar porque nenhum consumidor itera `IPC_CHANNELS` (Object.values/keys/
+   * entries); todos referenciam `IPC_CHANNELS.<canal>` individualmente.
+   */
+  tema: {
+    /** Renderer pede o estado de tema atual (preferência + efetivo). */
+    obter: "tema:obter",
+    /** Renderer define a preferência e recebe o novo estado. */
+    definir: "tema:definir",
+    /** Main avisa o renderer que o tema efetivo mudou (ex.: SO trocou). */
+    alterado: "tema:alterado",
+  },
 } as const;
 
 /**
@@ -324,4 +338,20 @@ export interface AppApi {
   exportarMarkdown: (alvo: AlvoExportacao) => Promise<ResultadoExportacao>;
   /** Igual a `exportarMarkdown`, mas gera um PDF (.pdf) via pdfmake. */
   exportarPdf: (alvo: AlvoExportacao) => Promise<ResultadoExportacao>;
+  /**
+   * Lê o estado de tema atual (preferência escolhida + tema efetivo resolvido
+   * contra o sistema). Usado no boot do renderer para aplicar o tema certo.
+   */
+  obterTema: () => Promise<EstadoTema>;
+  /**
+   * Define a preferência de tema e devolve o estado resultante já resolvido.
+   * A persistência é best-effort no main: uma falha ao gravar não rejeita.
+   */
+  definirTema: (preferencia: ThemePreference) => Promise<EstadoTema>;
+  /**
+   * Assina as mudanças de tema efetivo vindas do main (ex.: o SO alternou
+   * entre claro e escuro no modo automático). Devolve um cancelador que
+   * remove o ouvinte.
+   */
+  aoAlterarTema: (ouvinte: (estado: EstadoTema) => void) => () => void;
 }

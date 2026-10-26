@@ -1,6 +1,13 @@
-import { BrowserWindow, dialog, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain, nativeTheme } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
+import {
+  THEME_PREFERENCE_PADRAO,
+  ehThemePreference,
+  resolveEffectiveTheme,
+  type EstadoTema,
+  type ThemePreference,
+} from "@shared/theme";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import { montarCaderno } from "@shared/notebooks";
 import { calcularDicaDoDia } from "@shared/agenda";
@@ -90,6 +97,10 @@ import {
 } from "../services/provas.js";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
 import { gerarDicaIa } from "../services/dica.js";
+import {
+  carregarPreferenciaTema,
+  salvarPreferenciaTema,
+} from "../services/themeStorage.js";
 import {
   ExportacaoFalhouError,
   exportarMarkdown,
@@ -358,6 +369,41 @@ let modeloSelecionado = defaultModel;
 let modeloEscolhidoManualmente = false;
 
 /**
+ * Preferência de tema atual, mantida em cache no processo main. Começa no
+ * padrão e é sobrescrita pela leitura do disco no boot (uma vez) e pelas
+ * chamadas de `tema:definir`.
+ */
+let preferenciaTema: ThemePreference = THEME_PREFERENCE_PADRAO;
+
+/**
+ * Indica se `preferenciaTema` já foi carregada do disco. Enquanto `false`, o
+ * handler `tema:obter` lê do disco (uma vez); depois, serve o cache em memória
+ * — assim uma gravação que falha não reverte a escolha do usuário sob StrictMode.
+ */
+let preferenciaCarregada = false;
+
+/**
+ * Estado de tema atual: resolve o efetivo contra o sistema via o domínio puro.
+ * Usa `nativeTheme.shouldUseDarkColors` quando `nativeTheme` existe (em testes
+ * com o mock de electron sem `nativeTheme`, assume sistema claro).
+ */
+function estadoTemaAtual(): EstadoTema {
+  // `nativeTheme` pode ser um named export ausente no mock de electron (tocar
+  // nele lança no ESM mockado); o try/catch degrada para "sistema claro".
+  let sistemaEscuro = false;
+  try {
+    sistemaEscuro = nativeTheme?.shouldUseDarkColors ?? false;
+  } catch {
+    sistemaEscuro = false;
+  }
+  return {
+    preferencia: preferenciaTema,
+    efetivo: resolveEffectiveTheme(preferenciaTema, sistemaEscuro),
+    sistemaEscuro,
+  };
+}
+
+/**
  * Escolhe um modelo que realmente exista entre os instalados, dado o modelo
  * atualmente desejado. Regras, em ordem de preferência:
  *  1. Se o desejado já está instalado, mantém.
@@ -424,6 +470,18 @@ async function modeloParaGeracao(): Promise<string> {
  * Chamado uma única vez quando o app fica pronto.
  */
 export function registerIpcHandlers(): void {
+  // Carrega a preferência de tema do disco uma vez no boot, de forma tolerante
+  // (a leitura nunca lança: falha vira o padrão). Não bloqueia o registro dos
+  // handlers; `tema:obter` serve o cache assim que a flag resolve.
+  void carregarPreferenciaTema()
+    .then((preferencia) => {
+      preferenciaTema = preferencia;
+      preferenciaCarregada = true;
+    })
+    .catch(() => {
+      preferenciaCarregada = true;
+    });
+
   ipcMain.handle(
     IPC_CHANNELS.ping,
     (_event, mensagem: string): string => `pong: ${mensagem}`,
@@ -906,4 +964,62 @@ export function registerIpcHandlers(): void {
       }
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.tema.obter,
+    async (): Promise<EstadoTema> => {
+      // Se já carregou no boot, serve o cache (não relê o disco: uma gravação
+      // que falhou não deve reverter a escolha sob StrictMode). Só lê do disco
+      // se o boot ainda não resolveu.
+      if (!preferenciaCarregada) {
+        preferenciaTema = await carregarPreferenciaTema();
+        preferenciaCarregada = true;
+      }
+      return estadoTemaAtual();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.tema.definir,
+    async (_event, preferencia: unknown): Promise<EstadoTema> => {
+      // Valida: preferência inválida cai no padrão em vez de corromper o cache.
+      preferenciaTema = ehThemePreference(preferencia)
+        ? preferencia
+        : THEME_PREFERENCE_PADRAO;
+      preferenciaCarregada = true;
+      // Persistência best-effort: uma falha ao gravar é logada e NÃO rejeita
+      // (FR8.4) — a escolha continua valendo em memória para esta sessão.
+      try {
+        await salvarPreferenciaTema(preferenciaTema);
+      } catch (erro) {
+        console.warn(
+          "themeStorage: falha ao persistir preferência de tema:",
+          erro,
+        );
+      }
+      return estadoTemaAtual();
+    },
+  );
+
+  // Wiring de nativeTheme DEFENSIVO. Os mocks de electron dos testes de IPC
+  // expõem apenas { ipcMain, dialog } (sem `nativeTheme` nem, em geral,
+  // `BrowserWindow`); nesses mocks ESM, só TOCAR no named export ausente já
+  // lança, então o acesso vai dentro de try/catch e qualquer falha vira no-op.
+  // Em runtime real, assina `updated` para avisar os renderers quando o SO
+  // alterna claro/escuro.
+  try {
+    if (nativeTheme && BrowserWindow) {
+      // Remove ouvintes antigos antes de assinar, para não acumular entre
+      // registros repetidos (ex.: re-execução de registerIpcHandlers).
+      nativeTheme.removeAllListeners?.("updated");
+      nativeTheme.on("updated", () => {
+        const estado = estadoTemaAtual();
+        for (const janela of BrowserWindow.getAllWindows()) {
+          janela.webContents.send(IPC_CHANNELS.tema.alterado, estado);
+        }
+      });
+    }
+  } catch {
+    // Ambiente sem nativeTheme/BrowserWindow (ex.: testes): nada a assinar.
+  }
 }

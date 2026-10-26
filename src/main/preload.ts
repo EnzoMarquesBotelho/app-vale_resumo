@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { IpcRendererEvent } from "electron";
 import { IPC_CHANNELS, type AppApi } from "@shared/ipc";
+import type { EstadoTema } from "@shared/theme";
 
 /**
  * API tipada exposta ao renderer via `contextBridge`.
@@ -70,6 +72,17 @@ const api: AppApi = {
   exportarMarkdown: (alvo) =>
     ipcRenderer.invoke(IPC_CHANNELS.exportarMarkdown, alvo),
   exportarPdf: (alvo) => ipcRenderer.invoke(IPC_CHANNELS.exportarPdf, alvo),
+  obterTema: () => ipcRenderer.invoke(IPC_CHANNELS.tema.obter),
+  definirTema: (preferencia) =>
+    ipcRenderer.invoke(IPC_CHANNELS.tema.definir, preferencia),
+  aoAlterarTema: (ouvinte) => {
+    // Wrapper que descarta o objeto de evento e repassa só o estado. Guardamos
+    // a MESMA referência para o removeListener casar no cancelador.
+    const handler = (_evento: IpcRendererEvent, estado: EstadoTema): void =>
+      ouvinte(estado);
+    ipcRenderer.on(IPC_CHANNELS.tema.alterado, handler);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.tema.alterado, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("api", api);
