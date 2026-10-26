@@ -1,8 +1,10 @@
 # App de Estudos com IA Local
 
 Um aplicativo de **desktop**, **100% local e offline**, que transforma seu material de estudo
-em **resumos**, **flashcards** e **listas de exercícios** usando uma IA que roda na sua
-própria máquina (via **Ollama**). Nenhum conteúdo é enviado para a internet.
+em **resumos**, **flashcards**, **exercícios**, **mapas mentais** e **quizzes** usando uma IA
+que roda na sua própria máquina (via **Ollama**). Também organiza suas matérias em **cadernos**
+e ajuda a se preparar para provas com uma **agenda de revisão**. Nenhum conteúdo é enviado para
+a internet.
 
 Funciona com arquivos `.txt`, `.md` e `.pdf`. Os resultados ficam salvos no seu computador e
 podem ser reabertos a qualquer momento.
@@ -11,14 +13,35 @@ podem ser reabertos a qualquer momento.
 
 ## O que ele faz
 
-- **Importar** um arquivo de texto ou PDF e ver o texto extraído.
+**Importar material**
+- **Importar um arquivo** (`.txt`, `.md` ou `.pdf`) e ver o texto extraído.
+- **Importar uma pasta** inteira de uma vez: o app varre as subpastas e importa todos os
+  arquivos suportados, organizando cada um no caderno certo.
+
+**Gerar material de estudo (IA local)**
 - **Resumo** em dois modos: curto (essencial) ou longo (detalhado).
 - **Flashcards** (pergunta/resposta) navegáveis, de 5 a 100 por vez.
-- **Exercícios** nos modos teórico, prático ou misto, de 5 a 100.
-- **Histórico**: tudo o que você gera fica salvo e reabre depois.
+- **Exercícios** nos modos teórico, prático ou misto, de 5 a 100 — você pode **responder** e a
+  **IA corrige** (Correto / Parcial / Incorreto + comentário).
+- **Mapa mental**: uma árvore hierárquica do conteúdo, navegável (expandir/colapsar, zoom, mover).
+- **Quiz interativo**: perguntas de múltipla escolha, abertas ou mistas (5 a 100). Você responde
+  tudo e depois revê acertos e erros em cada questão, com pontuação. Nas perguntas abertas, você
+  escolhe entre **se autoavaliar** pelo gabarito ou deixar a **IA corrigir**.
+
+**Organizar e exportar**
+- **Cadernos**: suas matérias ficam separadas em cadernos (derivados da pasta de origem dos
+  arquivos). O **Histórico** mostra os cadernos e, dentro de cada um, seus documentos.
+- **Exportar** para **Markdown** ou **PDF**: cada artefato individualmente (só o resumo, só os
+  flashcards, etc.) ou o **documento inteiro** num arquivo só. O mapa mental sai como imagem no
+  PDF e como lista no Markdown. Você escolhe onde salvar o arquivo.
+- **Agenda e provas**: cadastre provas com data e veja a **contagem regressiva**. O app monta uma
+  **agenda de revisão** (revisar alguns dias antes da prova), que você pode ajustar à mão, e dá
+  uma **dica do dia** — rápida (automática) ou mais elaborada (pela IA). Provas podem ser de uma
+  matéria específica ou abrangentes (tipo ENEM/ENADE, cobrindo todas as matérias).
 
 > Tudo roda offline. Se o Ollama não estiver rodando, o app mostra um passo a passo
-> para resolver, sem travar.
+> para resolver, sem travar. Gerar ou corrigir muitos itens de uma vez pode ser lento no
+> modelo local — se demorar demais, o app avisa e sugere reduzir a quantidade.
 
 ---
 
@@ -79,9 +102,21 @@ A janela do app vai abrir. No topo você vê o status do Ollama:
 
 ### Passo 6 — Usar
 
-1. Clique em **Importar** e escolha um arquivo `.txt`, `.md` ou `.pdf`.
-2. Vá nas abas **Resumo**, **Flashcards** ou **Exercícios** e clique em gerar.
-3. O que você gerar fica salvo na aba **Histórico** — reabra quando quiser.
+A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblioteca** e **Agenda**.
+
+1. Na **Biblioteca**, importe um arquivo (`.txt`, `.md` ou `.pdf`) ou uma pasta inteira. Seus
+   documentos ficam organizados por caderno ali.
+2. Abra um documento para ir à **tela do documento**, onde ficam **Resumo**, **Flashcards**,
+   **Exercícios**, **Mapa mental** e **Quiz** — clique em gerar em cada um. Em Exercícios você
+   responde e pede a correção da IA; no Quiz você responde e revisa com pontuação.
+3. Na **Agenda**, cadastre provas para ver a contagem regressiva, a agenda de revisão e a dica
+   do dia.
+4. Tudo o que você gera fica salvo e reabre pela Biblioteca, organizado por caderno.
+5. Use **Exportar** (em cada artefato ou no documento inteiro) para salvar o material em
+   **Markdown** ou **PDF** onde você quiser.
+
+> **Tema:** use o seletor de tema (na barra lateral) para alternar entre **Claro**, **Escuro**
+> e **Automático** (acompanha o tema do Windows). Sua escolha fica salva.
 
 ---
 
@@ -110,6 +145,19 @@ conteúdo.
   reinstale o Node.js.
 - **A geração está lenta**: modelos locais usam a CPU/GPU da sua máquina. Textos menores e o
   modo de resumo "curto" respondem mais rápido.
+- **"A geração falhou ou demorou demais"**: você pediu itens demais de uma vez (ex.: 100
+  flashcards/exercícios/perguntas) e o modelo local estourou o tempo. Tente uma quantidade
+  menor (ex.: 10–30) ou um modelo mais leve. Isso **não** significa que o Ollama está desligado.
+- **O app não abre / erro "Electron uninstall"** ao rodar `npm run dev`: o binário do Electron
+  não foi baixado na instalação (acontece quando o `npm install` pula os scripts de pós-instalação
+  ou o download falha). Baixe o binário rodando, na pasta do projeto:
+
+  ```powershell
+  node node_modules/electron/install.js
+  ```
+
+  Depois rode `npm run dev` de novo. (Se preferir, um `npm install` com os scripts habilitados
+  também resolve.)
 
 ---
 

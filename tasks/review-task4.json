@@ -1,0 +1,18 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "label": "No renderer test for OllamaStatus",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "The OllamaStatus component is verified only manually; the project has no renderer test harness. Pre-existing debt carried from earlier tasks; add a test once a renderer harness exists."
+    },
+    {
+      "label": "Selected model not persisted",
+      "severity": "non-blocking",
+      "confidence": "confirmed",
+      "detail": "modeloSelecionado is in-memory main-process state and resets on restart. Explicitly deferred to the persistence task in both the code comment and worklog."
+    }
+  ],
+  "reviewDoc": "c:\\Dev/tasks/review-task4.md"
+}

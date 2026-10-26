@@ -1,7 +1,12 @@
-# Task List: App de Estudos com IA Local (MVP)
+# Task List: App de Estudos com IA Local
 
-> Plano: `tasks/plan.md`. Spec: `SPEC.md`.
+> Plano: `tasks/plan.md`. Spec: `SPEC.md`. Progresso geral: `tasks/PROGRESSO.md`.
 > Comandos de verificação: `npm test`, `npm run build`, `npm run lint`, `npm run dev`.
+>
+> **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
+> resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
+> próprio doc `roadmap-*.md` com as decisões confirmadas.
+> Estado atual: master `286a119`, **476 testes** passando, build/lint limpos.
 
 > **Pasta de material real para testes manuais/de aceitação:**
 > `C:\Users\enzom\OneDrive\Desktop\Facul` — contém PDFs/arquivos reais de faculdade,
@@ -52,7 +57,7 @@ e um esqueleto de IPC tipado (preload + canais) para o renderer chamar o main co
 ### Checkpoint: Fundação
 - [x] `npm run build`, `npm run lint`, `npm test` passam
 - [x] App abre e o IPC de teste funciona
-- [ ] Revisar com o usuário antes de prosseguir
+- [x] Revisar com o usuário antes de prosseguir
 
 ## Fase 2: Núcleo
 
@@ -140,9 +145,9 @@ estruturado; UI de lista.
 **Estimated scope:** M
 
 ### Checkpoint: Núcleo
-- [ ] Fluxo completo funciona offline: importar → resumo + flashcards + exercícios
-- [ ] `npm test` e `npm run lint` passam
-- [ ] Revisar com o usuário
+- [x] Fluxo completo funciona offline: importar → resumo + flashcards + exercícios
+- [x] `npm test` e `npm run lint` passam
+- [x] Revisar com o usuário
 
 ## Fase 3: Persistência e acabamento
 
@@ -183,3 +188,81 @@ configurar `npm run package` para gerar um executável.
 - [x] Todos os critérios de sucesso da SPEC.md atendidos
 - [x] App roda offline, trata Ollama ausente, persiste dados
 - [x] Pronto para revisão final
+
+## Fases pós-MVP (fatias entregues)
+
+> Cada fatia foi desenhada, revisada, implementada em worktree isolado e
+> mergeada na master. Decisões confirmadas em `roadmap-*.md`.
+
+- [x] **Correções de robustez** — resolução de modelo instalado no momento da
+  geração (evita 404 "model not found"); seletor aceita txt/md; `getApi()` com
+  erro visível; aviso de falha de persistência.
+- [x] **Cadernos (notebooks)** — `roadmap-notebooks.md`. Caderno → Documento;
+  sugestão pela pasta-mãe (fallback "Geral") editável na importação; Histórico
+  de dois níveis; migração idempotente.
+- [x] **Mapas mentais** — `roadmap-mapas-mentais.md`. Árvore hierárquica por IA;
+  visualização SVG navegável (expandir/colapsar, zoom, pan).
+- [x] **Geração JSON consistente** — `fix-mapas-inconsistencia.md`.
+  `format:"json"` nas gerações estruturadas; até 3 tentativas no mapa;
+  orientação de modelo de texto.
+- [x] **Importar pasta (lote, recursivo)** — `roadmap-importar-pasta.md`. Varre
+  subpastas; caderno pelo caminho relativo à pasta escolhida (decisão: Opção 1);
+  dedup por origem; limites; resultado em pt-BR.
+- [x] **Agenda + Provas + Dicas do dia** — `roadmap-agenda-provas.md`. Provas
+  (vínculo a caderno ou avulsa abrangente com modo rotação/intercalado);
+  contagem regressiva; agenda por repetição espaçada editável; dica mecânica +
+  botão "Dica da IA".
+- [x] **Quizzes interativos** — `roadmap-quizzes.md`. IA gera quiz (múltipla/
+  aberta/misto, 5–100); fluxo responder → revisar com pontuação; autoavaliação
+  nas abertas; salvo no documento, refazível.
+- [x] **Correção da mensagem falsa "Ollama não está rodando"** —
+  `fix-geracao-ollama-offline-falso.md`. `generate()` distingue recusa de
+  conexão (offline real) de abort/timeout/falha da geração (mensagem honesta,
+  orienta reduzir quantidade); timeout de 5 min via AbortController; 6
+  mapeadores de erro atualizados.
+- [x] **Correção por IA (exercícios + abertas do quiz)** —
+  `roadmap-correcao-ia.md`. Mecanismo único de avaliação (veredito Correto/
+  Parcial/Incorreto + comentário, `format:"json"`, estado seguro `nao_avaliado`).
+  Exercícios sempre por IA; quiz com alternador autoavaliação ⇆ IA (múltipla
+  escolha intacta). Verificado contra o Ollama real.
+- [x] **Exportação (Markdown + PDF)** — `roadmap-exportacao.md`. Por artefato e
+  documento inteiro; Markdown puro em `src/shared/export/`; PDF via
+  `pdfmake@0.2.20` (1ª dep nova, pinada) no main; mapa como SVG no PDF / lista
+  aninhada no Markdown; save dialog (nunca Facul); sem Ollama. Verificado com
+  PDF binário real.
+- [x] **Redesenho (sidebar) + temas claro/escuro** — `roadmap-redesign-temas.md`.
+  Navegação por barra lateral (Biblioteca + Agenda); artefatos na tela do
+  documento aberto. Temas Claro/Escuro/Automático (via `nativeTheme`, preferência
+  salva); `resolveEffectiveTheme` puro + tokens claro/escuro via `data-theme`;
+  acessibilidade (teclado, aria-current, foco, WCAG AA). Zero dep nova; lógica
+  intocada (views reusadas); 476 testes (468 + 8).
+
+## Roadmap restante (complementos — não iniciados)
+
+### Funcionalidades de estudo
+- [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
+- [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
+- [ ] **Geração de IA em lote** (pasta inteira).
+- [ ] **Geração em lotes/chunks para quantidades grandes** (quiz/exercícios com
+  ~100): hoje é lento/instável no modelo local; gerar em lotes evitaria timeout.
+- [ ] Transcrição de áudio; ingestão de vídeo/imagem (OCR).
+- [ ] Multi-idioma; multi-agente; monitoramento automático de pasta;
+  comparar/mesclar materiais; detectar falta de material.
+
+### Aparência e UX
+- [ ] **Criação de logo** (identidade visual do app; ícone do app/instalador).
+  (Modo claro/escuro + melhoria de aparência + barra lateral: ENTREGUES.)
+
+### Plataformas (porte)
+- [ ] **Porte para Linux e macOS** (desktop — a stack Electron já favorece;
+  revisar caminhos, empacotamento e detecção do Ollama por SO).
+- [ ] **Porte para Android / iOS** (mobile — decisão de arquitetura pendente: o
+  Ollama local não roda em celular; definir se usa IA remota, modelo no
+  dispositivo, ou um modo só-leitura/sync. É o item mais pesado e requer
+  levantamento próprio).
+
+### Distribuição e atualizações
+- [ ] **Deploy no GitHub** (publicar releases/instaladores no GitHub Releases;
+  CI para gerar os artefatos).
+- [ ] **Botão de atualização no app** ligado às releases do GitHub (verificar e
+  baixar novas versões; ex.: electron-updater apontando para o GitHub).
