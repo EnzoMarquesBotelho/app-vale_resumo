@@ -31,6 +31,7 @@ import type {
   SessaoRevisao,
   VinculoProva,
 } from "./types";
+import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
 
 /** Nomes dos canais de IPC. */
 export const IPC_CHANNELS = {
@@ -94,6 +95,10 @@ export const IPC_CHANNELS = {
   dicaDoDia: "prova:dica-do-dia",
   /** Gera a dica da IA (opcional) para uma prova via Ollama local. */
   dicaDaIa: "prova:dica-da-ia",
+  /** Exporta um artefato ou o documento inteiro para Markdown (.md). */
+  exportarMarkdown: "export:markdown",
+  /** Exporta um artefato ou o documento inteiro para PDF (.pdf). */
+  exportarPdf: "export:pdf",
 } as const;
 
 /**
@@ -310,4 +315,13 @@ export interface AppApi {
    * Ollama estiver indisponível (ou a prova não existir).
    */
   dicaDaIa: (id: string) => Promise<string>;
+  /**
+   * Exporta para Markdown o `alvo` (um artefato específico ou o documento
+   * inteiro). Abre um seletor de destino; se o usuário cancelar, resolve com
+   * `{ status: "cancelado" }` (sem gravar). Em sucesso resolve com o caminho
+   * gravado. 100% local: não usa o Ollama.
+   */
+  exportarMarkdown: (alvo: AlvoExportacao) => Promise<ResultadoExportacao>;
+  /** Igual a `exportarMarkdown`, mas gera um PDF (.pdf) via pdfmake. */
+  exportarPdf: (alvo: AlvoExportacao) => Promise<ResultadoExportacao>;
 }

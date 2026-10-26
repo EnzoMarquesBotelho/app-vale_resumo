@@ -67,6 +67,9 @@ const api: AppApi = {
   removerProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.removerProva, id),
   dicaDoDia: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDoDia, id),
   dicaDaIa: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDaIa, id),
+  exportarMarkdown: (alvo) =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportarMarkdown, alvo),
+  exportarPdf: (alvo) => ipcRenderer.invoke(IPC_CHANNELS.exportarPdf, alvo),
 };
 
 contextBridge.exposeInMainWorld("api", api);

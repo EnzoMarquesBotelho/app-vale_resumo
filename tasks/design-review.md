@@ -1,243 +1,240 @@
-# Design Review — Fatia "Importar pasta" (3ª rodada)
+# Revisão de design — Fatia Exportação (Markdown + PDF)
 
-> Revisão feita **sem** o contexto que produziu o design: só o próprio
-> `tasks/design.md`, o roadmap autoritativo
-> (`c:\Dev\tasks\roadmap-importar-pasta.md`), `SPEC.md`, e o código real do
-> worktree (`notebooks.ts`, `constants.ts`, `storage.ts`, `files.ts`,
-> `ipc.ts`, `ipc/index.ts`, `App.tsx`, `Importar.tsx`, `types.ts`).
->
-> Objetivo: decidir se o documento se sustenta sozinho para um coder
-> implementar sem re-decidir nada. Não rodei build nem testes (é revisão de
-> design).
+Documento revisado: `tasks/design-exportacao.md` (2ª passada, que afirma endereçar
+11 achados anteriores de `design-review.json`).
+Revisor: subagente de revisão de design, com contexto fresco, verificando as
+afirmações concretas contra o código-fonte real do worktree
+`c:\Dev\.worktrees\export`.
 
-## Escopo verificado contra o código real
+Veredito: **CHANGES_REQUESTED** (1 HIGH + 2 MEDIUM; NITs não bloqueiam, mas estão
+listados).
 
-Li o código citado e confirmei as afirmações factuais do design. Resumo nas
-seções "Verified Assumptions" e "Unverified/Wrong Assumptions" no fim.
+O design é maduro, bem estruturado e a maioria das decisões concretas foi
+**verificada contra o código real** (ver "Suposições verificadas"). Os pontos
+abaixo são os que ainda não se sustentam sozinhos para a implementação.
 
 ---
 
 ## Achados
 
-Cada achado tem severidade (HIGH / MEDIUM / NIT), onde ocorre, o problema e um
-fix concreto.
+### 1. HIGH — As afirmações centrais de pdfmake (entrypoint, vfs, fonte-Buffer) não são reproduzíveis a partir do estado versionado
 
-### 1. [MEDIUM] `normalizarCaminhoOrigem`: o alvo da "unificação de separadores" não é especificado fora do Windows
+Local: §5.1, §5.2, §10.3, §11 (#2).
 
-**Onde:** seção "Persistência: checagem de duplicata…", definição de
-`normalizarCaminhoOrigem`.
+O design baseia TODA a geração de PDF em três fatos "literais" sobre
+`pdfmake@0.2.20` + `@types/pdfmake@0.2.11`:
 
-**Problema:** a regra diz, no Windows, `p.trim()` "com separadores unificados
-para `\` e caixa baixa"; fora do Windows, `p.trim()` "com separadores
-unificados, preservando caixa". Para o ramo não-Windows **não diz para qual
-separador unificar**. Isso é uma instrução com múltiplas interpretações
-válidas (unificar para `/`? para `\`? não mexer?). Como a função é aplicada
-dos dois lados da comparação, se o coder escolher inconsistentemente (ex.:
-unificar para `/` num lugar e deixar como veio em outro), a dedup pode falhar
-silenciosamente. Mais importante: em POSIX, `\` é um caractere **válido** em
-nome de arquivo — converter `\`→`/` ali corromperia a chave. A intenção quase
-certamente é: no Windows, caminhos nunca contêm `/` e `\` de forma misturada
-vinda do dialog, mas `path`/`fs` podem produzir ambos; fora do Windows não há
-ambiguidade de separador e nenhuma conversão deve ocorrer.
+1. `import PdfPrinter from "pdfmake"` (default export = construtor; `main:
+   src/printer.js`, sem campo `exports`);
+2. `import vfs from "pdfmake/build/vfs_fonts.js"` (default export = dicionário
+   base64 plano `{ "Roboto-Regular.ttf": <base64>, ... }`);
+3. fontes passadas como `Buffer` nos descritores porque não há `.ttf` em disco.
 
-**Fix concreto:** especificar exatamente:
+Verifiquei o worktree: **`pdfmake` NÃO está em `package.json`** (só `pdfjs-dist`)
+e **NÃO está em `node_modules`** (`node_modules/pdfmake` e
+`node_modules/pdfmake/build/vfs_fonts.js` ausentes). O próprio design admite que
+instalou o pacote "apenas para verificação" e não alterou o `package.json`.
+Portanto, no estado atual, **nenhuma dessas três afirmações pode ser
+re-verificada**, e elas são exatamente o eixo em que o PDF inteiro quebra ou
+funciona. Um `exports` no `package.json` do pacote, um `vfs` aninhado em vez de
+plano, ou um default export diferente invalidam §5.2 inteiro em runtime (o
+`tsc --noEmit` do CI **não** pega isso, pois o pacote é externalizado e os
+caminhos são resolvidos só em runtime).
 
+Risco adicional concreto: `import vfs from "pdfmake/build/vfs_fonts.js"` e
+`vfs[nome]` são tipados? O `@types/pdfmake` normalmente **não** declara o módulo
+`pdfmake/build/vfs_fonts.js`. Com `verbatimModuleSyntax`/strict do projeto, esse
+import pode exigir uma declaração de módulo (`declare module`) ou `// @ts-expect-error`
+— o design não especifica isso, e isso afeta `npm run build` (CA1).
+
+Correção concreta (escolher uma e deixá-la fixa no design):
+- **Preferida:** tornar a adição pinada parte da tarefa ANTES de qualquer outra
+  coisa (`"pdfmake": "0.2.20"` em `dependencies`, `"@types/pdfmake": "0.2.11"` em
+  `devDependencies`), instalar, e então a implementação reconfirma os três fatos
+  no próprio worktree com um script mínimo (`node --input-type=module`) cujo
+  resultado é colado no design. O design já descreve o teste manual de render
+  (§8.2 item 1) — eleve a reprodução dos entrypoints a um passo **bloqueante** da
+  implementação, não a uma nota.
+- Especificar o tratamento de tipos do import de vfs: adicionar
+  `src/main/services/vfs-fonts.d.ts` com
+  `declare module "pdfmake/build/vfs_fonts.js" { const vfs: Record<string,string>; export default vfs; }`
+  (ou documentar que `@types/pdfmake@0.2.11` já cobre esse caminho — verificar e
+  registrar qual é o caso). Sem isso, o build pode falhar e CA1 não é atingível.
+
+Enquanto os entrypoints/fontes só existirem como "verificado numa instalação
+efêmera que não está no repo", a feature de PDF repousa sobre uma suposição que o
+próximo agente não consegue confirmar — é o que esta revisão existe para pegar.
+
+### 2. MEDIUM — O mock de `electron` dos testes existentes não cobre o que o handler de exportação precisa; o design não especifica como estendê-lo
+
+Local: §8.1 ("Molde: reusa `vi.mock(\"electron\", ...)` ... como as demais
+`tests/main/ipc-*.test.ts` (confirmado no projeto)"), §5.7.
+
+Verifiquei o molde real (`tests/main/ipc-mapa.test.ts`): o `vi.mock("electron",
+...)` existente expõe **apenas** `ipcMain.handle` e `dialog: { showOpenDialog }`.
+O handler de exportação precisa, em runtime de teste, de:
+- `dialog.showSaveDialog` (não `showOpenDialog`);
+- `BrowserWindow.fromWebContents` (usado por `janelaDoEvento`, §5.7) — ausente do
+  mock;
+- `app.getPath("documents")` (via `diretorioPadraoExport`, §5.4) — `app` **não**
+  está no mock atual e, importado em escopo de módulo em `export.ts`, será
+  `undefined` no ambiente `node` sem mock, quebrando a importação do módulo.
+
+"Reusa o molde das irmãs" é, portanto, **insuficiente** — o molde precisa de
+objetos novos. Como escrito, o teste de handler não roda.
+
+Correção concreta: especificar no design o mock estendido, por exemplo:
 ```ts
-// storage.ts
-function normalizarCaminhoOrigem(p: string): string {
-  const aparado = p.trim();
-  if (process.platform === "win32") {
-    // Windows: FS case-insensitive e aceita / e \ como separador.
-    return aparado.replace(/\//g, "\\").toLowerCase();
-  }
-  // POSIX: separador é só "/"; "\" é caractere de nome válido — NÃO converter.
-  // FS case-sensitive — preservar caixa. Normalização é só o trim.
-  return aparado;
-}
+vi.mock("electron", () => ({
+  ipcMain: { handle: (c, h) => registered.set(c, h) },
+  dialog: { showSaveDialog: vi.fn() },
+  BrowserWindow: { fromWebContents: vi.fn(() => undefined) },
+  app: { getPath: vi.fn(() => os.tmpdir()) }, // nunca Facul
+}));
 ```
+E fixar que `app.getPath` no mock devolve `os.tmpdir()` (coerente com RNF4). Sem
+isso, nem o caminho feliz de Markdown ponta a ponta (§8.1) nem o cancelado rodam.
 
-E atualizar o texto do design para dizer: "fora do Windows, a normalização é
-**apenas** `trim()` — nenhuma conversão de separador (o `/` já é o único
-separador e `\` é caractere de nome válido)."
+### 3. MEDIUM — `diretorioPadraoExport` chama `app.getPath` mas o design o posiciona em `export.ts` com funções "puras"; acoplamento a `electron` em escopo de módulo não está resolvido
 
-### 2. [MEDIUM] A derivação de `nomePasta` (passo 1) é descrita como testável como "função pura", mas não há função nomeada nem contrato — e ela usa `basename`, cujo resultado depende da plataforma
+Local: §5.4, §9.
 
-**Onde:** "Orquestração" passo 1; "Testabilidade" ("raiz de drive / raiz
-POSIX: teste de unidade da derivação do passo 1 (função pura de `nomePasta`)").
+`diretorioPadraoExport()` chama `app.getPath("documents")` — `app` vem de
+`electron`. O design declara `export.ts` como "a camada de efeito" e, em §5.2,
+fixa a regra "nenhum efeito de pdfmake em topo de módulo" com instanciação
+preguiçosa. Mas o design **não aplica a mesma disciplina a `electron`**:
+`import { app } from "electron"` em `export.ts` é carregado assim que o módulo é
+importado, e o teste de `sugerirNomeArquivo` (§8.1, `tests/main/export-nome.test.ts`,
+declarado "puro") importa `export.ts` — que importa `electron`. No ambiente
+`node` do vitest sem mock de `electron`, isso quebra a importação (o pacote
+`electron` não resolve para um objeto utilizável fora do runtime Electron).
 
-**Problema:** o design manda testar unitariamente "a derivação do passo 1
-(função pura de `nomePasta`) com entradas `C:\\` e `/`", mas o passo 1 está
-descrito como código inline dentro de `importarPasta`, não como uma função
-extraída. Não dá para unit-testar `C:\\` e `/` de forma determinística sem
-extrair, porque:
-(a) não há símbolo exportado para o teste chamar; e
-(b) `basename("C:\\")` só retorna `"C:"` quando `node:path` opera em modo
-Windows — em um runner POSIX (CI Linux), `basename` é a variante POSIX e
-`basename("C:\\")` retorna `"C:\\"` inteiro (não `"C:"`), então o guard
-`/^[A-Za-z]:$/` **não casa** e o teste do caso `C:\\` falha. O design não diz
-se o teste deve usar `path.win32.basename`/`path.posix.basename` explicitamente.
+Ou seja: há uma contradição entre "`sugerirNomeArquivo`/`diretorioPadraoExport`
+são puros e testáveis em `export.ts`" (§5.4, §8.1) e "o teste puro importa
+`export.ts`" quando `export.ts` importa `electron` no topo.
 
-**Fix concreto:** extrair uma função pura exportada e torná-la independente de
-plataforma, e dizer no design qual `basename` usar:
+Correção concreta (escolher uma):
+- Mover `sugerirNomeArquivo` (que é genuinamente puro — só string) para a camada
+  **shared** (`src/shared/export/nome.ts`) ou para `pdfDefinicao.ts`-style puro,
+  para que `tests/main/export-nome.test.ts` **não** importe `electron`. Manter
+  `diretorioPadraoExport` (que precisa de `app`) em `export.ts` e cobri-lo só via
+  o teste de handler com `electron` mockado.
+- OU declarar explicitamente que `tests/main/export-nome.test.ts` também carrega o
+  `vi.mock("electron", ...)` (então não é "puro", é "node com electron mockado"),
+  e aplicar o mesmo cuidado ao import de `app`. O design precisa dizer qual.
 
-```ts
-// pasta.ts
-import { win32 as pathWin32, posix as pathPosix } from "node:path";
-
-/**
- * Nome de exibição da pasta escolhida, saneando raiz de drive (Windows) e
- * raiz POSIX para "" (cai em "Geral" via montarCaderno). Pura e testável.
- */
-export function nomePastaParaCaderno(pastaEscolhida: string): string {
-  const semBarra = pastaEscolhida.replace(/[\\/]+$/, "");
-  // Tenta ambos os basenames para ser determinístico em qualquer runner.
-  const bruto = semBarra.includes("\\")
-    ? pathWin32.basename(semBarra)
-    : pathPosix.basename(semBarra);
-  if (bruto === "" || /^[A-Za-z]:$/.test(bruto)) return "";
-  return bruto;
-}
-```
-
-Then step 1 becomes `const nomePasta = nomePastaParaCaderno(pastaEscolhida)` and
-the test calls `nomePastaParaCaderno` directly with `"C:\\"` and `"/"`.
-Alternativa aceitável: declarar explicitamente que o teste do caso Windows usa
-`path.win32` e documentar que em produção o `basename` nativo basta (porque o
-app roda em Windows). Qualquer uma resolve, mas o design precisa **escolher
-uma** — hoje deixa o coder adivinhar.
-
-### 3. [NIT] CA6 ("PDF sem texto é importado, não conta como falha") não está refletido na precedência de `resumoLoteTexto`
-
-**Onde:** CA6 + seção UI (`resumoLoteTexto`).
-
-**Problema:** CA6 diz que um PDF sem texto extraível **é importado** (conta em
-`importados`). Correto e coberto pela orquestração (passo 5 cria o documento com
-texto vazio). Mas a frase de resumo não tem como distinguir "importado com
-texto" de "importado vazio", então um lote só de PDFs escaneados dirá
-"N arquivos importados em M cadernos" sem qualquer menção de que vieram vazios.
-Não é bug (bate com CA6/CA9), mas é um canto que vale um comentário para o coder
-não "consertar" indevidamente adicionando uma contagem de vazios fora de escopo.
-
-**Fix concreto:** acrescentar uma frase em CA6 ou na seção UI: "Documentos
-importados sem texto extraível contam apenas em `importados`; **não** há
-contador separado de 'sem texto' no resumo do lote (fora de escopo). O aviso
-'sem texto extraível' aparece por documento ao abri-lo, como hoje."
+Isto é o mesmo tipo de armadilha que o achado #1 da revisão anterior (efeito em
+escopo de módulo) — resolvido para pdfmake, mas deixado em aberto para `electron`.
 
 ---
 
-## Verificação ponto-a-ponto do que o prompt pediu
+## NITs (não bloqueiam)
 
-- **Regra do caderno composto, todos os casos:** inequívoca. Raiz/sem-subpasta
-  → nome da pasta escolhida (passo 1 + RF4 + CA4); um nível → CA3; vários níveis
-  → CA2; acentos/espaços → `montarCaderno` normaliza id e preserva nome
-  (confirmado em `notebooks.ts`); colisão cruzada `Cálculo\Teórica`
-  (`calculo-teorica`) vs `Física\Teórica` (`fisica-teorica`) → ids distintos
-  (seção "Invariantes"). A nota sobre colisão por normalização (dois caminhos
-  que normalizam ao mesmo id agrupam no mesmo caderno) está documentada e é
-  coerente com `listarCadernos`. **OK.**
-- **Re-import / dedup:** regra completa — pular por `caminhoOrigem` normalizado,
-  helper `caminhosOrigemImportados` sobre `carregarTodos` (que existe e é
-  tolerante), conjunto atualizado dentro do lote, dedup intra-lote determinística
-  (vence o primeiro por `localeCompare`). A única lacuna é a #1 (alvo da
-  unificação de separador em POSIX). **OK, exceto #1.**
-- **Tetos de arquivos/profundidade com números e comportamento seguro:**
-  `PASTA_MAX_ARQUIVOS_LOTE = 500` (parada segura, nada criado, CA7) e
-  `PASTA_PROFUNDIDADE_MAXIMA = 10` (poda + sinaliza), com definição operacional
-  única de profundidade (0 na raiz; desce se ≤ teto) e CA8 com exemplo numérico.
-  Resolve o off-by-one de rodadas anteriores. **OK.**
-- **Shape do resultado + contrato IPC/preload/AppApi:** `ResultadoImportacaoPasta`
-  concreto em `types.ts`; canal `pasta:importar`; `AppApi.importarPasta(): Promise<ResultadoImportacaoPasta | null>`;
-  preload com `ipcRenderer.invoke`; handler no estilo de `importarArquivo`
-  (confirmado idêntico ao real em `ipc/index.ts`), retornando `null` no cancel.
-  **OK.**
-- **Nada fora de escopo:** sem IA no lote (RF5/NFR1), sem watch, sem dedup
-  sofisticada, read-only (RF9/CA10). O lote reusa `importarArquivo` inteiro e
-  **descarta** a sugestão de caderno — documentado como intencional. Nenhum
-  scope creep detectado. **OK.**
+### N1. NIT — Baseline "434 testes" não confere com a contagem estática
 
----
+Local: cabeçalho, §1.4 (CA13), §8, §10.
+Medi o worktree: 431 chamadas `it(`/`test(` + 1 bloco `.each` (que expande para
+N casos). O número real só é confirmável rodando a suíte (fora de escopo desta
+revisão). O design repete "434" como fato "não de memória" — mas a contagem
+estática não bate exatamente. Correção: a implementação deve rodar `npm test` e
+corrigir o número de baseline no design/docs para o valor real antes de concluir,
+em vez de citar 434 de memória.
 
-## Verified Assumptions (li o código e confere)
+### N2. NIT — `BrowserWindow` não está nos imports de `ipc/index.ts`
 
-1. `montarCaderno(bruto)` existe em `src/shared/notebooks.ts`, devolve
-   `{ cadernoId, cadernoNome }`, usa `normalizarNomeCaderno` (strip de acento +
-   slug `[^a-z0-9]+`→`-`) e `derivarNomeExibicaoCaderno` (trim + slice em
-   `CADERNO_NOME_MAX = 200`). **O id NÃO é truncado** — a nota do design está
-   correta.
-2. `montarCaderno("")` cai em `geral`/`Geral` (via fallback de
-   `normalizarNomeCaderno`). O guard de raiz de drive passando `""` realmente
-   produz o caderno `Geral`. **Confere.**
-3. `notebooks.ts` só importa `import type` de `./types` e não depende de
-   `constants.ts`. Portanto declarar `SEPARADOR_CADERNO` dentro de `notebooks.ts`
-   (e não em `constants.ts`) é necessário para não quebrar a regra do módulo.
-   **Confere** (o cabeçalho do arquivo afirma exatamente isso).
-4. `derivarCadernoDeCaminho` já aplica o guard `/^[A-Za-z]:$/` para raiz de
-   drive. O design espelha esse mesmo guard no passo 1. **Confere.**
-5. `storage.criarDocumento(novo: NovoDocumento, baseDir?)` recebe
-   `{ nome, formato, texto, cadernoId, cadernoNome, caminhoOrigem? }` já prontos
-   — diferente do handler IPC `criarDocumento`, que recebe só a grafia e chama
-   `montarCaderno`. A decisão do design de chamar o `storage.criarDocumento`
-   direto (sem passar pelo handler) é válida e bate com a assinatura real.
-6. `carregarTodos` existe em `storage.ts`, é tolerante a corrompidos e trata
-   diretório ausente como `[]`. Reusá-lo em `caminhosOrigemImportados` é viável.
-7. `ArquivoImportado` (em `types.ts`) tem `nome`, `formato`, `texto`,
-   `semTextoExtraivel`, `caminhoOrigem?`, `cadernoIdSugerido?`,
-   `cadernoNomeSugerido?`. O passo 5 (`extraido.nome/formato/texto`) e a nota
-   sobre descartar `cadernoIdSugerido` batem com o tipo real.
-8. `importarArquivo` (`files.ts`) lança `ArquivoMuitoGrandeError` (>50 MB) e
-   `FormatoNaoSuportadoError`, e devolve `semTextoExtraivel`/texto vazio para PDF
-   sem texto. O tratamento do lote (tamanho → `falhas`; PDF vazio → importado)
-   bate com o comportamento real.
-9. O handler `importarArquivo` em `ipc/index.ts` tem exatamente a forma que o
-   design propõe para `importarPasta` (dialog → cancel→`null` → try/catch →
-   `throw new Error(mensagemAmigavel(...))`). O `mensagemAmigavelPasta` genérico
-   é consistente com o padrão existente.
-10. `App.tsx` passa `onConfirmarCaderno` **condicionalmente**
-    (`documento === null ? {...} : {}`) e `Importar` só é montado quando
-    `abaExibida === "importar"`. A correção do design (pôr `onLoteImportado`
-    **fora** do spread condicional) está certa e o JSX proposto é compatível com
-    o real. `setVersaoHistorico((v) => v + 1)` é o mecanismo real de recarga do
-    Histórico (usado em `persistirArtefato`).
-11. `Importar.tsx` usa `importar-header`, `ehFluxoImportacao =
-    onConfirmarCaderno !== undefined`, e `mensagemDeErro` para limpar o prefixo
-    do IPC — tudo como o design descreve ao propor o botão "Escolher pasta" e os
-    estados novos.
-12. `extensoesSuportadas = ["txt","md","pdf"]` e `tamanhoMaximoArquivoBytes`
-    (50 MB) existem em `constants.ts`; `derivarCadernoDeCaminho`/`montarCaderno`
-    exportados. O padrão de constantes `MAPA_*` existente justifica os novos
-    `PASTA_*`.
-13. Caminho real do roadmap: `c:\Dev\tasks\roadmap-importar-pasta.md` existe
-    **fora** do worktree (confirmado por busca); dentro de
-    `.worktrees\importpasta\tasks\` **não** há roadmap. O cabeçalho do design e a
-    seção "Resumo das decisões" agora apontam o caminho absoluto correto. As
-    decisões do roadmap (caderno composto com " — ", só texto, read-only,
-    feedback de lote, pular duplicatas por `caminhoOrigem`) batem com o design.
+Local: §5.7. `janelaDoEvento` usa `BrowserWindow.fromWebContents`, mas o
+`ipc/index.ts` atual importa só `{ dialog, ipcMain }` de `electron` (verificado).
+Correção: listar `BrowserWindow` na lista de imports novos de §5.7/§9.
 
-## Unverified / Wrong Assumptions
+### N3. NIT — Convenção de nome de arquivo de teste `.ts` (não `.tsx`)
 
-- **(parcial, vira achado #2)** O design afirma que a "derivação do passo 1" é
-  uma "função pura" testável com `C:\\` e `/`, mas (a) não a extrai como símbolo
-  e (b) depende de `basename` ser a variante Windows — o que **não é verdade** em
-  um runner POSIX, onde `path.basename("C:\\")` devolve `"C:\\"` e o guard não
-  casa. Essa é uma suposição implícita incorreta sobre o comportamento de
-  `node:path` no CI; o achado #2 dá o fix.
-- **(parcial, vira achado #1)** A afirmação "separadores unificados" fora do
-  Windows pressupõe um alvo de unificação que nunca é dado e que, se
-  interpretado como `\`→`/`, estaria **errado** em POSIX (onde `\` é caractere
-  de nome válido). Achado #1 dá o fix.
-- Não verifiquei em runtime o comportamento do `dialog.showOpenDialog` com
-  `openDirectory` (é interação de SO, fora do escopo de revisão estática); o
-  design corretamente o deixa mockado nos testes.
-- Não verifiquei `preload.ts` nem `tests/*` linha a linha; as mudanças ali são
-  aditivas e seguem padrões já confirmados nos outros arquivos.
+Local: §8, §9. O `vitest.config.ts` tem `include: ["tests/**/*.test.ts"]`
+(verificado) — só `.ts`. O design já coloca todos os testes novos como `.ts` e
+deixa o componente React em verificação manual, então está coerente; registro só
+para o implementador não criar um `.test.tsx` esperando que rode.
+
+### N4. NIT — `conteudoQuiz`/`gerarMarkdownQuiz` e o rótulo das alternativas
+
+Local: §3.2. Verifiquei `PerguntaQuiz`: a união é `multipla` (com
+`alternativas: AlternativaQuiz[]`, cada uma `{ texto, correta }`) ou `aberta`
+(com `gabarito`). O design usa `- [x]`/`- [ ]` e decide não rotular por letra —
+coerente com o tipo. OK; registro apenas que o texto "Alternativa A"/"Alternativa
+correta" nos exemplos de §3.2 é ilustrativo e o conteúdo real vem de
+`alternativa.texto` (o design diz isso em prosa, mas o exemplo pode confundir).
 
 ---
 
-## Veredito
+## Suposições verificadas (conferidas contra o código real)
 
-Contagem: **2 MEDIUM + 1 NIT** (0 HIGH). Por ser > 0 em HIGH/MEDIUM, o veredito
-é **CHANGES_REQUESTED**. Os dois MEDIUM são especificações faltando (não
-arquitetura): o alvo de unificação de separador em POSIX (#1) e a extração +
-determinismo de plataforma da derivação de `nomePasta` para o teste de raiz
-(#2). Ambos são correções pontuais de documentação/assinatura; o resto do design
-está sólido e verificado contra o código real.
+- **`calcularLayout(raiz: NoMapaMental, expandidos: Set<string>)`** — assinatura
+  confirmada em `src/shared/mapaLayout.ts`. O design usa `Set<string>` e um
+  helper `todosOsIds`. ✔ (achado #3 da revisão anterior está corretamente
+  endereçado).
+- **Constantes da view `NO_LARGURA=168`, `NO_ALTURA=40`, `MARGEM=24` e
+  `caminhoAresta`** — confirmadas literalmente em
+  `src/renderer/views/MapaMental.tsx`, com o mesmo corpo de `caminhoAresta` e o
+  mesmo viewBox (`largura + NO_LARGURA + MARGEM*2`) e offset
+  (`translate(MARGEM + NO_LARGURA/2, MARGEM)`). A extração aditiva para
+  `mapaLayout.ts` é factível. ✔ (achado #4 endereçado corretamente).
+- **`NoPosicionado`** expõe `x`, `y`, `nivel`, `rotulo`, `filhosIds` — confirmado;
+  `caminhoAresta(pai, filho)` usa campos existentes. ✔
+- **Regra de presença do storage** (`listarDocumentos`, linhas ~265-272):
+  `temResumo = resumo !== undefined`; `temFlashcards = flashcards !== undefined &&
+  length > 0`; `temExercicios = exercicios !== undefined && length > 0`;
+  `temMapaMental = mapaMental !== undefined`; **`temQuiz = quiz !== undefined`**
+  (sem `perguntas.length`). Bate exatamente com `artefatosPresentes` em §3.3. ✔
+  (achado #10 endereçado corretamente, inclusive a correção do quiz).
+- **Tipos de domínio** `Resumo{conteudo,modo}`, `Flashcard{pergunta,resposta}`,
+  `Exercicio{enunciado,resposta,modo}`, `MapaMental{raiz}`, `Quiz{perguntas}`,
+  `PerguntaQuiz` (união `multipla`/`aberta`), `ModoResumo = "curto"|"longo"` —
+  confirmados em `src/shared/types.ts`. ✔
+- **`vitest.config.ts`** `environment: "node"` global, sem override por arquivo,
+  `include: ["tests/**/*.test.ts"]`. ✔ (achado #7 endereçado).
+- **Escrita atômica `.tmp` + `rename`** — confirmada em `storage.ts`
+  (`gravarCru`/`salvarDocumento`), e o filtro `.json.tmp` órfão existe. O design
+  reusa o padrão corretamente. ✔
+- **Padrão de teste IPC** — `vi.mock("electron", ...)` capturando
+  `ipcMain.handle`, `registerIpcHandlers` importado de
+  `../../src/main/ipc/index.js`, Ollama mockado no nível do serviço. Confirmado em
+  `tests/main/ipc-mapa.test.ts` (com a ressalva do achado #2 sobre o conteúdo do
+  mock). ✔
+- **`getApi()`** em `src/renderer/api.ts` devolve `PreloadApi` e lança
+  `ERRO_API_INDISPONIVEL` se a ponte faltar — confirmado; o design respeita a
+  regra "sem `window.api?.`". ✔
+- **`preload.ts`** segue o estilo `(args) => ipcRenderer.invoke(CANAL, args)`
+  sem lógica — confirmado; as duas linhas novas encaixam. ✔
+- **`ipc.ts`** tem `IPC_CHANNELS` (objeto `as const`) e `AppApi` (interface) —
+  confirmado; a adição de `exportarMarkdown`/`exportarPdf` e o
+  `import type ... from "./export/types"` são coerentes. ✔
+- **`App.tsx`**: `persistirArtefato` existe (artefato fica em memória mesmo se o
+  save falhar, sustentando a decisão 4.2); `.app-documento-ativo` no header com
+  guarda `documento !== null`; views recebem `arquivo`/`*Salvo`/`onGerado`.
+  Confirmado — a colocação do controle de documento no header e o prop
+  `nomeDocumento` são factíveis. ✔
+- **Pinagem de dependências** — todas as deps atuais usam versão exata (sem
+  `^`/`~`); `jsdom` está em devDeps. A exigência de pinar `pdfmake`/`@types/pdfmake`
+  é coerente com o projeto. ✔ (a execução do pin está no achado #1).
+- **Decisões de produto respeitadas** — Markdown + PDF apenas; Anki/.docx/HTML/
+  temas fora de escopo (§1.5, §10.1); mapa como SVG vetorial no PDF e lista
+  aninhada no Markdown (RF5/RF6, §5.3, §5.5); gravação só via `showSaveDialog`,
+  default em Documentos e **nunca** `C:\Users\enzom\OneDrive\Desktop\Facul`
+  (RNF4, §5.4); nada de Ollama (RNF1, §8). Tudo coerente com o pedido original do
+  usuário. ✔
+
+---
+
+## Suposições não verificadas / em risco
+
+- **Entrypoints e vfs do `pdfmake@0.2.20`** (`import PdfPrinter from "pdfmake"`;
+  `import vfs from "pdfmake/build/vfs_fonts.js"` como dicionário base64 plano;
+  fontes como `Buffer`; `ContentSvg.svg: string`; `PDFFontSource` aceita
+  `Buffer`): **NÃO verificáveis** no estado atual — o pacote não está em
+  `package.json` nem em `node_modules`. Esta é a base do achado #1 (HIGH).
+- **Tipagem do import `pdfmake/build/vfs_fonts.js`** sob strict/`verbatimModuleSyntax`:
+  não confirmado que `@types/pdfmake@0.2.11` declara esse caminho de módulo; pode
+  exigir `declare module`. Afeta `npm run build` (CA1). Ver achado #1.
+- **Contagem exata da baseline (434)**: não verificável sem rodar a suíte; a
+  contagem estática deu 431 `it/test` + 1 `.each`. Ver N1.
+- **Render real do PDF (fontes carregam, SVG nítido, quebra de página, rodapé)**:
+  por natureza é verificação manual (§8.2) — não verificável nesta revisão
+  estática; depende da resolução do achado #1.

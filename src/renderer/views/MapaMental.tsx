@@ -1,8 +1,15 @@
 import { useMemo, useRef, useState } from "react";
-import { calcularLayout } from "@shared/mapaLayout";
+import {
+  MARGEM,
+  NO_ALTURA,
+  NO_LARGURA,
+  calcularLayout,
+  caminhoAresta,
+} from "@shared/mapaLayout";
 import type { NoPosicionado } from "@shared/mapaLayout";
 import type { ArquivoImportado, MapaMental, NoMapaMental } from "@shared/types";
 import { getApi } from "../api";
+import { ExportarControles } from "../components/ExportarControles";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -29,18 +36,14 @@ interface MapaMentalProps {
   mapaMentalSalvo?: MapaMental | null;
   /** Chamado quando um novo mapa é gerado, para o App persistir o artefato. */
   onGerado?: (mapa: MapaMental) => void;
+  /** Nome do documento ativo, usado para nomear o arquivo exportado. */
+  nomeDocumento?: string;
 }
 
 /** Limites e passo do zoom. */
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_PASSO = 0.1;
-
-/** Dimensões aproximadas de um nó (para desenhar o retângulo e centralizar). */
-const NO_LARGURA = 168;
-const NO_ALTURA = 40;
-/** Margem interna do conteúdo dentro do viewBox do SVG. */
-const MARGEM = 24;
 
 /**
  * Coleta o conjunto inicial de ids expandidos: a raiz e seus filhos diretos.
@@ -50,16 +53,6 @@ function expandidosIniciais(raiz: NoMapaMental): Set<string> {
   const ids = new Set<string>([raiz.id]);
   for (const filho of raiz.filhos) ids.add(filho.id);
   return ids;
-}
-
-/** Monta o path SVG (curva de Bézier) entre o pai e o filho posicionados. */
-function caminhoAresta(pai: NoPosicionado, filho: NoPosicionado): string {
-  const x1 = pai.x + NO_LARGURA / 2;
-  const y1 = pai.y;
-  const x2 = filho.x - NO_LARGURA / 2;
-  const y2 = filho.y;
-  const meio = (x1 + x2) / 2;
-  return `M ${x1} ${y1} C ${meio} ${y1}, ${meio} ${y2}, ${x2} ${y2}`;
 }
 
 /** Classe CSS do nó por nível (cores por profundidade via tokens). */
@@ -94,6 +87,7 @@ export function MapaMental({
   arquivo,
   mapaMentalSalvo,
   onGerado,
+  nomeDocumento,
 }: MapaMentalProps): React.JSX.Element {
   // Estado inicializado a partir do que está salvo. O App remonta esta tela
   // (via `key` por documento) ao reabrir/importar outro.
@@ -249,6 +243,20 @@ export function MapaMental({
 
       {raiz !== null && layout !== null && (
         <article className="mapa-resultado">
+          <ExportarControles
+            alvo={{
+              escopo: "artefato",
+              tipo: "mapaMental",
+              documento: {
+                nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+                mapaMental: {
+                  documentoId: "",
+                  raiz,
+                  geradoEm: mapaMentalSalvo?.geradoEm ?? "",
+                },
+              },
+            }}
+          />
           <div
             className="mapa-canvas"
             onMouseDown={aoApertarFundo}

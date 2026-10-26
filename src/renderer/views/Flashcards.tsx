@@ -2,6 +2,7 @@ import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
 import type { ArquivoImportado, Flashcard } from "@shared/types";
 import { getApi } from "../api";
+import { ExportarControles } from "../components/ExportarControles";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -28,6 +29,8 @@ interface FlashcardsProps {
   flashcardsSalvos?: Flashcard[] | null;
   /** Chamado quando novos flashcards são gerados, para o App persistir. */
   onGerado?: (flashcards: Flashcard[]) => void;
+  /** Nome do documento ativo, usado para nomear o arquivo exportado. */
+  nomeDocumento?: string;
 }
 
 /** Quantidade inicial sugerida de flashcards. */
@@ -42,6 +45,7 @@ export function Flashcards({
   arquivo,
   flashcardsSalvos,
   onGerado,
+  nomeDocumento,
 }: FlashcardsProps): React.JSX.Element {
   const [quantidade, setQuantidade] = useState<number>(QUANTIDADE_PADRAO);
   // Estado inicializado a partir do que está salvo. O App remonta esta tela
@@ -141,6 +145,16 @@ export function Flashcards({
 
       {cardAtual !== null && cards !== null && (
         <article className="flashcards-resultado">
+          <ExportarControles
+            alvo={{
+              escopo: "artefato",
+              tipo: "flashcards",
+              documento: {
+                nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+                flashcards: cards,
+              },
+            }}
+          />
           <p className="flashcards-contador" aria-live="polite">
             Card {indice + 1} de {cards.length}
           </p>

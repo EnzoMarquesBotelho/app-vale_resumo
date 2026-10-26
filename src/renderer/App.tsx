@@ -10,6 +10,9 @@ import type {
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { OllamaStatus } from "./components/OllamaStatus";
+import { ExportarControles } from "./components/ExportarControles";
+import { artefatosPresentes } from "@shared/export/markdown";
+import type { DocumentoExportavel } from "@shared/export/types";
 import { getApi } from "./api";
 import { Importar } from "./views/Importar";
 import { Resumo } from "./views/Resumo";
@@ -211,6 +214,30 @@ export function App(): React.JSX.Element {
     );
   }
 
+  // Documento exportável montado a partir do documento ativo: só inclui as
+  // chaves dos artefatos presentes (spread condicional). `null` sem documento.
+  const docExportavel: DocumentoExportavel | null =
+    documento !== null
+      ? {
+          nome: documento.nome,
+          ...(documento.resumo !== undefined
+            ? { resumo: documento.resumo }
+            : {}),
+          ...(documento.flashcards !== undefined
+            ? { flashcards: documento.flashcards }
+            : {}),
+          ...(documento.exercicios !== undefined
+            ? { exercicios: documento.exercicios }
+            : {}),
+          ...(documento.mapaMental !== undefined
+            ? { mapaMental: documento.mapaMental }
+            : {}),
+          ...(documento.quiz !== undefined ? { quiz: documento.quiz } : {}),
+        }
+      : null;
+  const semArtefatos =
+    docExportavel !== null && artefatosPresentes(docExportavel).length === 0;
+
   // Abas de geração ficam desabilitadas enquanto não há texto importado.
   function abaDesabilitada(id: Aba): boolean {
     const ehGeracao =
@@ -236,10 +263,17 @@ export function App(): React.JSX.Element {
             </p>
           </div>
         </div>
-        {documento !== null && (
-          <p className="app-documento-ativo" title={documento.nome}>
-            Documento: <strong>{documento.nome}</strong>
-          </p>
+        {documento !== null && docExportavel !== null && (
+          <div className="app-header-export">
+            <p className="app-documento-ativo" title={documento.nome}>
+              Documento: <strong>{documento.nome}</strong>
+            </p>
+            <ExportarControles
+              alvo={{ escopo: "documento", documento: docExportavel }}
+              desabilitado={semArtefatos}
+              dicaDesabilitado="Gere ao menos um artefato para exportar o documento."
+            />
+          </div>
         )}
       </header>
 
@@ -305,6 +339,7 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             resumoSalvo={documento?.resumo ?? null}
             onGerado={temTexto ? (r) => void salvarResumo(r) : undefined}
+            nomeDocumento={documento?.nome}
           />
         )}
         {abaExibida === "flashcards" && (
@@ -313,6 +348,7 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             flashcardsSalvos={documento?.flashcards ?? null}
             onGerado={temTexto ? (f) => void salvarFlashcards(f) : undefined}
+            nomeDocumento={documento?.nome}
           />
         )}
         {abaExibida === "exercicios" && (
@@ -321,6 +357,7 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             exerciciosSalvos={documento?.exercicios ?? null}
             onGerado={temTexto ? (e) => void salvarExercicios(e) : undefined}
+            nomeDocumento={documento?.nome}
           />
         )}
         {abaExibida === "mapa" && (
@@ -329,6 +366,7 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             mapaMentalSalvo={documento?.mapaMental ?? null}
             onGerado={temTexto ? (m) => void salvarMapaMental(m) : undefined}
+            nomeDocumento={documento?.nome}
           />
         )}
         {abaExibida === "quiz" && (
@@ -337,6 +375,7 @@ export function App(): React.JSX.Element {
             arquivo={arquivo}
             quizSalvo={documento?.quiz ?? null}
             onGerado={temTexto ? (q) => void salvarQuiz(q) : undefined}
+            nomeDocumento={documento?.nome}
           />
         )}
         {abaExibida === "agenda" && <Agenda />}

@@ -53,6 +53,31 @@ const LARGURA_COLUNA = 220;
 const ALTURA_LINHA = 64;
 
 /**
+ * Dimensões da caixa de um nó e a margem interna do conteúdo no viewBox.
+ * Conceitos distintos de `LARGURA_COLUNA`/`ALTURA_LINHA` (passos de layout):
+ * estes descrevem o retângulo desenhado e o deslocamento do conteúdo. Usados
+ * tanto pela view (`MapaMental.tsx`) quanto pelo SVG do PDF (`mapaSvg.ts`),
+ * para as coordenadas serem idênticas.
+ */
+export const NO_LARGURA = 168;
+export const NO_ALTURA = 40;
+export const MARGEM = 24;
+
+/**
+ * Monta o path SVG (curva de Bézier horizontal) entre o pai e o filho
+ * posicionados, saindo da borda direita do pai e chegando na borda esquerda do
+ * filho. Compartilhado pela view e pelo SVG do PDF.
+ */
+export function caminhoAresta(pai: NoPosicionado, filho: NoPosicionado): string {
+  const x1 = pai.x + NO_LARGURA / 2;
+  const y1 = pai.y;
+  const x2 = filho.x - NO_LARGURA / 2;
+  const y2 = filho.y;
+  const meio = (x1 + x2) / 2;
+  return `M ${x1} ${y1} C ${meio} ${y1}, ${meio} ${y2}, ${x2} ${y2}`;
+}
+
+/**
  * Calcula as posições de todos os nós visíveis da árvore `raiz`, dado o
  * conjunto `expandidos` (ids de nós cujos filhos estão visíveis). Um nó cujo id
  * não está em `expandidos` é desenhado, mas seus filhos (e a subárvore) saem do

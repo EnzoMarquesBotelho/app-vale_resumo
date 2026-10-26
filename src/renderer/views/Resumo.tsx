@@ -5,6 +5,7 @@ import type {
   Resumo as ResumoArtefato,
 } from "@shared/types";
 import { getApi } from "../api";
+import { ExportarControles } from "../components/ExportarControles";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -33,6 +34,8 @@ interface ResumoProps {
    * Chamado quando um novo resumo é gerado, para o App persistir o artefato.
    */
   onGerado?: (resumo: ResumoArtefato) => void;
+  /** Nome do documento ativo, usado para nomear o arquivo exportado. */
+  nomeDocumento?: string;
 }
 
 /** Rótulos em português para cada modo de resumo. */
@@ -49,6 +52,7 @@ export function Resumo({
   arquivo,
   resumoSalvo,
   onGerado,
+  nomeDocumento,
 }: ResumoProps): React.JSX.Element {
   // Estado inicializado a partir do que está salvo. O App remonta esta tela
   // (via `key` por documento) ao reabrir/importar outro, então a inicialização
@@ -129,6 +133,21 @@ export function Resumo({
 
       {resumo !== null && (
         <article className="resumo-resultado">
+          <ExportarControles
+            alvo={{
+              escopo: "artefato",
+              tipo: "resumo",
+              documento: {
+                nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+                resumo: {
+                  documentoId: "",
+                  modo,
+                  conteudo: resumo,
+                  geradoEm: resumoSalvo?.geradoEm ?? "",
+                },
+              },
+            }}
+          />
           <pre className="resumo-texto">{resumo}</pre>
         </article>
       )}

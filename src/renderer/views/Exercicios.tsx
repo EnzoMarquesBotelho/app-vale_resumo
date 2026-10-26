@@ -8,6 +8,7 @@ import type {
   ModoConteudo,
 } from "@shared/types";
 import { getApi } from "../api";
+import { ExportarControles } from "../components/ExportarControles";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -34,6 +35,8 @@ interface ExerciciosProps {
   exerciciosSalvos?: Exercicio[] | null;
   /** Chamado quando novos exercícios são gerados, para o App persistir. */
   onGerado?: (exercicios: Exercicio[]) => void;
+  /** Nome do documento ativo, usado para nomear o arquivo exportado. */
+  nomeDocumento?: string;
 }
 
 /** Quantidade inicial sugerida de exercícios. */
@@ -73,6 +76,7 @@ export function Exercicios({
   arquivo,
   exerciciosSalvos,
   onGerado,
+  nomeDocumento,
 }: ExerciciosProps): React.JSX.Element {
   // Estado inicializado a partir do que está salvo. O App remonta esta tela
   // (via `key` por documento) ao reabrir/importar outro, então a inicialização
@@ -232,6 +236,16 @@ export function Exercicios({
 
       {exercicios !== null && (
         <div className="exercicios-resultado">
+          <ExportarControles
+            alvo={{
+              escopo: "artefato",
+              tipo: "exercicios",
+              documento: {
+                nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+                exercicios,
+              },
+            }}
+          />
           <p className="exercicios-contador" aria-live="polite">
             {exercicios.length}{" "}
             {exercicios.length === 1 ? "exercício" : "exercícios"} ·{" "}

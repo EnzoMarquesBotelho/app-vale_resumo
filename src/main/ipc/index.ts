@@ -1,4 +1,5 @@
-import { dialog, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain } from "electron";
+import type { IpcMainInvokeEvent } from "electron";
 import { IPC_CHANNELS } from "@shared/ipc";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import { montarCaderno } from "@shared/notebooks";
@@ -89,6 +90,15 @@ import {
 } from "../services/provas.js";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
 import { gerarDicaIa } from "../services/dica.js";
+import {
+  ExportacaoFalhouError,
+  exportarMarkdown,
+  exportarPdf,
+} from "../services/export.js";
+import type {
+  AlvoExportacao,
+  ResultadoExportacao,
+} from "@shared/export/types";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -276,6 +286,23 @@ function mensagemAmigavelDica(erro: unknown): string {
     return erro.message;
   }
   return "Não foi possível gerar a dica da IA. Tente novamente.";
+}
+
+/**
+ * Converte erros conhecidos da exportação em mensagens amigáveis.
+ * `ExportacaoFalhouError` carrega uma frase pronta; o restante cai na genérica.
+ * Cancelar NÃO é erro (o serviço resolve `{ status: "cancelado" }`).
+ */
+function mensagemAmigavelExportacao(erro: unknown): string {
+  if (erro instanceof ExportacaoFalhouError) {
+    return erro.message;
+  }
+  return "Não foi possível exportar o arquivo. Tente novamente.";
+}
+
+/** Janela que originou o evento, para ancorar o save dialog (modal). */
+function janelaDoEvento(event: IpcMainInvokeEvent): BrowserWindow | undefined {
+  return BrowserWindow.fromWebContents(event.sender) ?? undefined;
 }
 
 /**
@@ -851,6 +878,31 @@ export function registerIpcHandlers(): void {
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelDica(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.exportarMarkdown,
+    async (
+      event,
+      alvo: AlvoExportacao,
+    ): Promise<ResultadoExportacao> => {
+      try {
+        return await exportarMarkdown(alvo, janelaDoEvento(event));
+      } catch (erro) {
+        throw new Error(mensagemAmigavelExportacao(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.exportarPdf,
+    async (event, alvo: AlvoExportacao): Promise<ResultadoExportacao> => {
+      try {
+        return await exportarPdf(alvo, janelaDoEvento(event));
+      } catch (erro) {
+        throw new Error(mensagemAmigavelExportacao(erro));
       }
     },
   );

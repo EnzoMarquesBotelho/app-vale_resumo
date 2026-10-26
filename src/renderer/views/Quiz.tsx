@@ -11,6 +11,7 @@ import type {
   Quiz as QuizArtefato,
 } from "@shared/types";
 import { getApi } from "../api";
+import { ExportarControles } from "../components/ExportarControles";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -58,6 +59,8 @@ interface QuizProps {
   quizSalvo?: QuizArtefato | null;
   /** Chamado quando um novo quiz é gerado, para o App persistir. */
   onGerado?: (quiz: QuizArtefato) => void;
+  /** Nome do documento ativo, usado para nomear o arquivo exportado. */
+  nomeDocumento?: string;
 }
 
 /** Quantidade inicial sugerida de perguntas. Constante LOCAL da view. */
@@ -85,6 +88,7 @@ export function Quiz({
   arquivo,
   quizSalvo,
   onGerado,
+  nomeDocumento,
 }: QuizProps): React.JSX.Element {
   // Estado inicializado a partir do que está salvo. O App remonta esta tela
   // (via `key` por documento) ao reabrir/importar outro, então a tentativa
@@ -278,6 +282,24 @@ export function Quiz({
         <p className="exercicios-erro" role="alert">
           {erro}
         </p>
+      )}
+
+      {perguntas !== null && perguntas.length > 0 && (
+        <ExportarControles
+          alvo={{
+            escopo: "artefato",
+            tipo: "quiz",
+            documento: {
+              nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+              quiz: {
+                documentoId: "",
+                modo,
+                perguntas,
+                geradoEm: quizSalvo?.geradoEm ?? "",
+              },
+            },
+          }}
+        />
       )}
 
       {perguntas !== null &&
