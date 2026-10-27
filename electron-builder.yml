@@ -43,3 +43,7 @@ publish:
   - provider: github
     owner: EnzoMarquesBotelho
     repo: app-vale_resumo
+    # Publica a release já PÚBLICA (não como rascunho). Evita o rascunho
+    # duplicado que o comportamento padrão gerou e dispensa o clique manual de
+    # "Publish". O controle de quando publicar vem de QUANDO a tag é criada.
+    releaseType: release
