@@ -1,240 +1,222 @@
-# Revisão de design — Fatia Exportação (Markdown + PDF)
+# Design review — Fatia "Botão de atualização" (auto-update via `electron-updater`)
 
-Documento revisado: `tasks/design-exportacao.md` (2ª passada, que afirma endereçar
-11 achados anteriores de `design-review.json`).
-Revisor: subagente de revisão de design, com contexto fresco, verificando as
-afirmações concretas contra o código-fonte real do worktree
-`c:\Dev\.worktrees\export`.
-
-Veredito: **CHANGES_REQUESTED** (1 HIGH + 2 MEDIUM; NITs não bloqueiam, mas estão
-listados).
-
-O design é maduro, bem estruturado e a maioria das decisões concretas foi
-**verificada contra o código real** (ver "Suposições verificadas"). Os pontos
-abaixo são os que ainda não se sustentam sozinhos para a implementação.
+Documento revisado: `tasks/design-botao-update.md` (iteração 2, responde a
+`tasks/design-review.json` com 2 HIGH, 4 MEDIUM, 4 NIT).
+Revisor: subagente de revisão de design, contexto limpo, reivindicações
+conferidas contra o código real do worktree `c:\Dev\.worktrees\update`.
 
 ---
 
-## Achados
+## Veredito
 
-### 1. HIGH — As afirmações centrais de pdfmake (entrypoint, vfs, fonte-Buffer) não são reproduzíveis a partir do estado versionado
+**APPROVED.**
 
-Local: §5.1, §5.2, §10.3, §11 (#2).
+Zero findings HIGH ou MEDIUM. Os 8 pontos do checklist de revisão estão
+decididos em termos testáveis, e as reivindicações estruturais do design foram
+verificadas contra o código-fonte (não aceitas de palavra). Os findings abaixo
+são todos **NIT** — refinamentos opcionais que não bloqueiam a implementação.
 
-O design baseia TODA a geração de PDF em três fatos "literais" sobre
-`pdfmake@0.2.20` + `@types/pdfmake@0.2.11`:
-
-1. `import PdfPrinter from "pdfmake"` (default export = construtor; `main:
-   src/printer.js`, sem campo `exports`);
-2. `import vfs from "pdfmake/build/vfs_fonts.js"` (default export = dicionário
-   base64 plano `{ "Roboto-Regular.ttf": <base64>, ... }`);
-3. fontes passadas como `Buffer` nos descritores porque não há `.ttf` em disco.
-
-Verifiquei o worktree: **`pdfmake` NÃO está em `package.json`** (só `pdfjs-dist`)
-e **NÃO está em `node_modules`** (`node_modules/pdfmake` e
-`node_modules/pdfmake/build/vfs_fonts.js` ausentes). O próprio design admite que
-instalou o pacote "apenas para verificação" e não alterou o `package.json`.
-Portanto, no estado atual, **nenhuma dessas três afirmações pode ser
-re-verificada**, e elas são exatamente o eixo em que o PDF inteiro quebra ou
-funciona. Um `exports` no `package.json` do pacote, um `vfs` aninhado em vez de
-plano, ou um default export diferente invalidam §5.2 inteiro em runtime (o
-`tsc --noEmit` do CI **não** pega isso, pois o pacote é externalizado e os
-caminhos são resolvidos só em runtime).
-
-Risco adicional concreto: `import vfs from "pdfmake/build/vfs_fonts.js"` e
-`vfs[nome]` são tipados? O `@types/pdfmake` normalmente **não** declara o módulo
-`pdfmake/build/vfs_fonts.js`. Com `verbatimModuleSyntax`/strict do projeto, esse
-import pode exigir uma declaração de módulo (`declare module`) ou `// @ts-expect-error`
-— o design não especifica isso, e isso afeta `npm run build` (CA1).
-
-Correção concreta (escolher uma e deixá-la fixa no design):
-- **Preferida:** tornar a adição pinada parte da tarefa ANTES de qualquer outra
-  coisa (`"pdfmake": "0.2.20"` em `dependencies`, `"@types/pdfmake": "0.2.11"` em
-  `devDependencies`), instalar, e então a implementação reconfirma os três fatos
-  no próprio worktree com um script mínimo (`node --input-type=module`) cujo
-  resultado é colado no design. O design já descreve o teste manual de render
-  (§8.2 item 1) — eleve a reprodução dos entrypoints a um passo **bloqueante** da
-  implementação, não a uma nota.
-- Especificar o tratamento de tipos do import de vfs: adicionar
-  `src/main/services/vfs-fonts.d.ts` com
-  `declare module "pdfmake/build/vfs_fonts.js" { const vfs: Record<string,string>; export default vfs; }`
-  (ou documentar que `@types/pdfmake@0.2.11` já cobre esse caminho — verificar e
-  registrar qual é o caso). Sem isso, o build pode falhar e CA1 não é atingível.
-
-Enquanto os entrypoints/fontes só existirem como "verificado numa instalação
-efêmera que não está no repo", a feature de PDF repousa sobre uma suposição que o
-próximo agente não consegue confirmar — é o que esta revisão existe para pegar.
-
-### 2. MEDIUM — O mock de `electron` dos testes existentes não cobre o que o handler de exportação precisa; o design não especifica como estendê-lo
-
-Local: §8.1 ("Molde: reusa `vi.mock(\"electron\", ...)` ... como as demais
-`tests/main/ipc-*.test.ts` (confirmado no projeto)"), §5.7.
-
-Verifiquei o molde real (`tests/main/ipc-mapa.test.ts`): o `vi.mock("electron",
-...)` existente expõe **apenas** `ipcMain.handle` e `dialog: { showOpenDialog }`.
-O handler de exportação precisa, em runtime de teste, de:
-- `dialog.showSaveDialog` (não `showOpenDialog`);
-- `BrowserWindow.fromWebContents` (usado por `janelaDoEvento`, §5.7) — ausente do
-  mock;
-- `app.getPath("documents")` (via `diretorioPadraoExport`, §5.4) — `app` **não**
-  está no mock atual e, importado em escopo de módulo em `export.ts`, será
-  `undefined` no ambiente `node` sem mock, quebrando a importação do módulo.
-
-"Reusa o molde das irmãs" é, portanto, **insuficiente** — o molde precisa de
-objetos novos. Como escrito, o teste de handler não roda.
-
-Correção concreta: especificar no design o mock estendido, por exemplo:
-```ts
-vi.mock("electron", () => ({
-  ipcMain: { handle: (c, h) => registered.set(c, h) },
-  dialog: { showSaveDialog: vi.fn() },
-  BrowserWindow: { fromWebContents: vi.fn(() => undefined) },
-  app: { getPath: vi.fn(() => os.tmpdir()) }, // nunca Facul
-}));
-```
-E fixar que `app.getPath` no mock devolve `os.tmpdir()` (coerente com RNF4). Sem
-isso, nem o caminho feliz de Markdown ponta a ponta (§8.1) nem o cancelado rodam.
-
-### 3. MEDIUM — `diretorioPadraoExport` chama `app.getPath` mas o design o posiciona em `export.ts` com funções "puras"; acoplamento a `electron` em escopo de módulo não está resolvido
-
-Local: §5.4, §9.
-
-`diretorioPadraoExport()` chama `app.getPath("documents")` — `app` vem de
-`electron`. O design declara `export.ts` como "a camada de efeito" e, em §5.2,
-fixa a regra "nenhum efeito de pdfmake em topo de módulo" com instanciação
-preguiçosa. Mas o design **não aplica a mesma disciplina a `electron`**:
-`import { app } from "electron"` em `export.ts` é carregado assim que o módulo é
-importado, e o teste de `sugerirNomeArquivo` (§8.1, `tests/main/export-nome.test.ts`,
-declarado "puro") importa `export.ts` — que importa `electron`. No ambiente
-`node` do vitest sem mock de `electron`, isso quebra a importação (o pacote
-`electron` não resolve para um objeto utilizável fora do runtime Electron).
-
-Ou seja: há uma contradição entre "`sugerirNomeArquivo`/`diretorioPadraoExport`
-são puros e testáveis em `export.ts`" (§5.4, §8.1) e "o teste puro importa
-`export.ts`" quando `export.ts` importa `electron` no topo.
-
-Correção concreta (escolher uma):
-- Mover `sugerirNomeArquivo` (que é genuinamente puro — só string) para a camada
-  **shared** (`src/shared/export/nome.ts`) ou para `pdfDefinicao.ts`-style puro,
-  para que `tests/main/export-nome.test.ts` **não** importe `electron`. Manter
-  `diretorioPadraoExport` (que precisa de `app`) em `export.ts` e cobri-lo só via
-  o teste de handler com `electron` mockado.
-- OU declarar explicitamente que `tests/main/export-nome.test.ts` também carrega o
-  `vi.mock("electron", ...)` (então não é "puro", é "node com electron mockado"),
-  e aplicar o mesmo cuidado ao import de `app`. O design precisa dizer qual.
-
-Isto é o mesmo tipo de armadilha que o achado #1 da revisão anterior (efeito em
-escopo de módulo) — resolvido para pdfmake, mas deixado em aberto para `electron`.
+A baseline foi medida de verdade: `npm test` em `0f05bdc` (tag `v0.1.1`) →
+**476 testes, 41 arquivos, verde** — exatamente o que o design afirma. `git log`
+confirma o HEAD `0f05bdc`.
 
 ---
 
-## NITs (não bloqueiam)
+## Findings
 
-### N1. NIT — Baseline "434 testes" não confere com a contagem estática
+### 1. [NIT] Comentário do mock em `ipc/index.ts` diz "{ ipcMain, dialog }", mas o mock real é "{ ipcMain }"
 
-Local: cabeçalho, §1.4 (CA13), §8, §10.
-Medi o worktree: 431 chamadas `it(`/`test(` + 1 bloco `.each` (que expande para
-N casos). O número real só é confirmável rodando a suíte (fora de escopo desta
-revisão). O design repete "434" como fato "não de memória" — mas a contagem
-estática não bate exatamente. Correção: a implementação deve rodar `npm test` e
-corrigir o número de baseline no design/docs para o valor real antes de concluir,
-em vez de citar 434 de memória.
+O design (§1, §5.5) ancora a decisão #1/#2 no bloco defensivo
+`try { if (nativeTheme && BrowserWindow) … } catch {}` de `ipc/index.ts`. Isso
+está correto e verificado. Porém o comentário daquele bloco no código afirma que
+os mocks "expõem apenas `{ ipcMain, dialog }`", enquanto `tests/main/ipc.test.ts`
+hoje mocka `electron` como **`{ ipcMain }`** apenas (sem `dialog`). Não é um
+problema do design — e não afeta a corretude, porque `dialog`/`BrowserWindow` só
+são tocados **dentro de handlers/ramos guardados**, nunca no momento do
+`registerIpcHandlers()`. Mas o design cita esse comentário como se fosse fiel.
 
-### N2. NIT — `BrowserWindow` não está nos imports de `ipc/index.ts`
+Correção: ao implementar, não repetir a imprecisão. Se algum texto novo
+descrever o mock de `ipc.test.ts`, dizer "`{ ipcMain }`" (o que o arquivo
+realmente tem). Nada a mudar no design em si.
 
-Local: §5.7. `janelaDoEvento` usa `BrowserWindow.fromWebContents`, mas o
-`ipc/index.ts` atual importa só `{ dialog, ipcMain }` de `electron` (verificado).
-Correção: listar `BrowserWindow` na lista de imports novos de §5.7/§9.
+### 2. [NIT] `StatusAtualizacao` consome o hook internamente — diverge do padrão "hook no topo" do tema
 
-### N3. NIT — Convenção de nome de arquivo de teste `.ts` (não `.tsx`)
+Verifiquei o padrão real: `useTema()` é chamado em **`App.tsx`** (topo) e o
+estado desce por props até `Sidebar` → `SeletorTema` (ambos controlados, sem
+hook próprio). O design (§5.8) propõe que `StatusAtualizacao` chame
+`useUpdater()` **internamente**, mantendo a assinatura de `Sidebar` intacta.
+Isso é legítimo (hook em componente-folha é padrão React comum) e a justificativa
+— não alterar `SidebarProps` — é boa. Só não é "o mesmo molde do tema" no ponto
+de onde o hook vive; o design em §1/§5.8 sugere paralelismo total com o tema no
+renderer, o que não é exato.
 
-Local: §8, §9. O `vitest.config.ts` tem `include: ["tests/**/*.test.ts"]`
-(verificado) — só `.ts`. O design já coloca todos os testes novos como `.ts` e
-deixa o componente React em verificação manual, então está coerente; registro só
-para o implementador não criar um `.test.tsx` esperando que rode.
+Correção (opcional): na §5.8, trocar qualquer sugestão de "espelha o wiring do
+tema no renderer" por uma nota de que o hook do updater vive no
+**componente-folha** (não no `App`), diferente do tema, de propósito, para não
+mexer na `Sidebar`. É só clareza; a decisão em si é aceitável.
 
-### N4. NIT — `conteudoQuiz`/`gerarMarkdownQuiz` e o rótulo das alternativas
+### 3. [NIT] `verificarNoBoot` + `verificarAtualizacao` do mount disparam duas checagens quase simultâneas
 
-Local: §3.2. Verifiquei `PerguntaQuiz`: a união é `multipla` (com
-`alternativas: AlternativaQuiz[]`, cada uma `{ texto, correta }`) ou `aberta`
-(com `gabarito`). O design usa `- [x]`/`- [ ]` e decide não rotular por letra —
-coerente com o tipo. OK; registro apenas que o texto "Alternativa A"/"Alternativa
-correta" nos exemplos de §3.2 é ilustrativo e o conteúdo real vem de
-`alternativa.texto` (o design diz isso em prosa, mas o exemplo pode confundir).
+O design assume isso e declara inofensivo (§5.8, §6.4 "Nota de corrida"):
+`checkForUpdates` repetido é idempotente e o last-write-wins resolve. Verdadeiro
+sob o contrato do `autoUpdater`. O único efeito observável é um possível
+`modoSilencioso = false` posto pela checagem manual logo após a do boot, tornando
+visível um `error` que o boot teria silenciado — o próprio design reconhece e
+aceita isso como correto (o usuário "pediu" a checagem via mount). Registro
+apenas para que a implementação não trate a corrida como bug.
 
----
+Correção (opcional): nenhuma mudança exigida. Se quiser suprimir a dupla
+chamada, o hook poderia **não** chamar `verificarAtualizacao()` no mount quando o
+estado inicial empurrado por `conectarUpdater` já for suficiente — mas isso
+reintroduz a necessidade de um estado inicial coerente em dev, então a escolha
+atual (chamar no mount) é defensável. Manter como está.
 
-## Suposições verificadas (conferidas contra o código real)
+### 4. [NIT] Nomes de campo `UpdateInfo.version` / `ProgressInfo.percent` não verificáveis do repo
 
-- **`calcularLayout(raiz: NoMapaMental, expandidos: Set<string>)`** — assinatura
-  confirmada em `src/shared/mapaLayout.ts`. O design usa `Set<string>` e um
-  helper `todosOsIds`. ✔ (achado #3 da revisão anterior está corretamente
-  endereçado).
-- **Constantes da view `NO_LARGURA=168`, `NO_ALTURA=40`, `MARGEM=24` e
-  `caminhoAresta`** — confirmadas literalmente em
-  `src/renderer/views/MapaMental.tsx`, com o mesmo corpo de `caminhoAresta` e o
-  mesmo viewBox (`largura + NO_LARGURA + MARGEM*2`) e offset
-  (`translate(MARGEM + NO_LARGURA/2, MARGEM)`). A extração aditiva para
-  `mapaLayout.ts` é factível. ✔ (achado #4 endereçado corretamente).
-- **`NoPosicionado`** expõe `x`, `y`, `nivel`, `rotulo`, `filhosIds` — confirmado;
-  `caminhoAresta(pai, filho)` usa campos existentes. ✔
-- **Regra de presença do storage** (`listarDocumentos`, linhas ~265-272):
-  `temResumo = resumo !== undefined`; `temFlashcards = flashcards !== undefined &&
-  length > 0`; `temExercicios = exercicios !== undefined && length > 0`;
-  `temMapaMental = mapaMental !== undefined`; **`temQuiz = quiz !== undefined`**
-  (sem `perguntas.length`). Bate exatamente com `artefatosPresentes` em §3.3. ✔
-  (achado #10 endereçado corretamente, inclusive a correção do quiz).
-- **Tipos de domínio** `Resumo{conteudo,modo}`, `Flashcard{pergunta,resposta}`,
-  `Exercicio{enunciado,resposta,modo}`, `MapaMental{raiz}`, `Quiz{perguntas}`,
-  `PerguntaQuiz` (união `multipla`/`aberta`), `ModoResumo = "curto"|"longo"` —
-  confirmados em `src/shared/types.ts`. ✔
-- **`vitest.config.ts`** `environment: "node"` global, sem override por arquivo,
-  `include: ["tests/**/*.test.ts"]`. ✔ (achado #7 endereçado).
-- **Escrita atômica `.tmp` + `rename`** — confirmada em `storage.ts`
-  (`gravarCru`/`salvarDocumento`), e o filtro `.json.tmp` órfão existe. O design
-  reusa o padrão corretamente. ✔
-- **Padrão de teste IPC** — `vi.mock("electron", ...)` capturando
-  `ipcMain.handle`, `registerIpcHandlers` importado de
-  `../../src/main/ipc/index.js`, Ollama mockado no nível do serviço. Confirmado em
-  `tests/main/ipc-mapa.test.ts` (com a ressalva do achado #2 sobre o conteúdo do
-  mock). ✔
-- **`getApi()`** em `src/renderer/api.ts` devolve `PreloadApi` e lança
-  `ERRO_API_INDISPONIVEL` se a ponte faltar — confirmado; o design respeita a
-  regra "sem `window.api?.`". ✔
-- **`preload.ts`** segue o estilo `(args) => ipcRenderer.invoke(CANAL, args)`
-  sem lógica — confirmado; as duas linhas novas encaixam. ✔
-- **`ipc.ts`** tem `IPC_CHANNELS` (objeto `as const`) e `AppApi` (interface) —
-  confirmado; a adição de `exportarMarkdown`/`exportarPdf` e o
-  `import type ... from "./export/types"` são coerentes. ✔
-- **`App.tsx`**: `persistirArtefato` existe (artefato fica em memória mesmo se o
-  save falhar, sustentando a decisão 4.2); `.app-documento-ativo` no header com
-  guarda `documento !== null`; views recebem `arquivo`/`*Salvo`/`onGerado`.
-  Confirmado — a colocação do controle de documento no header e o prop
-  `nomeDocumento` são factíveis. ✔
-- **Pinagem de dependências** — todas as deps atuais usam versão exata (sem
-  `^`/`~`); `jsdom` está em devDeps. A exigência de pinar `pdfmake`/`@types/pdfmake`
-  é coerente com o projeto. ✔ (a execução do pin está no achado #1).
-- **Decisões de produto respeitadas** — Markdown + PDF apenas; Anki/.docx/HTML/
-  temas fora de escopo (§1.5, §10.1); mapa como SVG vetorial no PDF e lista
-  aninhada no Markdown (RF5/RF6, §5.3, §5.5); gravação só via `showSaveDialog`,
-  default em Documentos e **nunca** `C:\Users\enzom\OneDrive\Desktop\Facul`
-  (RNF4, §5.4); nada de Ollama (RNF1, §8). Tudo coerente com o pedido original do
-  usuário. ✔
+O design já marca isto honestamente (§2, §2.1): o pacote não está instalado, os
+nomes seguem a tipagem pública do `electron-updater` 6.x, as funções puras
+recebem objetos estruturais (`{ version }` / `{ percent }`) montados à mão nos
+testes, e o `tsc --noEmit` do gate (§2.1) acusa divergência em tempo de
+compilação. O risco está contido na borda (`updater.ts`). Não é um buraco do
+design; é uma incerteza explicitamente assumida e mitigada.
+
+Correção (opcional): nenhuma. A instrução "confirmar contra o `.d.ts` instalado,
+não chutar" já está no design e deve ser seguida no passo de implementação.
 
 ---
 
-## Suposições não verificadas / em risco
+## Verified Assumptions (conferidas contra o código)
 
-- **Entrypoints e vfs do `pdfmake@0.2.20`** (`import PdfPrinter from "pdfmake"`;
-  `import vfs from "pdfmake/build/vfs_fonts.js"` como dicionário base64 plano;
-  fontes como `Buffer`; `ContentSvg.svg: string`; `PDFFontSource` aceita
-  `Buffer`): **NÃO verificáveis** no estado atual — o pacote não está em
-  `package.json` nem em `node_modules`. Esta é a base do achado #1 (HIGH).
-- **Tipagem do import `pdfmake/build/vfs_fonts.js`** sob strict/`verbatimModuleSyntax`:
-  não confirmado que `@types/pdfmake@0.2.11` declara esse caminho de módulo; pode
-  exigir `declare module`. Afeta `npm run build` (CA1). Ver achado #1.
-- **Contagem exata da baseline (434)**: não verificável sem rodar a suíte; a
-  contagem estática deu 431 `it/test` + 1 `.each`. Ver N1.
-- **Render real do PDF (fontes carregam, SVG nítido, quebra de página, rodapé)**:
-  por natureza é verificação manual (§8.2) — não verificável nesta revisão
-  estática; depende da resolução do achado #1.
+1. **Padrão de preload espelhado (`aoAlterarTema`)** — `src/main/preload.ts`
+   assina com `ipcRenderer.on(IPC_CHANNELS.tema.alterado, handler)` guardando a
+   MESMA referência e devolve `() => ipcRenderer.removeListener(…, handler)`.
+   O design (§5.6) copia isto fielmente para `aoAtualizarStatus`. **Correto.**
+
+2. **Bloco defensivo `try { if (nativeTheme && BrowserWindow) … } catch {}`** —
+   existe exatamente em `src/main/ipc/index.ts` (wiring de `nativeTheme.on
+   ("updated", …)`), com fan-out `for (const janela of
+   BrowserWindow.getAllWindows())`. O design (§1, §5.5) ancora o finding #1 nesse
+   bloco e propõe espelhá-lo. **Correto.**
+
+3. **`ipc.test.ts` roda hoje com mock `electron = { ipcMain }` e passa** — medido:
+   2 testes verdes. `registerIpcHandlers()` não lança sob esse mock porque o
+   ramo `nativeTheme && BrowserWindow` fica `undefined` e não executa. Isso
+   sustenta a viabilidade de #1 (o novo wiring no mesmo try/catch também não
+   quebrará). **Correto.**
+
+4. **Grupo aninhado `IPC_CHANNELS.tema`** existe em `src/shared/ipc.ts` com o
+   comentário de que ninguém itera `IPC_CHANNELS`. O design (§5.3) adiciona
+   `atualizacao` no mesmo molde aninhado. **Correto e seguro.**
+
+5. **Boot em `src/main/index.ts`** — há `app.whenReady().then(async () => { await
+   migrarCadernos(); registerIpcHandlers(); createWindow(); … })`. O design (§5.7)
+   insere `void import("./services/updater.js").then(svc =>
+   svc.verificarNoBoot())` após `createWindow()`, dentro desse callback.
+   **Correto** (o callback é `async` e já existe).
+
+6. **`window-all-closed` → `app.quit()` em não-darwin** confirma o risco de
+   `webContents` destruído entre boot e eventos assíncronos que motiva a guarda
+   `isDestroyed()` (§5.4, #6). **Correto.**
+
+7. **Alias de módulos** — tanto `electron.vite.config.ts` quanto
+   `vitest.config.ts` definem SOMENTE `@shared` (não há `@main`/`@renderer`).
+   O design (§8) afirma isso e conclui que os testes do serviço do main importam
+   por caminho relativo (`../../src/main/services/updater.js`), como `ipc.test.ts`
+   já faz. **Correto.** O serviço poder importar `@shared/ipc` e `@shared/updater`
+   também é válido.
+
+8. **`externalizeDepsPlugin()`** está aplicado em `main` e `preload` no
+   `electron.vite.config.ts`, externalizando `dependencies`. Sustenta a decisão
+   de pôr `electron-updater` em `dependencies` e o gate §2.1 (require externo no
+   bundle + presença no asar). **Correto.**
+
+9. **Bloco `publish` do `electron-builder.yml`** — provider `github`, owner
+   **`EnzoMarquesBotelho`**, repo **`app-vale_resumo`**, `releaseType: release`,
+   com comentário explícito "NÃO remova este bloco". O design (§2.1 passo 4, §10)
+   manda preservá-lo intacto. **Correto e preservado.**
+
+10. **Baseline 476 testes / 41 arquivos** — medido via `npm test`: `Tests 476
+    passed (476)`, `Test Files 41 passed (41)`. HEAD `0f05bdc` tag `v0.1.1` via
+    `git log`. **Correto.**
+
+11. **`vitest.config.ts`**: env `node`, include `tests/**/*.test.ts`. O design
+    (§8) afirma isto e conclui que não cria `.test.tsx` para o componente/hook
+    (verificação manual de UI). **Consistente com a config.**
+
+12. **Stack e versões** — `package.json` confirma Electron `44.7.2`,
+    `electron-builder 26.15.3`, React `19.3.1`, TypeScript `5.9.3`, Vitest
+    `3.2.7`, e `dependencies` atuais (`pdfjs-dist`, `pdfmake`) sem
+    `electron-updater` ainda. Coerente com "uma única dependência nova" (§2).
+
+13. **Nenhum arquivo `updater.*` existe** no worktree — confirma que todos os
+    arquivos de §5.1 são criações novas, sem colisão.
+
+14. **Mapa evento→estado** (§5.4/§6.1) cobre os 6 eventos exigidos
+    (`checking-for-update`, `update-available`, `update-not-available`,
+    `download-progress`, `update-downloaded`, `error`) com destino explícito e
+    isolado em funções puras no `shared`. **Completo e testável.**
+
+---
+
+## Unverified / Wrong Assumptions
+
+1. **`UpdateInfo.version: string` e `ProgressInfo.percent: number`** —
+   **NÃO verificável do repo** (pacote `electron-updater` ainda não instalado).
+   O design assume os nomes de campo da API 6.x. Mitigado por: funções puras
+   recebem objetos estruturais nos testes + `tsc --noEmit` no gate §2.1 acusa
+   divergência. Risco baixo, explicitamente reconhecido (ver NIT #4). A
+   implementação DEVE confirmar contra o `.d.ts` instalado.
+
+2. **Shape do import CJS `electron-updater` (`default.autoUpdater` + named
+   `autoUpdater`)** — **NÃO verificável do repo**. O design (§5.4) usa
+   `import electronUpdater from "electron-updater"; const { autoUpdater } =
+   electronUpdater;` e o mock de teste espelha
+   `{ default: { autoUpdater }, autoUpdater }`. É o padrão conhecido do pacote
+   (CJS com default), mas só o pacote instalado confirma. Mitigado pelo gate de
+   build §2.1 (o `tsc`/build falha se o import não resolver).
+
+3. **`electron-updater@6.8.12` existir no registro e empacotar no asar** —
+   **NÃO verificável do repo**. O design trata o número como pin-alvo e
+   transforma a validação no gate bloqueante §2.1 (asar + require externo),
+   com fallback documentado para a última `6.x` que passe no gate. Abordagem
+   correta: a incerteza está isolada e tem um portão que falha a fatia se não
+   casar.
+
+4. **Comportamento de carga do `electron-updater` real sob um stub de `electron`
+   sem `app`** — **NÃO verificável do repo** (o design só afirma que "poderia
+   lançar"). Isso é precisamente o motivo da decisão de import preguiçoso (§5.9);
+   a decisão não depende de saber se lança ou não, apenas evita o `module-eval`
+   no caminho de `ipc.test.ts`. A solução é robusta a essa incerteza.
+
+---
+
+## Cobertura do checklist de revisão solicitado
+
+- autoUpdater no MAIN, `autoDownload=false`, `quitAndInstall` só no "Reiniciar":
+  **decidido e testável** (§5.4 `garantirAssinatura` zera `autoDownload`; §6.4/§6.5
+  tabela de `baixar` por estado e `reiniciar` só em `ready`; casos em §8.2).
+- Checagem automática no boot + manual "Verificar"; checagem só notifica:
+  **decidido** (FR1–FR3, §5.7 boot, §5.8 botão, `autoDownload=false`).
+- Guard `app.isPackaged`: dev nunca toca o `autoUpdater`, estado
+  `dev-unavailable`, nada lança, boot só empacotado, falha de rede no boot
+  silenciosa: **decidido e testável** (FR6/FR7, §5.4 guard, §6.4 `verificarNoBoot`
+  + `modoSilencioso`, casos em §8.2).
+- Contrato IPC concreto (canais + payloads de `verificar/baixar/reiniciar` e o
+  canal de push `atualizacao:status`), localizado em `src/shared/ipc.ts`,
+  `src/main/ipc/index.ts`, `src/main/preload.ts`, espelhando `tema:alterado` com
+  `removeListener`: **decidido** (§5.3, §5.5, §5.6). Shapes de payload tipados
+  por `UpdaterStatus`.
+- Mapeamento evento→estado isolado como lógica pura testável: **decidido**
+  (§6.1 em `src/shared/updater.ts`, sem Electron; testes §8.1).
+- Estados de UI idle/checking/available(vX)/downloading(%)/ready/error/
+  dev-unavailable + placement no `sidebar-rodape`, textos pt-BR: **decidido**
+  (§4 tipo discriminado, §5.8 render por estado, NFR3).
+- `electron-updater` pin exato em `dependencies` (runtime) + bloco `publish`
+  (owner/repo) preservado: **decidido** (§2, §2.1; publish verificado no YAML).
+- Plano de testes com `autoUpdater` mockado (mapping, guard isPackaged,
+  `autoDownload=false`, `quitAndInstall` só em restart), sem rede, 476
+  preservados, fluxo real em checklist manual: **decidido** (§8, §9).
+- Nada fora de escopo (sem code signing, canais, rollback, changelog):
+  **respeitado** (§3 "Fora de escopo", §10).
+
+Todos os 8 pontos resolvidos sem ambiguidade bloqueante.

@@ -1,62 +1,34 @@
 {
-  "verdict": "CHANGES_REQUESTED",
+  "verdict": "APPROVED",
   "findings": [
     {
       "id": 1,
-      "severity": "HIGH",
-      "location": "§5.1, §5.2, §10.3, §11 (#2)",
-      "title": "Afirmações centrais do pdfmake (entrypoint default, vfs base64 plano, fonte como Buffer, tipagem do import de vfs) não são reproduzíveis a partir do estado versionado",
-      "problem": "Toda a geração de PDF depende de 'import PdfPrinter from \"pdfmake\"', 'import vfs from \"pdfmake/build/vfs_fonts.js\"' (dicionário base64 plano) e fontes passadas como Buffer. Verifiquei que pdfmake NÃO está em package.json (só pdfjs-dist) nem em node_modules. O design admite ter instalado apenas para verificação efêmera. Esses fatos são o eixo do PDF e não podem ser reconfirmados pelo próximo agente; tsc --noEmit não os pega porque o pacote é externalizado e resolvido só em runtime. Além disso, a tipagem do import de vfs_fonts.js sob strict/verbatimModuleSyntax pode exigir 'declare module', afetando npm run build (CA1).",
-      "fix": "Tornar a adição pinada (pdfmake 0.2.20 em dependencies, @types/pdfmake 0.2.11 em devDependencies) um passo BLOQUEANTE e inicial da implementação, instalar e reconfirmar os três fatos no próprio worktree (node --input-type=module), colando o resultado no design; e especificar o tratamento de tipos do import de vfs (src/main/services/vfs-fonts.d.ts com declare module, ou documentar que @types/pdfmake@0.2.11 já cobre o caminho)."
+      "severity": "NIT",
+      "title": "Comentario do mock em ipc/index.ts diz { ipcMain, dialog }, mas o mock real e { ipcMain }",
+      "where": "design §1/§5.5 cita o comentario; codigo tests/main/ipc.test.ts usa apenas { ipcMain }",
+      "fix": "Nao afeta corretude (dialog/BrowserWindow so sao tocados dentro de handlers/ramos guardados). Ao implementar, descrever o mock como { ipcMain }."
     },
     {
       "id": 2,
-      "severity": "MEDIUM",
-      "location": "§8.1, §5.7",
-      "title": "O mock de electron dos testes existentes não cobre showSaveDialog/BrowserWindow/app.getPath que o handler de exportação exige",
-      "problem": "O molde real (tests/main/ipc-mapa.test.ts) expõe apenas ipcMain.handle e dialog.showOpenDialog. O handler de exportação precisa de dialog.showSaveDialog, BrowserWindow.fromWebContents (janelaDoEvento) e app.getPath('documents') (diretorioPadraoExport) — nenhum presente no mock. 'Reusa o molde das irmãs' é insuficiente; como escrito, o teste de handler não roda.",
-      "fix": "Especificar no design o mock estendido de electron: ipcMain.handle (captura), dialog.showSaveDialog: vi.fn(), BrowserWindow.fromWebContents: vi.fn(()=>undefined), app.getPath: vi.fn(()=>os.tmpdir()) (nunca Facul). Fixar que app.getPath no mock devolve os.tmpdir()."
+      "severity": "NIT",
+      "title": "StatusAtualizacao consome useUpdater internamente, diferente do padrao hook-no-topo do tema",
+      "where": "design §5.8; padrao real: useTema() vive em App.tsx e desce por props a Sidebar/SeletorTema",
+      "fix": "Decisao aceitavel (hook em componente-folha mantem SidebarProps intacto). Ajustar texto para nao sugerir paralelismo total com o tema no renderer."
     },
     {
       "id": 3,
-      "severity": "MEDIUM",
-      "location": "§5.4, §8.1, §9",
-      "title": "export.ts importa electron (app) em escopo de módulo, mas o teste 'puro' de sugerirNomeArquivo importa export.ts",
-      "problem": "diretorioPadraoExport chama app.getPath, logo export.ts faz 'import { app } from \"electron\"' no topo. O design declara tests/main/export-nome.test.ts como teste 'puro' de sugerirNomeArquivo importando export.ts; no ambiente node do vitest sem mock de electron, carregar export.ts quebra (electron não resolve fora do runtime Electron). Mesma armadilha de efeito-em-escopo-de-módulo resolvida para pdfmake mas deixada em aberto para electron.",
-      "fix": "Mover sugerirNomeArquivo (genuinamente puro) para a camada shared (ex.: src/shared/export/nome.ts) para que o teste não importe electron; manter diretorioPadraoExport em export.ts coberto só pelo teste de handler com electron mockado. OU declarar explicitamente que export-nome.test.ts também carrega vi.mock('electron', ...) e deixar de chamá-lo de 'puro'. O design precisa fixar qual."
+      "severity": "NIT",
+      "title": "verificarNoBoot e verificarAtualizacao do mount disparam duas checagens quase simultaneas",
+      "where": "design §5.8/§6.4",
+      "fix": "Inofensivo sob o contrato do autoUpdater (checkForUpdates idempotente, last-write-wins). Nenhuma mudanca exigida; nao tratar a corrida como bug."
     },
     {
       "id": 4,
       "severity": "NIT",
-      "location": "cabeçalho, §1.4 (CA13), §8, §10",
-      "title": "Baseline '434 testes' não confere com a contagem estática",
-      "problem": "Contagem estática deu 431 chamadas it/test + 1 bloco .each; o número exato só é confirmável rodando a suíte. O design cita 434 como fato 'não de memória'.",
-      "fix": "A implementação deve rodar npm test e corrigir o número de baseline nos docs para o valor real antes de concluir."
-    },
-    {
-      "id": 5,
-      "severity": "NIT",
-      "location": "§5.7, §9",
-      "title": "BrowserWindow não está nos imports atuais de ipc/index.ts",
-      "problem": "janelaDoEvento usa BrowserWindow.fromWebContents, mas ipc/index.ts importa só { dialog, ipcMain } de electron.",
-      "fix": "Listar BrowserWindow nos imports novos de §5.7/§9."
-    },
-    {
-      "id": 6,
-      "severity": "NIT",
-      "location": "§8, §9",
-      "title": "Arquivos de teste devem ser .ts (vitest include)",
-      "problem": "vitest.config.ts tem include ['tests/**/*.test.ts'] — só .ts. O design já usa .ts e deixa o componente React em verificação manual (coerente); registro para não criar .test.tsx esperando que rode.",
-      "fix": "Manter todos os testes novos como .ts, como o design já prevê."
-    },
-    {
-      "id": 7,
-      "severity": "NIT",
-      "location": "§3.2",
-      "title": "Exemplos de rótulo de alternativa no Markdown do quiz podem confundir",
-      "problem": "Os exemplos 'Alternativa A'/'Alternativa correta' são ilustrativos; o conteúdo real vem de alternativa.texto (AlternativaQuiz{texto,correta}). O design diz isso em prosa mas o exemplo pode sugerir rótulos fixos.",
-      "fix": "Deixar explícito nos exemplos que o texto renderizado é alternativa.texto, não um rótulo fixo."
+      "title": "Nomes de campo UpdateInfo.version / ProgressInfo.percent nao verificaveis do repo",
+      "where": "design §2/§2.1",
+      "fix": "Ja assumido e mitigado (funcoes puras recebem objetos estruturais; tsc --noEmit do gate acusa divergencia). Confirmar contra o .d.ts instalado, nao chutar."
     }
   ],
-  "reviewDoc": "c:\\Dev\\.worktrees\\export\\tasks\\design-review.md"
+  "reviewDoc": "c:\\Dev\\.worktrees\\update\\tasks\\design-review.md"
 }
