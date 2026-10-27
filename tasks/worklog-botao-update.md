@@ -122,3 +122,17 @@ Releases. O updater só funciona no app instalado (nunca em `npm run dev` nem
 
 > Observação de ambiente: no Windows sem assinatura de código pode aparecer o
 > SmartScreen na 1ª execução do instalador — fora do escopo desta fatia.
+
+---
+
+## 4. Integração na master (rebase + re-verificação) — TUDO VERDE
+
+- **Review:** `tasks/review.json` com `verdict: APPROVED`, zero findings.
+- **Rebase:** `git rebase master` retornou *"Current branch
+  feat/botao-update is up to date"* — a master não andou desde o fork
+  (HEAD `0f05bdc`), então o rebase foi no-op e **não houve conflitos**.
+- **Re-verificação pós-rebase** (a partir de `c:\Dev\.worktrees\update`):
+  - `npm run build` → **sem erros** (exit 0).
+  - `npm run lint` → **sem erros / sem warnings** (exit 0).
+  - `npm test` → **44 arquivos, 514 testes verdes** (exit 0).
+- Próximo passo: fast-forward da master no checkout do usuário (`c:\Dev`).
