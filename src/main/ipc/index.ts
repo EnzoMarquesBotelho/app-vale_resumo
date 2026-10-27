@@ -110,6 +110,7 @@ import type {
   AlvoExportacao,
   ResultadoExportacao,
 } from "@shared/export/types";
+import type { UpdaterStatus } from "@shared/updater";
 
 /**
  * Converte erros conhecidos da importação em mensagens amigáveis ao usuário.
@@ -965,6 +966,35 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  // Updater in-app. O serviço é importado de forma PREGUIÇOSA (dynamic
+  // import()) dentro de cada handler para não forçar o module-eval de
+  // `electron-updater` em quem só chama `registerIpcHandlers()` sob o mock
+  // { ipcMain } de ipc.test.ts. Os testes que exercem o serviço fornecem seus
+  // próprios vi.mock("electron-updater", …).
+  ipcMain.handle(
+    IPC_CHANNELS.atualizacao.verificar,
+    async (): Promise<UpdaterStatus> => {
+      const svc = await import("../services/updater.js");
+      return svc.verificarAtualizacao();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.atualizacao.baixar,
+    async (): Promise<UpdaterStatus> => {
+      const svc = await import("../services/updater.js");
+      return svc.baixarAtualizacao();
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.atualizacao.reiniciar,
+    async (): Promise<void> => {
+      const svc = await import("../services/updater.js");
+      return svc.reiniciarParaAtualizar();
+    },
+  );
+
   ipcMain.handle(
     IPC_CHANNELS.tema.obter,
     async (): Promise<EstadoTema> => {
@@ -1021,5 +1051,21 @@ export function registerIpcHandlers(): void {
     }
   } catch {
     // Ambiente sem nativeTheme/BrowserWindow (ex.: testes): nada a assinar.
+  }
+
+  // Wiring do push do updater, sob o MESMO try/catch defensivo do bloco
+  // nativeTheme acima. Sob o mock { ipcMain } de ipc.test.ts, `BrowserWindow`
+  // é undefined: o ramo não executa, nada é importado e o registro não lança.
+  // `conectarUpdater` só guarda o getter e emite o estado corrente uma vez.
+  try {
+    if (BrowserWindow) {
+      void import("../services/updater.js").then((svc) => {
+        svc.conectarUpdater(
+          () => BrowserWindow.getAllWindows()[0]?.webContents,
+        );
+      });
+    }
+  } catch {
+    // Ambiente de teste sem BrowserWindow: push desligado, handlers registrados.
   }
 }

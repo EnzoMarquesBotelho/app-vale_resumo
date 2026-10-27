@@ -1,5 +1,6 @@
 import type { ThemePreference } from "@shared/theme";
 import { SeletorTema } from "./SeletorTema";
+import { StatusAtualizacao } from "./StatusAtualizacao";
 
 /** Seção de navegação principal. */
 export type Secao = "biblioteca" | "agenda";
@@ -55,6 +56,7 @@ export function Sidebar({
       </ul>
 
       <div className="sidebar-rodape">
+        <StatusAtualizacao />
         <SeletorTema preferencia={preferenciaTema} onDefinir={onDefinirTema} />
       </div>
     </nav>

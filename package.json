@@ -38,6 +38,7 @@
     "vitest": "3.2.7"
   },
   "dependencies": {
+    "electron-updater": "6.8.12",
     "pdfjs-dist": "6.4.299",
     "pdfmake": "0.2.20"
   }

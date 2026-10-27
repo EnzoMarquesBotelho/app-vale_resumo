@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import { IPC_CHANNELS, type AppApi } from "@shared/ipc";
 import type { EstadoTema } from "@shared/theme";
+import type { UpdaterStatus } from "@shared/updater";
 
 /**
  * API tipada exposta ao renderer via `contextBridge`.
@@ -82,6 +83,20 @@ const api: AppApi = {
       ouvinte(estado);
     ipcRenderer.on(IPC_CHANNELS.tema.alterado, handler);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.tema.alterado, handler);
+  },
+  verificarAtualizacao: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.atualizacao.verificar),
+  baixarAtualizacao: () => ipcRenderer.invoke(IPC_CHANNELS.atualizacao.baixar),
+  reiniciarParaAtualizar: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.atualizacao.reiniciar),
+  aoAtualizarStatus: (ouvinte) => {
+    // Espelha exatamente `aoAlterarTema`: mesma referência de handler para o
+    // removeListener casar no cancelador.
+    const handler = (_evento: IpcRendererEvent, estado: UpdaterStatus): void =>
+      ouvinte(estado);
+    ipcRenderer.on(IPC_CHANNELS.atualizacao.status, handler);
+    return () =>
+      ipcRenderer.removeListener(IPC_CHANNELS.atualizacao.status, handler);
   },
 };
 

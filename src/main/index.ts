@@ -40,6 +40,11 @@ app.whenReady().then(async () => {
   registerIpcHandlers();
   createWindow();
 
+  // Checagem silenciosa do boot (FR1/FR7). Import preguiçoso (coerente com o
+  // wiring do updater em ipc/index.ts); no-op em dev e silencioso em erro de
+  // rede. Best-effort: não bloqueia a abertura da janela.
+  void import("./services/updater.js").then((svc) => svc.verificarNoBoot());
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();

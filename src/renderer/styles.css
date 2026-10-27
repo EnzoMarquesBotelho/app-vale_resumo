@@ -306,6 +306,74 @@ a:focus-visible,
   color: var(--cor-primaria-texto);
 }
 
+/* ---------- Status de atualização ---------- */
+
+.atualizacao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.atualizacao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+  line-height: 1.3;
+}
+
+.atualizacao-rotulo {
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+.atualizacao-progresso {
+  width: 100%;
+  height: 0.4rem;
+  appearance: none;
+  border: none;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-2);
+  overflow: hidden;
+}
+
+.atualizacao-progresso::-webkit-progress-bar {
+  background: var(--cor-superficie-2);
+  border-radius: var(--raio-sm);
+}
+
+.atualizacao-progresso::-webkit-progress-value {
+  background: var(--cor-primaria);
+  border-radius: var(--raio-sm);
+}
+
+.atualizacao-progresso::-moz-progress-bar {
+  background: var(--cor-primaria);
+  border-radius: var(--raio-sm);
+}
+
+.atualizacao-botao {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.atualizacao-botao:hover:not(:disabled) {
+  background: var(--cor-hover);
+  color: var(--cor-texto);
+  transition: var(--transicao);
+}
+
+.atualizacao-botao:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ---------- Área principal ---------- */
 
 .app-principal {

@@ -33,6 +33,7 @@ import type {
 } from "./types";
 import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
 import type { EstadoTema, ThemePreference } from "./theme";
+import type { UpdaterStatus } from "./updater";
 
 /** Nomes dos canais de IPC. */
 export const IPC_CHANNELS = {
@@ -112,6 +113,20 @@ export const IPC_CHANNELS = {
     definir: "tema:definir",
     /** Main avisa o renderer que o tema efetivo mudou (ex.: SO trocou). */
     alterado: "tema:alterado",
+  },
+  /**
+   * Grupo ANINHADO dos canais do updater in-app (mesmo precedente seguro do
+   * grupo `tema`: ninguém itera `IPC_CHANNELS`).
+   */
+  atualizacao: {
+    /** Renderer pede uma verificação (manual) e/ou o estado atual. */
+    verificar: "atualizacao:verificar",
+    /** Renderer pede para iniciar o download da versão disponível. */
+    baixar: "atualizacao:baixar",
+    /** Renderer pede para reiniciar e instalar (quitAndInstall). */
+    reiniciar: "atualizacao:reiniciar",
+    /** Main empurra o UpdaterStatus ao renderer (push). */
+    status: "atualizacao:status",
   },
 } as const;
 
@@ -354,4 +369,29 @@ export interface AppApi {
    * remove o ouvinte.
    */
   aoAlterarTema: (ouvinte: (estado: EstadoTema) => void) => () => void;
+  /**
+   * Dispara uma verificação de atualização (ação manual do botão) e resolve
+   * com o estado resultante imediato. No app não-empacotado resolve
+   * `dev-unavailable` sem tocar o autoUpdater. Nunca rejeita: falhas viram
+   * estado `error` pelo push e um `UpdaterStatus` coerente no retorno.
+   */
+  verificarAtualizacao: () => Promise<UpdaterStatus>;
+  /**
+   * Inicia o download da versão disponível (autoDownload está desligado).
+   * No-op seguro (resolve o estado atual) se não houver update disponível ou
+   * em dev. O progresso chega pelo push; o retorno é o estado imediato
+   * ('downloading' ou o estado atual).
+   */
+  baixarAtualizacao: () => Promise<UpdaterStatus>;
+  /**
+   * Reinicia e instala a atualização já baixada (quitAndInstall). Só tem
+   * efeito no estado 'ready' e no app empacotado; caso contrário é no-op.
+   */
+  reiniciarParaAtualizar: () => Promise<void>;
+  /**
+   * Assina as mudanças de estado do updater vindas do main (checking /
+   * available / downloading / ready / not-available / error / dev-unavailable).
+   * Devolve um cancelador que remove o ouvinte — espelha `aoAlterarTema`.
+   */
+  aoAtualizarStatus: (ouvinte: (estado: UpdaterStatus) => void) => () => void;
 }
