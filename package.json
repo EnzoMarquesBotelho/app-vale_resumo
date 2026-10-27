@@ -1,6 +1,6 @@
 {
   "name": "app-estudos-ia-local",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "App de Estudos com IA Local (MVP) - desktop, offline, Ollama",
   "private": true,
   "author": "Enzo",
