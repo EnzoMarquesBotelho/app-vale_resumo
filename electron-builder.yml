@@ -35,15 +35,19 @@ nsis:
 # O app é 100% offline; não há assinatura de código configurada.
 npmRebuild: false
 
-# Destino de publicação dos artefatos de release (GitHub Releases).
-# O electron-builder usa este bloco para enviar o instalador ao Release da tag
-# quando chamado com `--publish always`. Também faz o builder gerar o manifesto
-# `latest.yml`, que o electron-updater lerá futuramente para detectar updates.
+# Destino de publicação dos artefatos (GitHub Releases).
+#
+# ATENÇÃO: no CI o electron-builder é chamado com `--publish never`, então ele
+# NÃO envia nada ao GitHub — quem cria a Release e anexa os assets é o próprio
+# workflow (softprops/action-gh-release). Este bloco permanece por dois motivos:
+#   1. faz o builder gerar o manifesto `latest.yml` em `release/`;
+#   2. o electron-updater lê owner/repo/provider daqui em tempo de execução
+#      para localizar atualizações (necessário para o futuro updater in-app).
+# NÃO remova este bloco.
 publish:
   - provider: github
     owner: EnzoMarquesBotelho
     repo: app-vale_resumo
-    # Publica a release já PÚBLICA (não como rascunho). Evita o rascunho
-    # duplicado que o comportamento padrão gerou e dispensa o clique manual de
-    # "Publish". O controle de quando publicar vem de QUANDO a tag é criada.
+    # Metadado usado pelo electron-updater. A criação/publicação da Release é
+    # feita pelo workflow do GitHub Actions, não pelo electron-builder.
     releaseType: release

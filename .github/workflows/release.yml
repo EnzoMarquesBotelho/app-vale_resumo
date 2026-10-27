@@ -1,7 +1,12 @@
-# Workflow de release: ao enviar uma tag `v*` (ex.: v0.1.0), o GitHub Actions
-# compila o instalador Windows (NSIS) e publica no GitHub Release da tag,
-# usando o GITHUB_TOKEN fornecido pelo proprio Actions (sem token pessoal na
-# maquina do usuario). Tambem pode ser disparado manualmente pela UI do GitHub.
+# Workflow de release: ao enviar uma tag `v*` (ex.: v0.1.1), o GitHub Actions
+# compila o instalador Windows (NSIS) e o manifesto de update (`latest.yml`) e
+# cria UMA UNICA GitHub Release para a tag, anexando os artefatos como assets.
+#
+# IMPORTANTE (CAMINHO 1): quem cria/publica a Release e o PROPRIO workflow
+# (acao softprops/action-gh-release). O electron-builder apenas CONSTROI os
+# artefatos localmente (`--publish never`) e NAO toca no GitHub. Isso evita as
+# releases DUPLICADAS que o modo de publicacao do electron-builder gerava e
+# garante que o nome/tag da Release seja exatamente a tag do git.
 name: release
 
 on:
@@ -10,7 +15,7 @@ on:
       - 'v*'
   workflow_dispatch:
 
-# Permissao necessaria para o workflow criar/atualizar o GitHub Release.
+# Permissao necessaria para o workflow criar o GitHub Release e anexar assets.
 permissions:
   contents: write
 
@@ -24,7 +29,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Instalar dependencias
@@ -33,7 +38,21 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Build do instalador e publicacao no GitHub Release
-        run: npx electron-builder --win --publish always --config electron-builder.yml
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Constroi o instalador NSIS e gera o latest.yml em release/, SEM publicar
+      # no GitHub. O electron-updater ainda le owner/repo/provider do bloco
+      # `publish` do electron-builder.yml em tempo de execucao.
+      - name: Build do instalador (sem publicar)
+        run: npx electron-builder --win --publish never --config electron-builder.yml
+
+      # Cria EXATAMENTE UMA Release para a tag que disparou o workflow e anexa
+      # o instalador (.exe), o .blockmap e o manifesto latest.yml como assets.
+      # `fail_on_unmatched_files: true` faz a build falhar alto se faltar algum
+      # artefato (ex.: latest.yml ausente).
+      - name: Criar GitHub Release e anexar artefatos
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+          fail_on_unmatched_files: true
