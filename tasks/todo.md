@@ -6,10 +6,9 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: branch `feat/geracao-lotes` HEAD `c6d3852` (review aprovado),
-> base master `d49a0ca`, **563 testes** passando, build/lint limpos — entra por
-> fast-forward na master. Publicado no GitHub (`app-vale_resumo`), release
-> pública `v0.1.1`.
+> Estado atual: master na fatia `0d83ba2` (geração em lotes) + commit de docs,
+> **563 testes** passando, build/lint limpos.
+> Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
 > `C:\Users\enzom\OneDrive\Desktop\Facul` — contém PDFs/arquivos reais de faculdade,

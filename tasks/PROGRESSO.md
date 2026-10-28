@@ -1,13 +1,12 @@
 # Progresso do App "Desenrola"
 
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
-> Onde paramos — atualizado em 2026-10-26.
+> Onde paramos — atualizado em 2026-10-27.
 
-## Estado atual (branch feat/geracao-lotes)
+## Estado atual (branch master)
 
-- Build, lint e **563 testes** passando. HEAD do branch: `c6d3852` (fatia
-  `feat/geracao-lotes`, review aprovado); base master: `d49a0ca` — entra por
-  fast-forward na master.
+- Build, lint e **563 testes** passando. Última fatia na master: `0d83ba2`
+  (geração em lotes), seguida de um commit de sincronização de docs.
 - **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
   `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
@@ -104,8 +103,8 @@
 
 ## Pendência operacional
 
-- As pastas `c:\Dev\.worktrees\agenda` e `c:\Dev\.worktrees\correcaoia` ficaram
-  **órfãs e travadas** por um processo do sistema (provável OneDrive/indexador)
+- As pastas `c:\Dev\.worktrees\agenda`, `correcaoia`, `update` e `geracao-lotes`
+  ficaram **órfãs e travadas** por um processo do sistema (provável OneDrive/indexador)
   e não puderam ser apagadas. São inócuas (ignoradas por git e ESLint; git já
   não as rastreia como worktree). Apagar manualmente quando o lock soltar
   (fechar OneDrive ou reiniciar). As demais pastas de worktree foram removidas
