@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Agent Skills — Session Start",
+      "trigger": "SessionStart",
+      "description": "Injeta o meta-skill using-agent-skills no início da sessão, emitindo o envelope SessionStart com o conteúdo de .kiro/skills/using-agent-skills/SKILL.md.",
+      "action": {
+        "type": "command",
+        "command": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p=Join-Path $PWD '.kiro/skills/using-agent-skills/SKILL.md'; if(Test-Path $p){ $c=Get-Content -Raw -LiteralPath $p; $ctx=\\\"agent-skills loaded. Use the skill discovery flowchart to find the right skill for your task.`n`n$c\\\" } else { $ctx='agent-skills: using-agent-skills meta-skill not found. Skills may still be available individually.' }; $o=@{ hookSpecificOutput=@{ hookEventName='SessionStart'; additionalContext=$ctx } }; $o | ConvertTo-Json -Depth 5 -Compress\"",
+        "timeout": 30
+      }
+    }
+  ]
+}
