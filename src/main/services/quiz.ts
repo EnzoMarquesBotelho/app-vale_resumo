@@ -14,10 +14,23 @@
  * A chamada ao modelo é injetável (`gerar`) para os testes mockarem o Ollama.
  */
 import {
+  GERACAO_EVITAR_MAX,
+  GERACAO_EVITAR_MAXLEN,
+  GERACAO_LOTE_LIMIAR,
+  GERACAO_LOTE_TAMANHO,
+  GERACAO_LOTE_TENTATIVAS_MARGEM,
   QUIZ_ALTERNATIVAS_MAXIMO,
   QUIZ_ALTERNATIVAS_MINIMO,
   tamanhoMaximoChunkCaracteres,
 } from "@shared/constants";
+import {
+  acumularComDedup,
+  chaveDedup,
+  deveParticionar,
+  enunciadosParaEvitar,
+  particionarQuantidade,
+} from "@shared/geracaoLotes";
+import type { AoProgresso } from "@shared/geracaoLotes";
 import {
   montarPromptCorrigirQuiz,
   montarPromptQuiz,
@@ -189,10 +202,44 @@ export interface GerarQuizParams {
   gerar?: GerarTexto;
   /**
    * Tamanho máximo de cada pedaço, em caracteres. Default:
-   * `tamanhoMaximoChunkCaracteres`. Rege o gate de chunking do quiz E é
-   * repassado a `gerarResumo`, para que o mesmo limite valha nas duas etapas.
+   * `tamanhoMaximoChunkCaracteres`. Rege a CONDENSAÇÃO de texto grande do quiz
+   * (caracteres) E é repassado a `gerarResumo`. É INDEPENDENTE do gate de lotes
+   * por quantidade (`GERACAO_LOTE_LIMIAR`) — não confundir os dois.
    */
   tamanhoChunk?: number;
+  /**
+   * Callback OPCIONAL de progresso (default no-op). Chamado com `(prontos,
+   * total)` a cada passo — o serviço é agnóstico ao artefato; quem anexa
+   * `artefato`/`geracaoId` é o handler IPC.
+   */
+  aoProgresso?: AoProgresso;
+}
+
+/**
+ * Pede UM lote de perguntas ao modelo e interpreta a resposta, com a mesma
+ * re-tentativa corretiva única do caminho curto. Devolve `null` se o lote não
+ * produziu nenhuma pergunta válida (mesmo após a corretiva). Erros de infra do
+ * `gerar` (Ollama offline/geração falhou) propagam para o laço.
+ */
+async function gerarLotePerguntas(
+  gerar: GerarTexto,
+  modo: ModoQuiz,
+  tamanho: number,
+  base: string,
+  evitar: string[],
+): Promise<PerguntaQuiz[] | null> {
+  const primeira = await gerar(
+    montarPromptQuiz(modo, tamanho, base, evitar),
+    "json",
+  );
+  const perguntas = parseQuiz(primeira, modo);
+  if (perguntas !== null) return perguntas;
+
+  const segunda = await gerar(
+    montarPromptCorrigirQuiz(modo, tamanho, primeira),
+    "json",
+  );
+  return parseQuiz(segunda, modo);
 }
 
 /**
@@ -221,6 +268,7 @@ export async function gerarQuiz({
   quantidade,
   gerar = generatePadrao,
   tamanhoChunk = tamanhoMaximoChunkCaracteres,
+  aoProgresso = () => {},
 }: GerarQuizParams): Promise<Quiz> {
   if (texto.trim().length === 0) {
     throw new SemTextoParaQuizError();
@@ -228,35 +276,71 @@ export async function gerarQuiz({
   const n = normalizarQuantidade(quantidade);
 
   // Texto grande: condensa primeiro num resumo coerente e usa-o como base.
-  // O mesmo `tamanhoChunk` rege o gate do quiz e o chunking do resumo.
+  // Feito UMA vez, antes do laço — o `base` condensado é reusado em todos os
+  // lotes. Independente do gate de lotes por quantidade.
   const base =
     dividirEmChunks(texto, tamanhoChunk).length > 1
       ? await gerarResumo({ texto, modo: "longo", gerar, tamanhoChunk })
       : texto;
 
-  // 1ª tentativa: prompt normal (JSON nativo do Ollama via format: "json").
-  const primeira = await gerar(montarPromptQuiz(modo, n, base), "json");
-  const perguntas = parseQuiz(primeira, modo);
-  if (perguntas !== null) {
-    return {
-      documentoId: "",
-      modo,
-      perguntas: perguntas.slice(0, n),
-      geradoEm: new Date().toISOString(),
-    };
+  /** Monta o `Quiz` final a partir das perguntas acumuladas (fatiadas em n). */
+  const montar = (perguntas: PerguntaQuiz[]): Quiz => ({
+    documentoId: "",
+    modo,
+    perguntas: perguntas.slice(0, n),
+    geradoEm: new Date().toISOString(),
+  });
+
+  // Caminho curto (n ≤ limiar): uma chamada + corretiva, como hoje. Emite o
+  // progresso UMA vez, imediatamente antes do retorno (ponto único).
+  if (!deveParticionar(n, GERACAO_LOTE_LIMIAR)) {
+    const unico = await gerarLotePerguntas(gerar, modo, n, base, []);
+    if (unico === null) throw new QuizInvalidoError();
+    const resultado = unico.slice(0, n);
+    aoProgresso(resultado.length, n);
+    return montar(resultado);
   }
 
-  // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
-  const segunda = await gerar(montarPromptCorrigirQuiz(modo, n, primeira), "json");
-  const corrigidas = parseQuiz(segunda, modo);
-  if (corrigidas !== null) {
-    return {
-      documentoId: "",
-      modo,
-      perguntas: corrigidas.slice(0, n),
-      geradoEm: new Date().toISOString(),
-    };
+  // Chunking (n > limiar): laço SEQUENCIAL acumulando com dedup. Pede lotes
+  // extras (até o teto) para repor o que a dedup descartou.
+  const lotes = particionarQuantidade(n, GERACAO_LOTE_TAMANHO);
+  const teto = lotes.length + GERACAO_LOTE_TENTATIVAS_MARGEM;
+  let itens: PerguntaQuiz[] = [];
+  let chavesVistas = new Set<string>();
+  let tentativas = 0;
+
+  while (itens.length < n && tentativas < teto) {
+    const tamanhoLote =
+      tentativas < lotes.length
+        ? lotes[tentativas]
+        : Math.min(GERACAO_LOTE_TAMANHO, n - itens.length);
+    const evitar = enunciadosParaEvitar(
+      itens.map((p) => p.enunciado),
+      GERACAO_EVITAR_MAX,
+      GERACAO_EVITAR_MAXLEN,
+    );
+    tentativas += 1;
+
+    let lote: PerguntaQuiz[] | null;
+    try {
+      lote = await gerarLotePerguntas(gerar, modo, tamanhoLote, base, evitar);
+    } catch (erro) {
+      // Erro de infra: com algo acumulado, entrega o parcial (sem re-tentar);
+      // sem nada acumulado, propaga o erro tipado (offline vs falha).
+      if (itens.length > 0) break;
+      throw erro;
+    }
+
+    if (lote !== null) {
+      const acumulo = acumularComDedup(itens, chavesVistas, lote, n, (p) =>
+        chaveDedup(p.enunciado),
+      );
+      itens = acumulo.itens;
+      chavesVistas = acumulo.chavesVistas;
+    }
+    aoProgresso(itens.length, n);
   }
 
-  throw new QuizInvalidoError();
+  if (itens.length === 0) throw new QuizInvalidoError();
+  return montar(itens);
 }

@@ -5,7 +5,8 @@
 
 ## Estado atual (branch master)
 
-- Build, lint e **514 testes** passando. HEAD: `e1c7dfb`.
+- Build, lint e **563 testes** passando. HEAD base: `d49a0ca` (a fatia
+  `feat/geracao-lotes` entra por fast-forward na sequência).
 - **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
   `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
@@ -83,6 +84,20 @@
   468 testes de lógica seguem verdes + 8 novos de tema (476/41). Verificado: a
   regra pura de tema (6 casos) e que a suíte não regrediu. Aparência é
   verificação manual.
+- **Geração em lotes (chunks) para quiz e exercícios** (`roadmap-geracao-lotes`,
+  design/plan aprovados): quando o usuário pede uma quantidade grande (acima de
+  20) de perguntas de quiz ou de exercícios, a geração passa a ser feita em
+  vários pedidos menores ao Ollama (lotes de 15), acumulando e deduplicando os
+  itens até atingir o total — sem estourar o timeout de 5 min de um pedido
+  gigante. A tela mostra o progresso ("Gerando X de N…") durante a geração. Se
+  um lote falha depois de já ter acumulado itens, o app entrega o parcial (não
+  perde tudo); se o 1º lote falha sem nada, a mensagem honesta de sempre (Ollama
+  offline vs. geração falhou) aparece. A lógica de particionar/acumular/
+  deduplicar é pura (`src/shared/geracaoLotes.ts`), 100% testada. Flashcards
+  ficaram de fora desta fatia (ver roadmap restante). Até 20 itens o
+  comportamento é idêntico ao de antes. 563 testes (514 + 49, Ollama mockado).
+  Verificado: build/lint/testes verdes. O comportamento do modelo local real em
+  quantidades grandes é verificação manual (fora do CI).
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -116,10 +131,10 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   mapa como imagem.
 - **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - **Geração de IA em lote** (gerar artefatos para uma pasta inteira de uma vez).
-- **Geração em lotes/chunks para quantidades grandes** (ex.: quiz/exercícios
-  com 100): hoje quantidades altas são lentas/instáveis no modelo local e a
-  mensagem honesta orienta reduzir; gerar internamente em lotes evitaria o
-  timeout. Anotado como roadmap na correção do offline-falso.
+- **Geração em lotes/chunks para quantidades grandes** — FEITO para **quiz e
+  exercícios** (ver "Entregue"). Falta estender a **flashcards** (a base pura já
+  é genérica — `ArtefatoLote` é um union; a extensão é uma fatia pequena e
+  isolada, sem redesenho).
 - Transcrição de áudio; ingestão de vídeo/imagem (OCR).
 - Multi-idioma; multi-agente; monitoramento automático de pasta;
   comparar/mesclar materiais; detectar falta de material.

@@ -187,19 +187,31 @@ describe("gerarExercicios (modos e limites 5–100)", () => {
     expect(gerar.mock.calls[0][0]).toContain("5 exercícios");
   });
 
-  it("normaliza quantidade acima do máximo para 100 no prompt", async () => {
-    const gerar = vi
-      .fn<(p: string) => Promise<string>>()
-      .mockResolvedValue('{"exercicios":[{"enunciado":"E","resposta":"R"}]}');
+  it("normaliza quantidade acima do máximo para 100 (clamp do total entregue)", async () => {
+    // 500 → clamp 100 (>limiar → chunking). Cada chamada devolve itens únicos
+    // por lote (prefixo = índice da chamada), então a dedup não reduz o total.
+    let chamada = 0;
+    const gerar = vi.fn<(p: string) => Promise<string>>().mockImplementation(() => {
+      const prefixo = `C${chamada++}`;
+      return Promise.resolve(
+        JSON.stringify({
+          exercicios: Array.from({ length: 15 }, (_, i) => ({
+            enunciado: `${prefixo}-${i}`,
+            resposta: `R-${i}`,
+          })),
+        }),
+      );
+    });
 
-    await gerarExercicios({
+    const lista = await gerarExercicios({
       texto: "conteúdo",
       modo: "mista",
       quantidade: 500,
       gerar,
     });
 
-    expect(gerar.mock.calls[0][0]).toContain("100 exercícios");
+    // Nunca excede 100 (normalizarQuantidade + slice(0, n)).
+    expect(lista).toHaveLength(100);
   });
 
   it("propaga o erro do gerador (ex.: Ollama offline)", async () => {
@@ -212,5 +224,158 @@ describe("gerarExercicios (modos e limites 5–100)", () => {
         gerar,
       }),
     ).rejects.toThrow("offline");
+  });
+});
+
+/** JSON de um lote com `n` exercícios distintos a partir de um prefixo. */
+function loteEx(prefixo: string, n: number): string {
+  return JSON.stringify({
+    exercicios: Array.from({ length: n }, (_, i) => ({
+      enunciado: `${prefixo}-${i}`,
+      resposta: `R${prefixo}-${i}`,
+    })),
+  });
+}
+
+describe("gerarExercicios (geração em lotes)", () => {
+  it("caminho curto (n=20): UMA chamada e UM progresso (len, 20)", async () => {
+    const gerar = vi.fn().mockResolvedValue(loteEx("A", 20));
+    const aoProgresso = vi.fn();
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 20,
+      gerar,
+      aoProgresso,
+    });
+
+    expect(lista).toHaveLength(20);
+    expect(gerar).toHaveBeenCalledTimes(1);
+    expect(aoProgresso).toHaveBeenCalledTimes(1);
+    expect(aoProgresso).toHaveBeenCalledWith(20, 20);
+    // O serviço é agnóstico ao artefato: só (prontos, total).
+    expect(aoProgresso.mock.calls[0]).toHaveLength(2);
+  });
+
+  it("chunking (n=21): ≥2 chamadas e acúmulo até N na ordem de chegada", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("B", 6));
+    const aoProgresso = vi.fn();
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 21,
+      gerar,
+      aoProgresso,
+    });
+
+    expect(lista).toHaveLength(21);
+    expect(gerar.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(lista[0].enunciado).toBe("A-0");
+    expect(lista[20].enunciado).toBe("B-5");
+    // Progresso crescente terminando em 21.
+    const prontos = aoProgresso.mock.calls.map((c) => c[0]);
+    expect(prontos[prontos.length - 1]).toBe(21);
+  });
+
+  it("dedup: enunciados repetidos entre lotes são descartados e pede extras", async () => {
+    // 1º lote: A-0..A-14 (15). 2º lote repete A-0..A-5 (dedup → 0 novos).
+    // 3º lote: C-0..C-5 (6 novos) → completa 21.
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("A", 6))
+      .mockResolvedValueOnce(loteEx("C", 6));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 21,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(21);
+    expect(gerar).toHaveBeenCalledTimes(3);
+  });
+
+  it("parcial por infra: falha no 3º lote devolve o acumulado SEM lançar", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("B", 15))
+      .mockRejectedValueOnce(new Error("falhou"));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 40,
+      gerar,
+    });
+
+    // Os dois primeiros lotes acumularam 30; o 3º falhou → parcial.
+    expect(lista).toHaveLength(30);
+  });
+
+  it("parcial por teto: modelo repete tudo após o 1º lote (gerar chamado = teto)", async () => {
+    // 1º lote válido (15), todos os seguintes repetem A → aceitos=0 por lote.
+    // n=40 → lotes = [15,15,10] (3) + margem 3 = teto 6.
+    const gerar = vi.fn().mockResolvedValue(loteEx("A", 15));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 40,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(15);
+    expect(gerar).toHaveBeenCalledTimes(6);
+  });
+
+  it("offline no 1º lote (prontos=0): PROPAGA o erro tipado", async () => {
+    const gerar = vi.fn().mockRejectedValue(new Error("Ollama offline"));
+
+    await expect(
+      gerarExercicios({
+        texto: "conteúdo",
+        modo: "mista",
+        quantidade: 30,
+        gerar,
+      }),
+    ).rejects.toThrow("Ollama offline");
+  });
+
+  it("todos inválidos com prontos=0: lança ExerciciosInvalidosError", async () => {
+    const gerar = vi.fn().mockResolvedValue("nunca é json");
+
+    await expect(
+      gerarExercicios({
+        texto: "conteúdo",
+        modo: "mista",
+        quantidade: 30,
+        gerar,
+      }),
+    ).rejects.toBeInstanceOf(ExerciciosInvalidosError);
+  });
+
+  it("corretiva por lote: JSON sujo depois válido dentro de um lote", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce("não é json")
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("B", 15));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 30,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(30);
   });
 });

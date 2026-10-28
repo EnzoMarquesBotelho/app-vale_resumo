@@ -9,6 +9,7 @@ import {
   type ThemePreference,
 } from "@shared/theme";
 import { defaultModel, extensoesSuportadas } from "@shared/constants";
+import type { ArtefatoLote } from "@shared/geracaoLotes";
 import { montarCaderno } from "@shared/notebooks";
 import { calcularDicaDoDia } from "@shared/agenda";
 import type {
@@ -318,6 +319,37 @@ function janelaDoEvento(event: IpcMainInvokeEvent): BrowserWindow | undefined {
 }
 
 /**
+ * Contador modular para compor um `geracaoId` barato (log/telemetria). Não
+ * depende de `crypto.randomUUID`; combinado com `Date.now()` em base-36 basta
+ * para distinguir gerações nos logs.
+ */
+let contadorGeracao = 0;
+
+/**
+ * Monta um `AoProgresso` que empurra `ProgressoGeracao` ao `webContents` que
+ * invocou a geração, com guarda `isDestroyed()`. Escopado ao `event` (não ao
+ * updater global). Quando não há janela (ex.: testes com `event` vazio), o push
+ * é no-op — a geração nunca falha por falta de janela.
+ */
+function empurrarProgresso(
+  event: IpcMainInvokeEvent,
+  artefato: ArtefatoLote,
+): (prontos: number, total: number) => void {
+  const geracaoId = `${Date.now().toString(36)}-${contadorGeracao++}`;
+  return (prontos, total) => {
+    const wc = janelaDoEvento(event)?.webContents;
+    if (wc && !wc.isDestroyed()) {
+      wc.send(IPC_CHANNELS.geracao.progresso, {
+        geracaoId,
+        artefato,
+        prontos,
+        total,
+      });
+    }
+  };
+}
+
+/**
  * Monta `CadernoEmFoco[]` ordenado por `cadernoId` ascendente, agregando as
  * flags de artefato (`temResumo`/`temFlashcards`) por caderno a partir de
  * `listarDocumentos()` e o `totalDocumentos` de `listarCadernos()`. A ORDEM
@@ -599,7 +631,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.gerarExercicios,
     async (
-      _event,
+      event,
       texto: string,
       modo: ModoConteudo,
       quantidade: number,
@@ -612,6 +644,7 @@ export function registerIpcHandlers(): void {
           modo,
           quantidade,
           gerar: (prompt, format) => generate({ prompt, model, format }),
+          aoProgresso: empurrarProgresso(event, "exercicios"),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelExercicios(erro));
@@ -639,7 +672,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.gerarQuiz,
     async (
-      _event,
+      event,
       texto: string,
       modo: ModoQuiz,
       quantidade: number,
@@ -652,6 +685,7 @@ export function registerIpcHandlers(): void {
           modo,
           quantidade,
           gerar: (prompt, format) => generate({ prompt, model, format }),
+          aoProgresso: empurrarProgresso(event, "quiz"),
         });
         return quiz.perguntas;
       } catch (erro) {

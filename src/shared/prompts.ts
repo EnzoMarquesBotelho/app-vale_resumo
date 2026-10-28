@@ -79,6 +79,21 @@ export function normalizarQuantidade(quantidade: number): number {
 }
 
 /**
+ * Monta o bloco de prompt que instrui o modelo a NÃO repetir enunciados já
+ * gerados em lotes anteriores, pedindo itens novos e diferentes. Usado só na
+ * geração em lotes (quiz/exercícios) a partir do 2º lote. Quando `evitar` está
+ * vazio, devolve `[]` — assim o prompt fica byte-a-byte igual ao de hoje (sem
+ * chunking). O `substantivo` adapta o texto ("perguntas" vs "exercícios").
+ */
+function blocoEvitar(evitar: string[], substantivo: string): string[] {
+  if (evitar.length === 0) return [];
+  return [
+    `NÃO repita os seguintes ${substantivo} já gerados; crie novos e diferentes:`,
+    ...evitar.map((e) => `- ${e}`),
+  ];
+}
+
+/**
  * Monta o prompt que pede `quantidade` flashcards (pares pergunta/resposta) em
  * JSON a partir do conteúdo. A saída estruturada permite que a UI monte os
  * cards; o parser (`parse.ts`) é tolerante caso o modelo adicione texto ao
@@ -243,6 +258,7 @@ export function montarPromptExercicios(
   modo: ModoConteudo,
   quantidade: number,
   texto: string,
+  evitar: string[] = [],
 ): string {
   const n = normalizarQuantidade(quantidade);
   return [
@@ -251,6 +267,7 @@ export function montarPromptExercicios(
     INSTRUCOES_EXERCICIOS[modo],
     `Gere exatamente ${n} exercícios cobrindo os pontos mais importantes do conteúdo.`,
     "Cada exercício deve ter um enunciado claro e uma resposta/gabarito correto e conciso.",
+    ...blocoEvitar(evitar, "exercícios"),
     "Responda APENAS com um JSON válido, sem comentários nem texto fora do JSON, " +
       "no formato:",
     '{"exercicios": [{"enunciado": "...", "resposta": "..."}]}',
@@ -316,6 +333,7 @@ export function montarPromptQuiz(
   modo: ModoQuiz,
   quantidade: number,
   texto: string,
+  evitar: string[] = [],
 ): string {
   const n = normalizarQuantidade(quantidade);
   return [
@@ -327,6 +345,7 @@ export function montarPromptQuiz(
       `${QUIZ_ALTERNATIVAS_MAXIMO} alternativas, com exatamente uma marcada como ` +
       '"correta": true.',
     "Cada pergunta aberta deve ter um gabarito correto e conciso.",
+    ...blocoEvitar(evitar, "perguntas"),
     "Responda APENAS com um JSON válido, sem comentários nem texto fora do JSON, " +
       "no formato:",
     FORMATO_QUIZ,

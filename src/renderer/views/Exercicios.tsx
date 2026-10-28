@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
+import { rotuloProgresso } from "@shared/geracaoLotes";
 import type {
   ArquivoImportado,
   AvaliacaoResposta,
@@ -89,6 +90,7 @@ export function Exercicios({
     exerciciosSalvos ?? null,
   );
   const [gerando, setGerando] = useState(false);
+  const [progresso, setProgresso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   // Tentativa efêmera (em memória): respostas digitadas e avaliações por IA,
   // alinhadas por índice à lista de exercícios. Nada disso persiste no
@@ -121,7 +123,12 @@ export function Exercicios({
     setRespostas([]);
     setAvaliacoes([]);
     setErroAvaliacao(null);
+    setProgresso(null);
     setGerando(true);
+    // Assina o progresso em lotes ANTES do await; filtra por "exercicios".
+    const cancelar = getApi().aoProgressoGeracao((p) => {
+      if (p.artefato === "exercicios") setProgresso(rotuloProgresso(p));
+    });
     try {
       const resultado = await getApi().gerarExercicios(
         arquivo.texto,
@@ -139,6 +146,8 @@ export function Exercicios({
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {
+      cancelar();
+      setProgresso(null);
       setGerando(false);
     }
   }
@@ -217,7 +226,7 @@ export function Exercicios({
               onClick={() => void gerar()}
               disabled={gerando || !quantidadeValida}
             >
-              {gerando ? "Gerando…" : "Gerar exercícios"}
+              {gerando ? (progresso ?? "Gerando…") : "Gerar exercícios"}
             </button>
             {!quantidadeValida && (
               <span className="app-meta">

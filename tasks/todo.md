@@ -6,7 +6,8 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master `e1c7dfb`, **514 testes** passando, build/lint limpos.
+> Estado atual: master base `d49a0ca`, **563 testes** passando, build/lint
+> limpos (a fatia `feat/geracao-lotes` entra por fast-forward na sequência).
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -237,6 +238,16 @@ configurar `npm run package` para gerar um executável.
   salva); `resolveEffectiveTheme` puro + tokens claro/escuro via `data-theme`;
   acessibilidade (teclado, aria-current, foco, WCAG AA). Zero dep nova; lógica
   intocada (views reusadas); 476 testes (468 + 8).
+- [x] **Geração em lotes (chunks) para quiz e exercícios** —
+  `roadmap-geracao-lotes` (design/plan aprovados). Quantidade grande (> 20) de
+  quiz/exercícios passa a ser gerada em lotes de 15 ao Ollama, acumulando e
+  deduplicando até o total, sem estourar o timeout de 5 min; progresso
+  "Gerando X de N…" na tela; falha parcial honesta (entrega o acumulado; só
+  propaga o erro tipado se nada foi gerado). Lógica pura em
+  `src/shared/geracaoLotes.ts` (particionar/acumular/dedup), 100% testada; até
+  20 itens o comportamento é idêntico ao anterior. Flashcards ficaram de fora
+  (base genérica já acomoda a extensão). Zero dep nova; 563 testes (514 + 49,
+  Ollama mockado).
 
 ## Roadmap restante (complementos — não iniciados)
 
@@ -248,8 +259,8 @@ configurar `npm run package` para gerar um executável.
 - [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
 - [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - [ ] **Geração de IA em lote** (pasta inteira).
-- [ ] **Geração em lotes/chunks para quantidades grandes** (quiz/exercícios com
-  ~100): hoje é lento/instável no modelo local; gerar em lotes evitaria timeout.
+- [ ] **Geração em lotes/chunks para flashcards** (quiz e exercícios já feitos):
+  estender a mesma base pura genérica a flashcards — fatia pequena e isolada.
 - [ ] Transcrição de áudio; ingestão de vídeo/imagem (OCR).
 - [ ] Multi-idioma; multi-agente; monitoramento automático de pasta;
   comparar/mesclar materiais; detectar falta de material.

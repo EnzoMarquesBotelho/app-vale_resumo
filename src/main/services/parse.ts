@@ -12,6 +12,21 @@
  * A chamada ao modelo é injetável para facilitar os testes (Ollama mockado).
  */
 import {
+  GERACAO_EVITAR_MAX,
+  GERACAO_EVITAR_MAXLEN,
+  GERACAO_LOTE_LIMIAR,
+  GERACAO_LOTE_TAMANHO,
+  GERACAO_LOTE_TENTATIVAS_MARGEM,
+} from "@shared/constants";
+import {
+  acumularComDedup,
+  chaveDedup,
+  deveParticionar,
+  enunciadosParaEvitar,
+  particionarQuantidade,
+} from "@shared/geracaoLotes";
+import type { AoProgresso } from "@shared/geracaoLotes";
+import {
   montarPromptCorrigirExercicios,
   montarPromptCorrigirFlashcards,
   montarPromptExercicios,
@@ -326,6 +341,39 @@ export interface GerarExerciciosParams {
    * Injetável nos testes para mockar a resposta do modelo.
    */
   gerar?: GerarTexto;
+  /**
+   * Callback OPCIONAL de progresso (default no-op). Chamado com `(prontos,
+   * total)` a cada passo — o serviço é agnóstico ao artefato; quem anexa
+   * `artefato`/`geracaoId` é o handler IPC.
+   */
+  aoProgresso?: AoProgresso;
+}
+
+/**
+ * Pede UM lote de exercícios ao modelo e interpreta a resposta, com a mesma
+ * re-tentativa corretiva única do caminho curto. Devolve `null` se o lote não
+ * produziu nenhum exercício válido (mesmo após a corretiva). Erros de infra do
+ * `gerar` (Ollama offline/geração falhou) propagam para o laço.
+ */
+async function gerarLoteExercicios(
+  gerar: GerarTexto,
+  modo: ModoConteudo,
+  tamanho: number,
+  texto: string,
+  evitar: string[],
+): Promise<Exercicio[] | null> {
+  const primeira = await gerar(
+    montarPromptExercicios(modo, tamanho, texto, evitar),
+    "json",
+  );
+  const exercicios = parseExercicios(primeira, modo);
+  if (exercicios !== null) return exercicios;
+
+  const segunda = await gerar(
+    montarPromptCorrigirExercicios(tamanho, primeira),
+    "json",
+  );
+  return parseExercicios(segunda, modo);
 }
 
 /**
@@ -348,25 +396,63 @@ export async function gerarExercicios({
   modo,
   quantidade,
   gerar = generatePadrao,
+  aoProgresso = () => {},
 }: GerarExerciciosParams): Promise<Exercicio[]> {
   if (texto.trim().length === 0) {
     throw new SemTextoParaExerciciosError();
   }
   const n = normalizarQuantidade(quantidade);
 
-  // 1ª tentativa: prompt normal (JSON nativo do Ollama via format: "json").
-  const primeira = await gerar(montarPromptExercicios(modo, n, texto), "json");
-  const exercicios = parseExercicios(primeira, modo);
-  if (exercicios !== null) {
-    return exercicios.slice(0, n);
+  // Caminho curto (n ≤ limiar): uma chamada + corretiva, como hoje. Emite o
+  // progresso UMA vez, imediatamente antes do retorno (ponto único).
+  if (!deveParticionar(n, GERACAO_LOTE_LIMIAR)) {
+    const unico = await gerarLoteExercicios(gerar, modo, n, texto, []);
+    if (unico === null) throw new ExerciciosInvalidosError();
+    const resultado = unico.slice(0, n);
+    aoProgresso(resultado.length, n);
+    return resultado;
   }
 
-  // 2ª tentativa (corretiva): reapresenta o formato e a resposta anterior.
-  const segunda = await gerar(montarPromptCorrigirExercicios(n, primeira), "json");
-  const corrigidos = parseExercicios(segunda, modo);
-  if (corrigidos !== null) {
-    return corrigidos.slice(0, n);
+  // Chunking (n > limiar): laço SEQUENCIAL acumulando com dedup. Pede lotes
+  // extras (até o teto) para repor o que a dedup descartou.
+  const lotes = particionarQuantidade(n, GERACAO_LOTE_TAMANHO);
+  const teto = lotes.length + GERACAO_LOTE_TENTATIVAS_MARGEM;
+  let itens: Exercicio[] = [];
+  let chavesVistas = new Set<string>();
+  let tentativas = 0;
+
+  while (itens.length < n && tentativas < teto) {
+    const tamanhoLote =
+      tentativas < lotes.length
+        ? lotes[tentativas]
+        : Math.min(GERACAO_LOTE_TAMANHO, n - itens.length);
+    const evitar = enunciadosParaEvitar(
+      itens.map((e) => e.enunciado),
+      GERACAO_EVITAR_MAX,
+      GERACAO_EVITAR_MAXLEN,
+    );
+    tentativas += 1;
+
+    let lote: Exercicio[] | null;
+    try {
+      lote = await gerarLoteExercicios(gerar, modo, tamanhoLote, texto, evitar);
+    } catch (erro) {
+      // Erro de infra: com algo acumulado, entrega o parcial (sem re-tentar);
+      // sem nada acumulado, propaga o erro tipado (offline vs falha).
+      if (itens.length > 0) break;
+      throw erro;
+    }
+
+    if (lote !== null) {
+      const acumulo = acumularComDedup(itens, chavesVistas, lote, n, (e) =>
+        chaveDedup(e.enunciado),
+      );
+      itens = acumulo.itens;
+      chavesVistas = acumulo.chavesVistas;
+    }
+    aoProgresso(itens.length, n);
   }
 
-  throw new ExerciciosInvalidosError();
+  if (itens.length === 0) throw new ExerciciosInvalidosError();
+  return itens.slice(0, n);
 }

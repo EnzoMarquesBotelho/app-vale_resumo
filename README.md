@@ -29,6 +29,10 @@ podem ser reabertos a qualquer momento.
 - **Quiz interativo**: perguntas de múltipla escolha, abertas ou mistas (5 a 100). Você responde
   tudo e depois revê acertos e erros em cada questão, com pontuação. Nas perguntas abertas, você
   escolhe entre **se autoavaliar** pelo gabarito ou deixar a **IA corrigir**.
+- **Quantidades grandes de quiz e exercícios** (mais de 20): o app gera em partes menores por
+  baixo dos panos e mostra o progresso (**"Gerando 30 de 100…"**) no botão, entregando o total
+  que você pediu sem travar. Se uma parte falhar no meio, você fica com o que já foi gerado em
+  vez de perder tudo.
 
 **Organizar e exportar**
 - **Cadernos**: suas matérias ficam separadas em cadernos (derivados da pasta de origem dos
@@ -152,9 +156,11 @@ conteúdo.
   reinstale o Node.js.
 - **A geração está lenta**: modelos locais usam a CPU/GPU da sua máquina. Textos menores e o
   modo de resumo "curto" respondem mais rápido.
-- **"A geração falhou ou demorou demais"**: você pediu itens demais de uma vez (ex.: 100
-  flashcards/exercícios/perguntas) e o modelo local estourou o tempo. Tente uma quantidade
-  menor (ex.: 10–30) ou um modelo mais leve. Isso **não** significa que o Ollama está desligado.
+- **"A geração falhou ou demorou demais"**: o modelo local estourou o tempo. Em **quiz e
+  exercícios** o app já gera quantidades grandes em partes menores (veja acima), então isso é
+  mais raro; se mesmo assim acontecer — ou se for **flashcards** em grande quantidade — tente um
+  número menor (ex.: 10–30) ou um modelo mais leve. Isso **não** significa que o Ollama está
+  desligado.
 - **O app não abre / erro "Electron uninstall"** ao rodar `npm run dev`: o binário do Electron
   não foi baixado na instalação (acontece quando o `npm install` pula os scripts de pós-instalação
   ou o download falha). Baixe o binário rodando, na pasta do projeto:

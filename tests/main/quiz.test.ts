@@ -372,3 +372,151 @@ describe("gerarQuiz", () => {
     expect(promptQuiz).toContain("resumo combinado");
   });
 });
+
+/** JSON de um lote de `n` perguntas abertas distintas a partir de um prefixo. */
+function loteQuiz(prefixo: string, n: number): string {
+  return JSON.stringify({
+    perguntas: Array.from({ length: n }, (_, i) => ({
+      tipo: "aberta",
+      enunciado: `${prefixo}-${i}`,
+      gabarito: `G${prefixo}-${i}`,
+    })),
+  });
+}
+
+describe("gerarQuiz (geração em lotes)", () => {
+  it("caminho curto (n=20): UMA chamada e UM progresso (len, 20)", async () => {
+    const gerar = vi.fn().mockResolvedValue(loteQuiz("A", 20));
+    const aoProgresso = vi.fn();
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 20,
+      gerar,
+      aoProgresso,
+    });
+
+    expect(quiz.perguntas).toHaveLength(20);
+    expect(gerar).toHaveBeenCalledTimes(1);
+    expect(aoProgresso).toHaveBeenCalledTimes(1);
+    expect(aoProgresso).toHaveBeenCalledWith(20, 20);
+    expect(aoProgresso.mock.calls[0]).toHaveLength(2);
+  });
+
+  it("chunking (n=21): ≥2 chamadas e acúmulo até N na ordem", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteQuiz("A", 15))
+      .mockResolvedValueOnce(loteQuiz("B", 6));
+    const aoProgresso = vi.fn();
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 21,
+      gerar,
+      aoProgresso,
+    });
+
+    expect(quiz.perguntas).toHaveLength(21);
+    expect(gerar.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(quiz.perguntas[0].enunciado).toBe("A-0");
+    expect(quiz.perguntas[20].enunciado).toBe("B-5");
+    const prontos = aoProgresso.mock.calls.map((c) => c[0]);
+    expect(prontos[prontos.length - 1]).toBe(21);
+  });
+
+  it("dedup: perguntas repetidas entre lotes são descartadas e pede extras", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteQuiz("A", 15))
+      .mockResolvedValueOnce(loteQuiz("A", 6))
+      .mockResolvedValueOnce(loteQuiz("C", 6));
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 21,
+      gerar,
+    });
+
+    expect(quiz.perguntas).toHaveLength(21);
+    expect(gerar).toHaveBeenCalledTimes(3);
+  });
+
+  it("parcial por infra: falha no 3º lote devolve o acumulado SEM lançar", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteQuiz("A", 15))
+      .mockResolvedValueOnce(loteQuiz("B", 15))
+      .mockRejectedValueOnce(new Error("falhou"));
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 40,
+      gerar,
+    });
+
+    expect(quiz.perguntas).toHaveLength(30);
+  });
+
+  it("parcial por teto: modelo repete tudo após o 1º lote (gerar chamado = teto)", async () => {
+    // n=40 → lotes [15,15,10] (3) + margem 3 = teto 6.
+    const gerar = vi.fn().mockResolvedValue(loteQuiz("A", 15));
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 40,
+      gerar,
+    });
+
+    expect(quiz.perguntas).toHaveLength(15);
+    expect(gerar).toHaveBeenCalledTimes(6);
+  });
+
+  it("offline no 1º lote (prontos=0): PROPAGA o erro tipado", async () => {
+    const gerar = vi.fn().mockRejectedValue(new Error("Ollama offline"));
+
+    await expect(
+      gerarQuiz({
+        texto: "conteúdo",
+        modo: "aberta",
+        quantidade: 30,
+        gerar,
+      }),
+    ).rejects.toThrow("Ollama offline");
+  });
+
+  it("todos inválidos com prontos=0: lança QuizInvalidoError", async () => {
+    const gerar = vi.fn().mockResolvedValue("nunca é json");
+
+    await expect(
+      gerarQuiz({
+        texto: "conteúdo",
+        modo: "aberta",
+        quantidade: 30,
+        gerar,
+      }),
+    ).rejects.toBeInstanceOf(QuizInvalidoError);
+  });
+
+  it("corretiva por lote: JSON sujo depois válido dentro de um lote", async () => {
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce("não é json")
+      .mockResolvedValueOnce(loteQuiz("A", 15))
+      .mockResolvedValueOnce(loteQuiz("B", 15));
+
+    const quiz = await gerarQuiz({
+      texto: "conteúdo",
+      modo: "aberta",
+      quantidade: 30,
+      gerar,
+    });
+
+    expect(quiz.perguntas).toHaveLength(30);
+  });
+});

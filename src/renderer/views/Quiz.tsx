@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
+import { rotuloProgresso } from "@shared/geracaoLotes";
 import { calcularPontuacao } from "@shared/quizScore";
 import type { RespostaUsuarioPura } from "@shared/quizScore";
 import type {
@@ -103,6 +104,7 @@ export function Quiz({
   );
   const [enviado, setEnviado] = useState(false);
   const [gerando, setGerando] = useState(false);
+  const [progresso, setProgresso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   // Correção das abertas: o modo escolhido mais a tentativa efêmera (avaliações
   // da IA alinhadas por índice global às perguntas — objetivas ficam `null`).
@@ -130,7 +132,12 @@ export function Quiz({
     setAvaliacoes([]);
     setErroAvaliacao(null);
     setAvaliando(false);
+    setProgresso(null);
     setGerando(true);
+    // Assina o progresso em lotes ANTES do await; filtra pelo artefato "quiz".
+    const cancelar = getApi().aoProgressoGeracao((p) => {
+      if (p.artefato === "quiz") setProgresso(rotuloProgresso(p));
+    });
     try {
       const perguntasGeradas = await getApi().gerarQuiz(
         arquivo.texto,
@@ -153,6 +160,8 @@ export function Quiz({
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {
+      cancelar();
+      setProgresso(null);
       setGerando(false);
     }
   }
@@ -267,7 +276,7 @@ export function Quiz({
               onClick={() => void gerar()}
               disabled={gerando || !quantidadeValida}
             >
-              {gerando ? "Gerando…" : "Gerar quiz"}
+              {gerando ? (progresso ?? "Gerando…") : "Gerar quiz"}
             </button>
             {!quantidadeValida && (
               <span className="app-meta">

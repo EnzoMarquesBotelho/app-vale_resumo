@@ -7,6 +7,7 @@ import {
   montarPromptCorrigirMapaMental,
   montarPromptCorrigirQuiz,
   montarPromptDicaDoDia,
+  montarPromptExercicios,
   montarPromptFlashcards,
   montarPromptMapaMental,
   montarPromptQuiz,
@@ -192,6 +193,53 @@ describe("montarPromptQuiz", () => {
   it("normaliza a quantidade pedida aos limites (5–100)", () => {
     expect(montarPromptQuiz("multipla", 2, "x")).toContain("5 perguntas");
     expect(montarPromptQuiz("multipla", 200, "x")).toContain("100 perguntas");
+  });
+
+  it("sem `evitar` fica byte-a-byte igual ao prompt sem o parâmetro", () => {
+    expect(montarPromptQuiz("misto", 8, "x", [])).toBe(
+      montarPromptQuiz("misto", 8, "x"),
+    );
+  });
+
+  it("com `evitar` acrescenta o bloco 'não repita' com os enunciados", () => {
+    const prompt = montarPromptQuiz("misto", 8, "x", ["Pergunta A", "Pergunta B"]);
+    expect(prompt).toContain("NÃO repita");
+    expect(prompt).toContain("perguntas");
+    expect(prompt).toContain("- Pergunta A");
+    expect(prompt).toContain("- Pergunta B");
+  });
+});
+
+describe("montarPromptExercicios", () => {
+  it("inclui o conteúdo, a quantidade normalizada e o formato JSON", () => {
+    const prompt = montarPromptExercicios("mista", 8, "conteúdo de teste");
+    expect(prompt).toContain("conteúdo de teste");
+    expect(prompt).toContain("8 exercícios");
+    expect(prompt).toContain('"exercicios"');
+    expect(prompt.toLowerCase()).toContain("português");
+  });
+
+  it("instrui cada modo (teórica/prática/mista)", () => {
+    expect(montarPromptExercicios("teorica", 5, "x")).toContain("TEÓRICOS");
+    expect(montarPromptExercicios("pratica", 5, "x")).toContain("PRÁTICOS");
+    expect(montarPromptExercicios("mista", 5, "x")).toContain("MISTA");
+  });
+
+  it("sem `evitar` fica byte-a-byte igual ao prompt sem o parâmetro", () => {
+    expect(montarPromptExercicios("mista", 8, "x", [])).toBe(
+      montarPromptExercicios("mista", 8, "x"),
+    );
+  });
+
+  it("com `evitar` acrescenta o bloco 'não repita' com os enunciados", () => {
+    const prompt = montarPromptExercicios("mista", 8, "x", [
+      "Exercício A",
+      "Exercício B",
+    ]);
+    expect(prompt).toContain("NÃO repita");
+    expect(prompt).toContain("exercícios");
+    expect(prompt).toContain("- Exercício A");
+    expect(prompt).toContain("- Exercício B");
   });
 });
 

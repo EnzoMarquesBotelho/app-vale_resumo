@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import { IPC_CHANNELS, type AppApi } from "@shared/ipc";
+import type { ProgressoGeracao } from "@shared/geracaoLotes";
 import type { EstadoTema } from "@shared/theme";
 import type { UpdaterStatus } from "@shared/updater";
 
@@ -97,6 +98,15 @@ const api: AppApi = {
     ipcRenderer.on(IPC_CHANNELS.atualizacao.status, handler);
     return () =>
       ipcRenderer.removeListener(IPC_CHANNELS.atualizacao.status, handler);
+  },
+  aoProgressoGeracao: (ouvinte) => {
+    // Espelha exatamente `aoAtualizarStatus`: mesma referência de handler para
+    // o removeListener casar no cancelador.
+    const handler = (_evento: IpcRendererEvent, p: ProgressoGeracao): void =>
+      ouvinte(p);
+    ipcRenderer.on(IPC_CHANNELS.geracao.progresso, handler);
+    return () =>
+      ipcRenderer.removeListener(IPC_CHANNELS.geracao.progresso, handler);
   },
 };
 

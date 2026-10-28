@@ -74,6 +74,31 @@ export const QUIZ_ALTERNATIVAS_MAXIMO = 6;
  */
 export const AVALIACAO_COMENTARIO_MAX = 600;
 
+/**
+ * A partir de quantos itens a geração de quiz/exercícios passa a ser feita em
+ * lotes (chunking). Igual ou abaixo deste limiar, o comportamento é o de hoje
+ * (uma única chamada ao Ollama). Acima, liga o chunking. O gate é `total >
+ * GERACAO_LOTE_LIMIAR`, então 21 é o menor caso particionado (com lote 15).
+ */
+export const GERACAO_LOTE_LIMIAR = 20;
+/** Tamanho (itens) de cada lote quando a geração é particionada. */
+export const GERACAO_LOTE_TAMANHO = 15;
+/**
+ * Quantos enunciados já aceitos entram no bloco "evitar" do próximo lote (os
+ * mais recentes). Limita o custo de prompt extra por lote.
+ */
+export const GERACAO_EVITAR_MAX = 30;
+/** Comprimento máximo (caracteres) de cada enunciado no bloco "evitar". */
+export const GERACAO_EVITAR_MAXLEN = 120;
+/**
+ * Margem fixa de tentativas extras além do número de lotes da partição, para
+ * repor itens descartados pela deduplicação sem girar indefinidamente. O TETO
+ * de tentativas NÃO é uma constante: é computado no serviço como
+ * `lotes.length + GERACAO_LOTE_TENTATIVAS_MARGEM` (depende de `lotes.length`,
+ * que é runtime).
+ */
+export const GERACAO_LOTE_TENTATIVAS_MARGEM = 3;
+
 /** Intervalos padrão de repetição espaçada: dias antes da prova. */
 export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;
 /** Teto defensivo de intervalos distintos aceitos por prova. */

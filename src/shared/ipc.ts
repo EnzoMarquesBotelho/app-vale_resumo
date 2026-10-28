@@ -32,6 +32,7 @@ import type {
   VinculoProva,
 } from "./types";
 import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
+import type { ProgressoGeracao } from "./geracaoLotes";
 import type { EstadoTema, ThemePreference } from "./theme";
 import type { UpdaterStatus } from "./updater";
 
@@ -127,6 +128,14 @@ export const IPC_CHANNELS = {
     reiniciar: "atualizacao:reiniciar",
     /** Main empurra o UpdaterStatus ao renderer (push). */
     status: "atualizacao:status",
+  },
+  /**
+   * Grupo ANINHADO do progresso de geração em lotes (mesmo precedente seguro
+   * dos grupos `tema`/`atualizacao`: ninguém itera `IPC_CHANNELS`).
+   */
+  geracao: {
+    /** Main empurra o progresso de uma geração em lotes (push). */
+    progresso: "geracao:progresso",
   },
 } as const;
 
@@ -394,4 +403,10 @@ export interface AppApi {
    * Devolve um cancelador que remove o ouvinte — espelha `aoAlterarTema`.
    */
   aoAtualizarStatus: (ouvinte: (estado: UpdaterStatus) => void) => () => void;
+  /**
+   * Assina o progresso das gerações em lotes (quiz/exercícios) vindas do main
+   * ("Gerando X de N…"). Devolve um cancelador que remove o ouvinte. Espelha
+   * `aoAtualizarStatus`. O renderer filtra por `artefato` no ouvinte.
+   */
+  aoProgressoGeracao: (ouvinte: (p: ProgressoGeracao) => void) => () => void;
 }

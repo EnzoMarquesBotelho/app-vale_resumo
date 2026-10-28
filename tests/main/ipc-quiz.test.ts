@@ -7,6 +7,9 @@ const registered = new Map<
   (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
 >();
 
+/** Controla o retorno de BrowserWindow.fromWebContents por teste. */
+const fromWebContents = vi.fn(() => undefined as unknown);
+
 vi.mock("electron", () => ({
   ipcMain: {
     handle: (
@@ -17,6 +20,9 @@ vi.mock("electron", () => ({
     },
   },
   dialog: { showOpenDialog: vi.fn() },
+  // Necessário: o push de progresso passa por janelaDoEvento(event) →
+  // BrowserWindow.fromWebContents em todo invoke. Sem isto, o acesso lança.
+  BrowserWindow: { fromWebContents: (...a: unknown[]) => fromWebContents(...(a as [])) },
 }));
 
 // Ollama mockado no nível do serviço: `generate` não chama modelo real.
@@ -92,6 +98,8 @@ describe("IPC: gerar quiz", () => {
     generate.mockReset();
     listModels.mockReset();
     listModels.mockResolvedValue([]);
+    fromWebContents.mockReset();
+    fromWebContents.mockReturnValue(undefined);
     registerIpcHandlers();
   });
 
@@ -175,5 +183,36 @@ describe("IPC: gerar quiz", () => {
     await expect(
       chamar(IPC_CHANNELS.gerarQuiz, "texto base", "misto", 10),
     ).rejects.toThrow(/Ollama não está rodando/);
+  });
+
+  it("empurra ProgressoGeracao com artefato 'quiz' ao webContents", async () => {
+    const send = vi.fn();
+    fromWebContents.mockReturnValue({
+      webContents: { send, isDestroyed: () => false },
+    } as unknown as undefined);
+    // n=21 (>20) força o chunking; dois lotes de abertas distintas completam 21.
+    const lote = (prefixo: string, n: number): string =>
+      JSON.stringify({
+        perguntas: Array.from({ length: n }, (_, i) => ({
+          tipo: "aberta",
+          enunciado: `${prefixo}-${i}`,
+          gabarito: `G${i}`,
+        })),
+      });
+    generate
+      .mockResolvedValueOnce(lote("A", 15))
+      .mockResolvedValueOnce(lote("B", 6));
+
+    const evento2 = { sender: {} } as unknown as IpcMainInvokeEvent;
+    const handler = registered.get(IPC_CHANNELS.gerarQuiz);
+    await Promise.resolve(handler!(evento2, "texto base", "aberta", 21));
+
+    expect(send).toHaveBeenCalled();
+    const [canal, payload] = send.mock.calls[0];
+    expect(canal).toBe(IPC_CHANNELS.geracao.progresso);
+    expect(payload.artefato).toBe("quiz");
+    expect(payload.total).toBe(21);
+    expect(typeof payload.prontos).toBe("number");
+    expect(typeof payload.geracaoId).toBe("string");
   });
 });
