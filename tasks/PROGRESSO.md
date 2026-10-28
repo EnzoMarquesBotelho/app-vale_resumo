@@ -1,10 +1,13 @@
-# Progresso do App de Estudos
+# Progresso do App "Desenrola"
 
-> Onde paramos — atualizado em 2026-10-16.
+> Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
+> Onde paramos — atualizado em 2026-10-26.
 
 ## Estado atual (branch master)
 
-- Build, lint e **476 testes** passando. HEAD: `286a119`.
+- Build, lint e **514 testes** passando. HEAD: `e1c7dfb`.
+- **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
+  `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
   `moondream`/embeddings, que são inadequados para gerar JSON).
 
@@ -117,8 +120,24 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   comparar/mesclar materiais; detectar falta de material.
 
 ### Aparência e UX
-- **Criação de logo** (identidade visual + ícone do app/instalador).
+- **Nome do app + Logo** — FEITO.
+  - **Nome: "Desenrola"** (gíria BR de resolver/explicar; benefício, memorável,
+    vira marca). Tagline: "estudo sem complicação".
+  - **Logo:** pergaminho se desenrolando (folha com conteúdo + pontas enroladas),
+    volume 3D via sombras/gradiente, paleta vibrante laranja→magenta→roxo,
+    wordmark itálico pesado. SVGs em `resources/logo-icone.svg` (ícone quadrado)
+    e `resources/logo-horizontal.svg` (com wordmark + tagline).
+  - **Pipeline de ícones:** `npm run icons` (`scripts/gerar-icones.mjs`) gera
+    PNGs 16–512 + `resources/icon.ico` multi-resolução a partir do SVG, via
+    `sharp@0.35.5` + `png-to-ico@3.0.2` (devDeps pinadas). `electron-builder.yml`
+    usa `icon: resources/icon.ico`; a `BrowserWindow` usa o PNG 256. Título da
+    janela mudado para "Desenrola". Verificado: .ico válido (assinatura 0,0,1,0),
+    PNGs válidos, build/lint/514 testes OK.
   (Modo claro/escuro + melhoria de aparência + barra lateral: ENTREGUES.)
+- **Rename completo do app para "Desenrola"** (PENDENTE, pequeno): ainda há
+  `productName`/`appId`/`shortcutName` antigos ("App de Estudos com IA Local")
+  no `electron-builder.yml`, e `name`/`description` no `package.json`. Trocar
+  para a marca Desenrola numa próxima passada (afeta instalador e appId).
 
 ### Plataformas (porte)
 - **Porte para Linux e macOS** (desktop — a stack Electron já favorece; revisar
@@ -128,7 +147,30 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   modelo no dispositivo, ou modo só-leitura/sync. Requer levantamento próprio).
 
 ### Distribuição e atualizações
-- **Deploy no GitHub** (publicar releases/instaladores no GitHub Releases; CI
-  para gerar os artefatos).
-- **Botão de atualização no app** ligado às releases do GitHub (verificar/baixar
-  novas versões; ex.: electron-updater apontando para o GitHub).
+- **Deploy no GitHub** — CONCLUÍDO (`worklog-deploy-github.md`): repo
+  `EnzoMarquesBotelho/app-vale_resumo`. CI em **Caminho 1**:
+  `.github/workflows/release.yml` dispara na tag `v*`, builda o instalador com
+  `electron-builder --publish never` (só constrói, não publica) e cria UMA única
+  Release via `softprops/action-gh-release@v2`, anexando `.exe` + `.blockmap` +
+  `latest.yml`. Node 22 no CI. O bloco `publish` (github) segue no
+  `electron-builder.yml` porque o electron-updater o lê em runtime.
+  - **Release pública validada:** `v0.1.1` (commit `0f05bdc`), draft=False, com
+    os 3 assets (`.exe` 126 MB, `.blockmap`, `latest.yml` 383 bytes). SEM
+    duplicata — o problema das releases duplicadas (electron-builder publicando)
+    foi resolvido tirando a publicação do builder.
+  - **Processo de release** (documentado no worklog): bumpar `package.json` →
+    commitar → criar tag que CASA com a versão → `git push origin master` →
+    `git push origin <tag>`. A tag DEVE igualar a versão do package.json.
+  - Tags/releases antigas `v0.1.0` (e as duplicatas) foram limpas.
+- **Botão de atualização no app** — FEITO (`roadmap-botao-update.md`):
+  `electron-updater@6.8.12` (dep nova, pinada) no main, `autoDownload=false`,
+  `quitAndInstall` só no clique de "Reiniciar". Verificação automática ao abrir
+  (silenciosa) + botão manual; download com barra de progresso → "Reiniciar para
+  atualizar". Lógica pura de estado em `src/shared/updater.ts`; eventos
+  main→renderer no padrão do tema; controle no rodapé da Sidebar (claro+escuro).
+  Tudo protegido por `app.isPackaged` — em dev mostra "disponível só no app
+  instalado", sem erro. 514 testes (476 + 38, autoUpdater mockado). Verificado:
+  lógica pura (mapeamento evento→estado, clamp, versão, erro rede/genérico).
+  - **Pendente de verificação do usuário (precisa de app instalado + 2 versões):**
+    o fluxo real baixar→reiniciar só se testa instalando a `v0.1.1` e publicando
+    uma `v0.1.2`. Auto-update NÃO roda em `npm run dev`.

@@ -6,7 +6,8 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master `286a119`, **476 testes** passando, build/lint limpos.
+> Estado atual: master `e1c7dfb`, **514 testes** passando, build/lint limpos.
+> Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
 > `C:\Users\enzom\OneDrive\Desktop\Facul` — contém PDFs/arquivos reais de faculdade,
@@ -250,8 +251,13 @@ configurar `npm run package` para gerar um executável.
   comparar/mesclar materiais; detectar falta de material.
 
 ### Aparência e UX
-- [ ] **Criação de logo** (identidade visual do app; ícone do app/instalador).
-  (Modo claro/escuro + melhoria de aparência + barra lateral: ENTREGUES.)
+- [x] **Nome do app + Logo** — nome **"Desenrola"** (tagline "estudo sem
+  complicação"); logo de pergaminho se desenrolando (SVGs em `resources/`),
+  pipeline `npm run icons` (sharp + png-to-ico) gerando PNGs + `icon.ico`,
+  ligado no `electron-builder.yml` e na janela. 514 testes OK.
+- [ ] **Rename completo para "Desenrola"** (pequeno): trocar
+  `productName`/`appId`/`shortcutName` (electron-builder.yml) e
+  `name`/`description` (package.json), hoje ainda "App de Estudos com IA Local".
 
 ### Plataformas (porte)
 - [ ] **Porte para Linux e macOS** (desktop — a stack Electron já favorece;
@@ -262,7 +268,15 @@ configurar `npm run package` para gerar um executável.
   levantamento próprio).
 
 ### Distribuição e atualizações
-- [ ] **Deploy no GitHub** (publicar releases/instaladores no GitHub Releases;
-  CI para gerar os artefatos).
-- [ ] **Botão de atualização no app** ligado às releases do GitHub (verificar e
-  baixar novas versões; ex.: electron-updater apontando para o GitHub).
+- [x] **Deploy no GitHub** — `worklog-deploy-github.md`. Repo
+  `EnzoMarquesBotelho/app-vale_resumo`. CI Caminho 1: workflow dispara na tag
+  `v*`, builda com `electron-builder --publish never` e cria UMA Release via
+  `softprops/action-gh-release@v2` (`.exe` + `.blockmap` + `latest.yml`). Release
+  pública `v0.1.1` validada (3 assets, sem duplicata). Processo: bumpar
+  package.json → tag casando com a versão → push.
+- [x] **Botão de atualização no app** — `roadmap-botao-update.md`.
+  `electron-updater@6.8.12` no main (autoDownload=false, quitAndInstall só no
+  "Reiniciar"); verificação automática ao abrir + botão manual; download com
+  progresso → reiniciar. Lógica pura em `src/shared/updater.ts`; controle no
+  rodapé da Sidebar; tudo sob `app.isPackaged` (dev = estado neutro). 514 testes.
+  Fluxo real baixar→reiniciar = verificação do usuário (app instalado + 2 versões).

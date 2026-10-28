@@ -1,4 +1,6 @@
-# App de Estudos com IA Local
+# Desenrola
+
+> _Estudo sem complicação._
 
 Um aplicativo de **desktop**, **100% local e offline**, que transforma seu material de estudo
 em **resumos**, **flashcards**, **exercícios**, **mapas mentais** e **quizzes** usando uma IA
