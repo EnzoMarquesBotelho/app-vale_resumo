@@ -137,3 +137,76 @@ até o total, com feedback de progresso na tela.
   grandes (variedade entre lotes, pressão de contexto com `n` alto) é verificação
   manual. Primeiro ajuste se houver pressão de contexto: reduzir
   `GERACAO_EVITAR_MAX` (uma linha em `constants.ts`).
+
+## Correção de acabamento (2026-10-28) — teto por estagnação + parcial honesto
+
+> Feedback do usuário: ao pedir 50 questões, o quiz entregou 30 **sem** nenhum
+> aviso e **sem** mostrar a contagem no topo — então ele só percebeu o parcial
+> contando à mão. Esta correção fecha as duas lacunas (o laço desistia cedo
+> demais e o parcial era silencioso) sem mudar o contrato de UI.
+
+### Decisão 6 — Teto do laço: estagnação (K lotes vazios), não margem fixa
+
+- **Problema do teto antigo:** o critério era `tentativas < lotes.length + 3`
+  (margem fixa). Para 50 itens a partição é 15+15+15+5 → 4 lotes, teto 7. Se o
+  modelo repetia muito (dedup descartando itens), as 7 tentativas se esgotavam
+  antes de atingir 50 e o laço entregava o parcial cedo demais, sem persistir
+  enquanto ainda havia progresso real.
+- **Novo critério (`deveContinuarLotes`, puro):** continua enquanto
+  `prontos < alvo` **E** `semProgresso < GERACAO_LOTE_SEM_PROGRESSO_MAX` (K=3)
+  **E** `tentativas < tetoAbsoluto`. Qualquer uma das três para o laço.
+  - `semProgresso` = lotes **consecutivos** com `aceitos === 0` (vindo de
+    `acumularComDedup`). Zera a cada lote que aceita ≥ 1 item novo. Assim o laço
+    **persiste** enquanto o modelo ainda produz coisa nova (resolve o "entregou
+    30 cedo demais") e **desiste** quando o modelo claramente travou repetindo
+    (3 lotes vazios seguidos), sem queimar tempo.
+  - `tetoAbsoluto = lotes.length + GERACAO_LOTE_TETO_MARGEM_ABS` (margem 6,
+    computada no serviço porque depende de `lotes.length` em runtime, não é
+    constante). É só rede de segurança de terminação para o caso degenerado de
+    alternar "1 aceito / 0 aceito" indefinidamente; a parada por estagnação
+    dispara antes na prática. Garante que o laço SEMPRE termina.
+- **`semProgresso` só muda no SUCESSO do `await`** (quando o lote volta e a
+  dedup roda), **nunca** no `catch` de infra. Uma falha de Ollama no meio
+  continua encerrando o laço e devolvendo o parcial (Decisão 3, intacta) — ela
+  não é contada como "estagnação".
+- **`tamanhoLote` clampado a `Math.max(1, …)`** na partição, defensivo.
+- Constantes novas em `constants.ts`: `GERACAO_LOTE_SEM_PROGRESSO_MAX = 3`,
+  `GERACAO_LOTE_TETO_MARGEM_ABS = 6`. A antiga `GERACAO_LOTE_TENTATIVAS_MARGEM`
+  (margem fixa 3) foi substituída.
+- Aplicado em `quiz.ts` e `parse.ts` (exercícios) com o MESMO critério, via a
+  função pura compartilhada.
+
+### Decisão 7 — Como o parcial chega ao renderer (contrato)
+
+- **O contrato de `AppApi` NÃO muda.** `gerarQuiz`/`gerarExercicios` continuam
+  devolvendo só a **lista** de itens (sem envelope, sem flag de parcial, sem
+  causa). O progresso segue no canal lateral `geracao.progresso`.
+- **O parcial é derivado no renderer**, não transmitido pelo main: a view
+  **congela `quantidadePedida`** (quanto o usuário pediu) no **sucesso** da
+  geração e compara com `lista.length`. Se `lista.length < quantidadePedida`, a
+  view renderiza o aviso; senão, `null` (helper puro `avisoGeracaoParcial`).
+  - `quantidadePedida` é **resetada no topo de cada `gerar()`** e só regravada no
+    sucesso → o aviso **nunca** aparece num erro (erro mostra a mensagem honesta
+    de sempre, não "parcial").
+- **Mensagem de aviso causa-NEUTRA:** como o contrato não carrega a causa, a
+  frase cobre honestamente as duas possibilidades ("o modelo pode não ter
+  produzido conteúdo novo suficiente, ou a geração foi interrompida; tente de
+  novo ou reduza a quantidade"). Acessível: `role="status"`, `aria-live="polite"`.
+- **Contagem no topo do quiz:** o quiz passa a mostrar `N questões · Modo` no
+  topo (espelhando a contagem que os Exercícios já tinham), via `ROTULO_MODO_QUIZ`
+  e as classes `.quiz-contador` / `.quiz-aviso-parcial` / `.exercicios-aviso-parcial`.
+  Assim o usuário vê de imediato quantas questões vieram, sem contar à mão.
+- **Distinto do selo "parcial" da avaliação por IA** (veredito Correto/Parcial/
+  Incorreto numa resposta): aquele é veredito de correção; este é "veio menos do
+  que você pediu".
+
+### Verificação desta correção
+
+- Puros: `deveContinuarLotes` (5 casos) e `avisoGeracaoParcial` (3 casos).
+- Serviço (quiz e exercícios): gerou o total; estagnação com reset do contador
+  quando um lote volta a produzir; lote extra sempre ≥ 1; falha de infra **após**
+  já ter progresso devolve o parcial sem contar como estagnação. Os 2 testes
+  antigos de "parcial por teto" foram atualizados para o critério de estagnação.
+- **579 testes** verdes (build/lint OK). A validação com o **Ollama real**
+  (pedir 50 e ver o aviso + a contagem) continua sendo verificação **manual** do
+  usuário — o ambiente de CI não tem GUI nem modelo.

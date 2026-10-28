@@ -6,8 +6,9 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master na fatia `0d83ba2` (geração em lotes) + commit de docs,
-> **563 testes** passando, build/lint limpos.
+> Estado atual: master na fatia `c6d3852` (geração em lotes — implementação) +
+> docs/roadmap + correção de acabamento (parcial honesto + contagem no quiz) e
+> seu commit de docs, **579 testes** passando, build/lint limpos.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -248,6 +249,15 @@ configurar `npm run package` para gerar um executável.
   20 itens o comportamento é idêntico ao anterior. Flashcards ficaram de fora
   (base genérica já acomoda a extensão). Zero dep nova; 563 testes (514 + 49,
   Ollama mockado).
+  - **Correção de acabamento** (feedback: pediu 50, veio 30 sem aviso/contagem):
+    (a) teto do laço afrouxado — parada fixa `lotes.length + 3` virou **parada
+    por estagnação** (desiste após 3 lotes seguidos sem item novo, teto absoluto
+    `lotes.length + 6`), persistindo enquanto há progresso real; critério na
+    função pura `deveContinuarLotes`; (b) **aviso de parcial honesto** (pt-BR,
+    acessível, causa-neutra) quando a lista vem abaixo do pedido, derivado no
+    renderer sem mudar o contrato `AppApi`; (c) **contagem no topo do quiz**
+    (`N questões · Modo`). 579 testes (563 + 16). Ollama real = verificação
+    manual do usuário.
 
 ## Roadmap restante (complementos — não iniciados)
 

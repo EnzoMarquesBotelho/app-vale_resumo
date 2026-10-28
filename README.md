@@ -30,9 +30,13 @@ podem ser reabertos a qualquer momento.
   tudo e depois revê acertos e erros em cada questão, com pontuação. Nas perguntas abertas, você
   escolhe entre **se autoavaliar** pelo gabarito ou deixar a **IA corrigir**.
 - **Quantidades grandes de quiz e exercícios** (mais de 20): o app gera em partes menores por
-  baixo dos panos e mostra o progresso (**"Gerando 30 de 100…"**) no botão, entregando o total
-  que você pediu sem travar. Se uma parte falhar no meio, você fica com o que já foi gerado em
-  vez de perder tudo.
+  baixo dos panos e mostra o progresso (**"Gerando 30 de 100…"**) no botão, tentando entregar o
+  total que você pediu sem travar. No modelo local, pedir muitas de uma vez pode vir **parcial**
+  (ex.: você pede 50 e vêm 30) — o app **avisa na tela** quando isso acontece, com uma mensagem
+  dizendo quantas vieram e sugerindo tentar de novo ou reduzir a quantidade. O **quiz mostra a
+  contagem de questões no topo** (ex.: "30 questões · Múltipla escolha"), então você vê de cara
+  quantas foram geradas, sem precisar contar. Se uma parte falhar no meio, você fica com o que
+  já foi gerado em vez de perder tudo.
 
 **Organizar e exportar**
 - **Cadernos**: suas matérias ficam separadas em cadernos (derivados da pasta de origem dos
@@ -47,7 +51,8 @@ podem ser reabertos a qualquer momento.
 
 > Tudo roda offline. Se o Ollama não estiver rodando, o app mostra um passo a passo
 > para resolver, sem travar. Gerar ou corrigir muitos itens de uma vez pode ser lento no
-> modelo local — se demorar demais, o app avisa e sugere reduzir a quantidade.
+> modelo local e, em quiz/exercícios, pode vir uma quantidade menor do que a pedida — nesse
+> caso o app avisa na tela quantas vieram e sugere tentar de novo ou reduzir a quantidade.
 
 ---
 

@@ -1,12 +1,14 @@
 # Progresso do App "Desenrola"
 
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
-> Onde paramos — atualizado em 2026-10-27.
+> Onde paramos — atualizado em 2026-10-28.
 
 ## Estado atual (branch master)
 
-- Build, lint e **563 testes** passando. Última fatia na master: `0d83ba2`
-  (geração em lotes), seguida de um commit de sincronização de docs.
+- Build, lint e **579 testes** passando. Última fatia na master: `c6d3852`
+  (geração em lotes — implementação), seguida do roadmap/sincronização de docs e
+  da correção de acabamento da própria fatia (parcial honesto + contagem no
+  quiz) com seu commit de docs.
 - **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
   `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
@@ -98,6 +100,27 @@
   comportamento é idêntico ao de antes. 563 testes (514 + 49, Ollama mockado).
   Verificado: build/lint/testes verdes. O comportamento do modelo local real em
   quantidades grandes é verificação manual (fora do CI).
+- **Correção de acabamento da geração em lotes** (`roadmap-geracao-lotes.md`,
+  seção "Correção de acabamento 2026-10-28"): o usuário pediu 50 questões, o
+  quiz entregou 30 **sem aviso** e **sem contagem** no topo (só percebeu
+  contando à mão). Dois ajustes, sem mudar o contrato de UI:
+  (a) **teto do laço afrouxado** — a parada por margem fixa (`lotes.length + 3`,
+  que desistia cedo demais quando a dedup descartava muito) virou **parada por
+  estagnação**: continua enquanto há progresso real, desiste após **3 lotes
+  consecutivos sem item novo** (`GERACAO_LOTE_SEM_PROGRESSO_MAX`), com um teto
+  absoluto de segurança `lotes.length + 6` que garante terminação; critério
+  numa função pura (`deveContinuarLotes`) aplicada a quiz e exercícios;
+  (b) **aviso de parcial honesto** — quando a lista vem **abaixo** do pedido, a
+  view mostra um aviso pt-BR acessível (`role=status`) com mensagem causa-neutra
+  ("geramos X de N; o modelo pode não ter produzido conteúdo novo suficiente ou
+  a geração foi interrompida"), derivado no renderer comparando `lista.length`
+  com a `quantidadePedida` congelada no sucesso — o contrato `AppApi` não muda
+  (a lista continua a ser o único retorno);
+  (c) **contagem no topo do quiz** (`N questões · Modo`, espelhando os
+  Exercícios), para o usuário ver de imediato quantas vieram.
+  579 testes (563 + 16, Ollama mockado); build/lint verdes. A validação com o
+  Ollama real (pedir 50 e ver o aviso + a contagem) é verificação **manual** do
+  usuário (CI sem GUI/modelo).
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
