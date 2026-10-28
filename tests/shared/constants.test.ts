@@ -9,7 +9,7 @@ import {
 
 describe("shared constants", () => {
   it("define o nome do app", () => {
-    expect(appName).toBe("App de Estudos com IA Local");
+    expect(appName).toBe("Desenrola");
   });
 
   it("usa a porta local padrão do Ollama", () => {

@@ -1,7 +1,7 @@
 # Configuração do electron-builder para gerar o executável distribuível do app.
 # Usada por `npm run package`. Gera um instalador Windows (NSIS) em `release/`.
-appId: com.appestudos.ialocal
-productName: App de Estudos com IA Local
+appId: com.desenrola.app
+productName: Desenrola
 
 # Diretórios de saída e de recursos de build (ícones etc.).
 directories:
@@ -33,7 +33,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: App de Estudos
+  shortcutName: Desenrola
 
 # Evita tentar baixar/assinar binários online durante o empacotamento local.
 # O app é 100% offline; não há assinatura de código configurada.

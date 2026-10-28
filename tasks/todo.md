@@ -241,6 +241,10 @@ configurar `npm run package` para gerar um executável.
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo
+- [ ] **Plano de estudo guiado por questionário** — `roadmap-plano-estudo-guiado.md`.
+  Questionário (data da prova, tempo disponível, assuntos/mais comuns em
+  ENEM-ENADE, dificuldades/facilidades) + quiz diagnóstico (lacuna na base vs.
+  tópico novo) → plano direcionado. Estende a Agenda/Provas.
 - [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
 - [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - [ ] **Geração de IA em lote** (pasta inteira).

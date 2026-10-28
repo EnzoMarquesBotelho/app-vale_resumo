@@ -107,6 +107,11 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
 ## Roadmap restante (não priorizado)
 
 ### Funcionalidades de estudo
+- **Plano de estudo guiado por questionário** (ideia registrada —
+  `roadmap-plano-estudo-guiado.md`): questionário (data da prova, tempo
+  disponível, assuntos que caem / mais comuns em ENEM-ENADE, dificuldades e
+  facilidades) + quiz diagnóstico (lacuna na base vs. dificuldade no tópico
+  novo) → plano/agenda direcionada. Estende a Agenda/Provas atual.
 - **Edição manual dos mapas mentais** (renomear/adicionar/remover nós); exportar
   mapa como imagem.
 - **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
@@ -134,10 +139,12 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
     janela mudado para "Desenrola". Verificado: .ico válido (assinatura 0,0,1,0),
     PNGs válidos, build/lint/514 testes OK.
   (Modo claro/escuro + melhoria de aparência + barra lateral: ENTREGUES.)
-- **Rename completo do app para "Desenrola"** (PENDENTE, pequeno): ainda há
-  `productName`/`appId`/`shortcutName` antigos ("App de Estudos com IA Local")
-  no `electron-builder.yml`, e `name`/`description` no `package.json`. Trocar
-  para a marca Desenrola numa próxima passada (afeta instalador e appId).
+- **Rename completo para "Desenrola"** — FEITO. `appId: com.desenrola.app`,
+  `productName: Desenrola`, `shortcutName: Desenrola` (electron-builder.yml);
+  `name: desenrola` + description (package.json); `appName`, `<title>` e título
+  da janela = "Desenrola". Teste do nome atualizado; 514 testes OK. Nota: o
+  `appId` mudou — como ainda não há base instalada em produção, foi o momento
+  certo (muda o userData e o casamento do auto-update).
 
 ### Plataformas (porte)
 - **Porte para Linux e macOS** (desktop — a stack Electron já favorece; revisar
