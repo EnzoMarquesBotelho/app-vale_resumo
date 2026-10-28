@@ -3,10 +3,11 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-26.
 
-## Estado atual (branch master)
+## Estado atual (branch feat/geracao-lotes)
 
-- Build, lint e **563 testes** passando. HEAD base: `d49a0ca` (a fatia
-  `feat/geracao-lotes` entra por fast-forward na sequência).
+- Build, lint e **563 testes** passando. HEAD do branch: `c6d3852` (fatia
+  `feat/geracao-lotes`, review aprovado); base master: `d49a0ca` — entra por
+  fast-forward na master.
 - **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
   `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
@@ -84,9 +85,9 @@
   468 testes de lógica seguem verdes + 8 novos de tema (476/41). Verificado: a
   regra pura de tema (6 casos) e que a suíte não regrediu. Aparência é
   verificação manual.
-- **Geração em lotes (chunks) para quiz e exercícios** (`roadmap-geracao-lotes`,
-  design/plan aprovados): quando o usuário pede uma quantidade grande (acima de
-  20) de perguntas de quiz ou de exercícios, a geração passa a ser feita em
+- **Geração em lotes (chunks) para quiz e exercícios** (`roadmap-geracao-lotes.md`,
+  design e review aprovados): quando o usuário pede uma quantidade grande (acima
+  de 20) de perguntas de quiz ou de exercícios, a geração passa a ser feita em
   vários pedidos menores ao Ollama (lotes de 15), acumulando e deduplicando os
   itens até atingir o total — sem estourar o timeout de 5 min de um pedido
   gigante. A tela mostra o progresso ("Gerando X de N…") durante a geração. Se

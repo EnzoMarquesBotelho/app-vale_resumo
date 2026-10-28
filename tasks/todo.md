@@ -6,9 +6,10 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master base `d49a0ca`, **563 testes** passando, build/lint
-> limpos (a fatia `feat/geracao-lotes` entra por fast-forward na sequência).
-> Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
+> Estado atual: branch `feat/geracao-lotes` HEAD `c6d3852` (review aprovado),
+> base master `d49a0ca`, **563 testes** passando, build/lint limpos — entra por
+> fast-forward na master. Publicado no GitHub (`app-vale_resumo`), release
+> pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
 > `C:\Users\enzom\OneDrive\Desktop\Facul` — contém PDFs/arquivos reais de faculdade,
@@ -239,7 +240,7 @@ configurar `npm run package` para gerar um executável.
   acessibilidade (teclado, aria-current, foco, WCAG AA). Zero dep nova; lógica
   intocada (views reusadas); 476 testes (468 + 8).
 - [x] **Geração em lotes (chunks) para quiz e exercícios** —
-  `roadmap-geracao-lotes` (design/plan aprovados). Quantidade grande (> 20) de
+  `roadmap-geracao-lotes.md` (design e review aprovados). Quantidade grande (> 20) de
   quiz/exercícios passa a ser gerada em lotes de 15 ao Ollama, acumulando e
   deduplicando até o total, sem estourar o timeout de 5 min; progresso
   "Gerando X de N…" na tela; falha parcial honesta (entrega o acumulado; só
