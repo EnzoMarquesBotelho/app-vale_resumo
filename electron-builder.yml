@@ -16,6 +16,10 @@ files:
 # Alvo Windows: instalador NSIS (um .exe distribuível que o usuário executa
 # para instalar o app). Arquitetura x64.
 win:
+  # Ícone do app e do instalador (gerado de resources/logo-icone.svg via
+  # `npm run icons`). Multi-resolução (16–256) para ficar nítido em qualquer
+  # tamanho na barra de tarefas, atalho e Explorer.
+  icon: resources/icon.ico
   target:
     - target: nsis
       arch:

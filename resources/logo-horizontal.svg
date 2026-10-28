@@ -1,0 +1,60 @@
+<svg width="900" height="400" viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo Desenrola — estudo sem complicação">
+  <defs>
+    <linearGradient id="folhaC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="0.5" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="roloTopo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c026d3"/>
+      <stop offset="0.45" stop-color="#ff6b9d"/>
+      <stop offset="1" stop-color="#9d1fc4"/>
+    </linearGradient>
+    <linearGradient id="roloBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9d1fc4"/>
+      <stop offset="0.55" stop-color="#ff6b9d"/>
+      <stop offset="1" stop-color="#7a1a9e"/>
+    </linearGradient>
+    <linearGradient id="textoC" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff7a3d"/>
+      <stop offset="0.55" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <radialGradient id="brilhoC" cx="0.5" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sombraC" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#a21caf" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <rect width="900" height="400" rx="26" fill="#0b1120"/>
+
+  <g transform="translate(95,55)" filter="url(#sombraC)">
+    <path d="M48,70 C120,58 176,58 248,70 L244,250 C176,262 120,262 52,250 Z" fill="url(#folhaC)"/>
+    <path d="M48,70 C120,58 176,58 248,70 L246,96 C176,84 120,84 50,96 Z" fill="#000000" opacity="0.18"/>
+    <path d="M52,226 C120,238 176,238 244,226 L244,250 C176,262 120,262 52,250 Z" fill="#000000" opacity="0.18"/>
+    <path d="M48,70 C120,58 176,58 248,70 L246,150 C176,140 120,140 50,150 Z" fill="url(#brilhoC)"/>
+    <g stroke="#ffffff" stroke-opacity="0.6" stroke-width="7" stroke-linecap="round">
+      <line x1="84" y1="120" x2="212" y2="116"/>
+      <line x1="84" y1="152" x2="212" y2="150"/>
+      <line x1="84" y1="184" x2="184" y2="184"/>
+    </g>
+    <g>
+      <path d="M30,70 C30,42 60,30 92,32 L248,44 C280,46 300,62 300,70 C300,96 272,104 244,102 L90,92 C58,90 30,96 30,70 Z" fill="url(#roloTopo)"/>
+      <ellipse cx="44" cy="68" rx="15" ry="22" fill="#7a1a9e"/>
+      <ellipse cx="44" cy="68" rx="7" ry="12" fill="#ffd1ea" opacity="0.85"/>
+      <path d="M40,78 C40,60 52,54 66,58" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <g>
+      <path d="M30,250 C30,224 58,230 90,228 L244,218 C272,216 300,224 300,250 C300,258 280,274 248,276 L92,288 C60,290 30,278 30,250 Z" fill="url(#roloBase)"/>
+      <ellipse cx="44" cy="252" rx="15" ry="22" fill="#6b1690"/>
+      <ellipse cx="44" cy="252" rx="7" ry="12" fill="#ffd1ea" opacity="0.8"/>
+      <path d="M40,262 C40,244 52,238 66,242" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <text x="370" y="215" font-family="'Trebuchet MS', Verdana, sans-serif" font-size="92" font-weight="700" font-style="italic" fill="url(#textoC)" letter-spacing="-1">Desenrola</text>
+  <text x="374" y="261" font-family="'Trebuchet MS', Verdana, sans-serif" font-size="26" font-weight="400" fill="#c7b3e0" letter-spacing="3">estudo sem complicação</text>
+</svg>

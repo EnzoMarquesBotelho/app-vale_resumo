@@ -118,6 +118,11 @@ A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblio
 > **Tema:** use o seletor de tema (na barra lateral) para alternar entre **Claro**, **Escuro**
 > e **Automático** (acompanha o tema do Windows). Sua escolha fica salva.
 
+> **Atualizações:** o app **instalado** verifica sozinho se há uma versão mais nova ao abrir
+> (e você também pode checar pelo botão na barra lateral). Havendo atualização, ele baixa com
+> barra de progresso e oferece **Reiniciar para atualizar**. (A atualização automática só
+> funciona no app instalado pelo instalador — não no modo de desenvolvimento.)
+
 ---
 
 ## Gerar um instalador (opcional)

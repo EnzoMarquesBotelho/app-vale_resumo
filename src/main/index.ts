@@ -11,7 +11,11 @@ function createWindow(): void {
     height: 760,
     show: false,
     autoHideMenuBar: true,
-    title: "App de Estudos com IA Local",
+    title: "Desenrola",
+    // Ícone da janela/barra de tarefas. Em produção o electron-builder embute o
+    // ícone no .exe; aqui garantimos também em dev. `resources/` fica fora de
+    // `out/`, então sobe dois níveis a partir de out/main.
+    icon: resolve(__dirname, "../../resources/icons/icon-256.png"),
     webPreferences: {
       preload: resolve(__dirname, "../preload/preload.js"),
       contextIsolation: true,
