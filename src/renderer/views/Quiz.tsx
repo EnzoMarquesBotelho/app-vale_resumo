@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
-import { rotuloProgresso } from "@shared/geracaoLotes";
+import { avisoGeracaoParcial, rotuloProgresso } from "@shared/geracaoLotes";
 import { calcularPontuacao } from "@shared/quizScore";
 import type { RespostaUsuarioPura } from "@shared/quizScore";
 import type {
@@ -67,6 +67,13 @@ interface QuizProps {
 /** Quantidade inicial sugerida de perguntas. Constante LOCAL da view. */
 const QUANTIDADE_PADRAO = 10;
 
+/** Rótulo em português para cada modo de quiz (espelha ROTULO_MODO dos exercícios). */
+const ROTULO_MODO_QUIZ: Record<ModoQuiz, string> = {
+  multipla: "Múltipla escolha",
+  aberta: "Aberta",
+  misto: "Misto",
+};
+
 /** Monta o vetor de respostas vazias para a lista de perguntas dada. */
 function respostasVazias(perguntas: PerguntaQuiz[]): RespostaUsuario[] {
   return perguntas.map((pergunta) =>
@@ -99,6 +106,10 @@ export function Quiz({
   const [perguntas, setPerguntas] = useState<PerguntaQuiz[] | null>(
     quizSalvo?.perguntas ?? null,
   );
+  // Quantidade CONGELADA no momento da geração (não o input atual, que o usuário
+  // pode alterar sem regerar). Resetada para `null` no topo de cada `gerar()` e
+  // regravada só no sucesso — garante que o aviso de parcial não aparece no erro.
+  const [quantidadePedida, setQuantidadePedida] = useState<number | null>(null);
   const [respostas, setRespostas] = useState<RespostaUsuario[]>(
     quizSalvo?.perguntas ? respostasVazias(quizSalvo.perguntas) : [],
   );
@@ -127,6 +138,7 @@ export function Quiz({
     if (!temTexto || !quantidadeValida) return;
     setErro(null);
     setPerguntas(null);
+    setQuantidadePedida(null);
     setRespostas([]);
     setEnviado(false);
     setAvaliacoes([]);
@@ -147,6 +159,7 @@ export function Quiz({
       const lista = perguntasGeradas ?? null;
       setPerguntas(lista);
       if (lista != null) {
+        setQuantidadePedida(quantidade);
         setRespostas(respostasVazias(lista));
         if (onGerado) {
           onGerado({
@@ -229,6 +242,15 @@ export function Quiz({
     window.scrollTo({ top: 0 });
   }
 
+  // Guarda a LISTA além de `quantidadePedida`: a const é avaliada em TODO render,
+  // inclusive durante uma nova geração em que `perguntas === null`. Sem o guard,
+  // `perguntas.length` quebraria com TypeError. (O reset de `quantidadePedida`
+  // no topo de `gerar()` já cobre o mesmo cenário; este guard é redundante.)
+  const textoAvisoParcial =
+    perguntas === null || quantidadePedida === null
+      ? null
+      : avisoGeracaoParcial(perguntas.length, quantidadePedida, "questões");
+
   /** Refaz: zera as respostas e volta ao modo responder (mesmas perguntas). */
   function refazer(): void {
     if (perguntas !== null) setRespostas(respostasVazias(perguntas));
@@ -294,21 +316,33 @@ export function Quiz({
       )}
 
       {perguntas !== null && perguntas.length > 0 && (
-        <ExportarControles
-          alvo={{
-            escopo: "artefato",
-            tipo: "quiz",
-            documento: {
-              nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
-              quiz: {
-                documentoId: "",
-                modo,
-                perguntas,
-                geradoEm: quizSalvo?.geradoEm ?? "",
+        <>
+          <ExportarControles
+            alvo={{
+              escopo: "artefato",
+              tipo: "quiz",
+              documento: {
+                nome: nomeDocumento ?? arquivo?.nome ?? "Documento",
+                quiz: {
+                  documentoId: "",
+                  modo,
+                  perguntas,
+                  geradoEm: quizSalvo?.geradoEm ?? "",
+                },
               },
-            },
-          }}
-        />
+            }}
+          />
+          <p className="quiz-contador" aria-live="polite">
+            {perguntas.length}{" "}
+            {perguntas.length === 1 ? "questão" : "questões"} ·{" "}
+            {ROTULO_MODO_QUIZ[modo]}
+          </p>
+          {textoAvisoParcial !== null && (
+            <p className="quiz-aviso-parcial" role="status" aria-live="polite">
+              {textoAvisoParcial}
+            </p>
+          )}
+        </>
       )}
 
       {perguntas !== null &&

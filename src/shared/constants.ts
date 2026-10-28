@@ -91,13 +91,23 @@ export const GERACAO_EVITAR_MAX = 30;
 /** Comprimento máximo (caracteres) de cada enunciado no bloco "evitar". */
 export const GERACAO_EVITAR_MAXLEN = 120;
 /**
- * Margem fixa de tentativas extras além do número de lotes da partição, para
- * repor itens descartados pela deduplicação sem girar indefinidamente. O TETO
- * de tentativas NÃO é uma constante: é computado no serviço como
- * `lotes.length + GERACAO_LOTE_TENTATIVAS_MARGEM` (depende de `lotes.length`,
- * que é runtime).
+ * Quantos lotes CONSECUTIVOS sem nenhum item novo aceito (`aceitos === 0`) o
+ * laço tolera antes de desistir e devolver o parcial. Distingue o modelo que
+ * ainda produz (o contador zera a cada lote produtivo, o laço persiste rumo ao
+ * total) do modelo travado repetindo tudo (para após K lotes vazios seguidos,
+ * sem queimar tempo). Um único lote vazio pode ser azar; três vazios seguidos
+ * indicam convergência real.
  */
-export const GERACAO_LOTE_TENTATIVAS_MARGEM = 3;
+export const GERACAO_LOTE_SEM_PROGRESSO_MAX = 3;
+/**
+ * Margem do TETO ABSOLUTO de tentativas, além do número de lotes da partição.
+ * Rede de segurança de terminação para a hipótese degenerada de alternar
+ * "1 aceito / 0 aceito" indefinidamente (a parada por estagnação dispararia
+ * antes na prática). O teto NÃO é uma constante: é computado no serviço como
+ * `lotes.length + GERACAO_LOTE_TETO_MARGEM_ABS` (depende de `lotes.length`,
+ * que é runtime). Garante que o laço SEMPRE termina.
+ */
+export const GERACAO_LOTE_TETO_MARGEM_ABS = 6;
 
 /** Intervalos padrão de repetição espaçada: dias antes da prova. */
 export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;

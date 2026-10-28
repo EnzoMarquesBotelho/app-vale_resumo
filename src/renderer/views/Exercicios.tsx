@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { QUANTIDADE_MAXIMA, QUANTIDADE_MINIMA } from "@shared/types";
-import { rotuloProgresso } from "@shared/geracaoLotes";
+import { avisoGeracaoParcial, rotuloProgresso } from "@shared/geracaoLotes";
 import type {
   ArquivoImportado,
   AvaliacaoResposta,
@@ -89,6 +89,10 @@ export function Exercicios({
   const [exercicios, setExercicios] = useState<Exercicio[] | null>(
     exerciciosSalvos ?? null,
   );
+  // Quantidade CONGELADA no momento da geração (não o input atual, que o usuário
+  // pode alterar sem regerar). Resetada para `null` no topo de cada `gerar()` e
+  // regravada só no sucesso — garante que o aviso de parcial não aparece no erro.
+  const [quantidadePedida, setQuantidadePedida] = useState<number | null>(null);
   const [gerando, setGerando] = useState(false);
   const [progresso, setProgresso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -120,6 +124,7 @@ export function Exercicios({
     if (!temTexto || !quantidadeValida) return;
     setErro(null);
     setExercicios(null);
+    setQuantidadePedida(null);
     setRespostas([]);
     setAvaliacoes([]);
     setErroAvaliacao(null);
@@ -137,6 +142,7 @@ export function Exercicios({
       );
       setExercicios(resultado ?? null);
       if (resultado != null) {
+        setQuantidadePedida(quantidade);
         setRespostas(respostasVaziasEx(resultado));
         setAvaliacoes(avaliacoesVazias(resultado.length));
         if (onGerado) {
@@ -161,6 +167,15 @@ export function Exercicios({
 
   // Sem resposta digitada em lugar nenhum, não há o que corrigir.
   const todasVazias = respostas.every((r) => r.trim().length === 0);
+
+  // Guarda a LISTA além de `quantidadePedida`: a const é avaliada em TODO render,
+  // inclusive durante uma nova geração em que `exercicios === null`. Sem o guard,
+  // `exercicios.length` quebraria com TypeError. (O reset de `quantidadePedida`
+  // no topo de `gerar()` já cobre o mesmo cenário; este guard é redundante.)
+  const textoAvisoParcial =
+    exercicios === null || quantidadePedida === null
+      ? null
+      : avisoGeracaoParcial(exercicios.length, quantidadePedida, "exercícios");
 
   /**
    * Corrige TODAS as respostas de uma vez pela IA (os exercícios são sempre
@@ -260,6 +275,11 @@ export function Exercicios({
             {exercicios.length === 1 ? "exercício" : "exercícios"} ·{" "}
             {ROTULO_MODO[modo]}
           </p>
+          {textoAvisoParcial !== null && (
+            <p className="exercicios-aviso-parcial" role="status" aria-live="polite">
+              {textoAvisoParcial}
+            </p>
+          )}
           <ol className="exercicios-lista">
             {exercicios.map((exercicio, indice) => {
               const avaliacao = avaliacoes[indice] ?? null;

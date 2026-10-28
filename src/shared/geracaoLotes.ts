@@ -40,9 +40,10 @@ export interface ResultadoAcumulo<T> {
   /** Novo conjunto de chaves já vistas (não é o mesmo Set de entrada). */
   chavesVistas: Set<string>;
   /**
-   * Quantos itens do lote foram realmente aceitos. Usado SÓ para o progresso
-   * (`prontos += aceitos`); NÃO participa do critério de parada do laço. Um
-   * lote com `aceitos === 0` ainda conta como `tentativa`.
+   * Quantos itens do lote foram realmente aceitos. Usado para o progresso
+   * (`prontos += aceitos`) **e** como sinal do critério de estagnação: um lote
+   * com `aceitos === 0` conta como lote sem progresso (`semProgresso`); K lotes
+   * sem progresso consecutivos encerram o laço.
    */
   aceitos: number;
 }
@@ -120,6 +121,57 @@ export function acumularComDedup<T>(
     aceitos += 1;
   }
   return { itens, chavesVistas: chaves, aceitos };
+}
+
+/**
+ * Decide se o laço de lotes deve CONTINUAR pedindo mais lotes. Pura e
+ * determinística — centraliza o critério de parada para o serviço e os testes
+ * usarem o MESMO julgamento. Continua enquanto faltam itens (`prontos < alvo`)
+ * E o modelo ainda não estagnou (`semProgresso < semProgressoMax`) E não bateu
+ * o teto absoluto de segurança (`tentativas < tetoAbsoluto`). Qualquer uma das
+ * três condições de parada encerra o laço.
+ *
+ * `semProgressoMax` e `tetoAbsoluto` são PARÂMETROS (não constantes embutidas)
+ * para serem exercitáveis com valores arbitrários nos testes; o serviço sempre
+ * passa `GERACAO_LOTE_SEM_PROGRESSO_MAX` e `lotes.length +
+ * GERACAO_LOTE_TETO_MARGEM_ABS`.
+ */
+export function deveContinuarLotes(params: {
+  prontos: number;
+  alvo: number;
+  tentativas: number;
+  semProgresso: number; // lotes CONSECUTIVOS com aceitos === 0
+  semProgressoMax: number; // GERACAO_LOTE_SEM_PROGRESSO_MAX
+  tetoAbsoluto: number; // lotes.length + GERACAO_LOTE_TETO_MARGEM_ABS
+}): boolean {
+  return (
+    params.prontos < params.alvo &&
+    params.semProgresso < params.semProgressoMax &&
+    params.tentativas < params.tetoAbsoluto
+  );
+}
+
+/**
+ * Mensagem pt-BR de resultado parcial (geração que veio ABAIXO do pedido), ou
+ * `null` quando veio o total pedido (ou mais). Pura — a view só renderiza a
+ * string se ela não for `null`. `substantivo` já no plural ("questões" /
+ * "exercícios"). A frase é causa-NEUTRA de propósito: o renderer não sabe se o
+ * parcial veio por falta de conteúdo novo ou por interrupção de infra (o
+ * contrato não carrega a causa), então a mensagem cobre honestamente ambos.
+ *
+ * NB: distinto de `avaliacao-selo-parcial` (veredito de IA numa resposta).
+ */
+export function avisoGeracaoParcial(
+  entregue: number,
+  pedido: number,
+  substantivo: string,
+): string | null {
+  if (entregue >= pedido) return null;
+  return (
+    `Geramos ${entregue} de ${pedido} ${substantivo}. O modelo pode não ter ` +
+    `produzido conteúdo novo suficiente, ou a geração foi interrompida. ` +
+    `Tente novamente ou reduza a quantidade.`
+  );
 }
 
 /**

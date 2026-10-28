@@ -15,12 +15,14 @@ import {
   GERACAO_EVITAR_MAX,
   GERACAO_EVITAR_MAXLEN,
   GERACAO_LOTE_LIMIAR,
+  GERACAO_LOTE_SEM_PROGRESSO_MAX,
   GERACAO_LOTE_TAMANHO,
-  GERACAO_LOTE_TENTATIVAS_MARGEM,
+  GERACAO_LOTE_TETO_MARGEM_ABS,
 } from "@shared/constants";
 import {
   acumularComDedup,
   chaveDedup,
+  deveContinuarLotes,
   deveParticionar,
   enunciadosParaEvitar,
   particionarQuantidade,
@@ -414,18 +416,35 @@ export async function gerarExercicios({
   }
 
   // Chunking (n > limiar): laço SEQUENCIAL acumulando com dedup. Pede lotes
-  // extras (até o teto) para repor o que a dedup descartou.
+  // extras — enquanto o modelo ainda produz novos e até um teto absoluto de
+  // segurança — para repor o que a dedup descartou. Para por estagnação (K
+  // lotes consecutivos sem item novo) antes de queimar tempo num modelo travado.
   const lotes = particionarQuantidade(n, GERACAO_LOTE_TAMANHO);
-  const teto = lotes.length + GERACAO_LOTE_TENTATIVAS_MARGEM;
+  const tetoAbsoluto = lotes.length + GERACAO_LOTE_TETO_MARGEM_ABS;
   let itens: Exercicio[] = [];
   let chavesVistas = new Set<string>();
   let tentativas = 0;
+  let semProgresso = 0;
 
-  while (itens.length < n && tentativas < teto) {
-    const tamanhoLote =
+  while (
+    deveContinuarLotes({
+      prontos: itens.length,
+      alvo: n,
+      tentativas,
+      semProgresso,
+      semProgressoMax: GERACAO_LOTE_SEM_PROGRESSO_MAX,
+      tetoAbsoluto,
+    })
+  ) {
+    const tamanhoLote = Math.max(
+      1,
       tentativas < lotes.length
         ? lotes[tentativas]
-        : Math.min(GERACAO_LOTE_TAMANHO, n - itens.length);
+        : Math.min(GERACAO_LOTE_TAMANHO, n - itens.length),
+    );
+    // INVARIANTE: `evitar` é derivado de `itens` NO ESTADO ANTERIOR a este lote
+    // — calculado ANTES de pedir/acumular, pois `itens` é reatribuído abaixo (no
+    // caminho de sucesso). Reflete os enunciados aceitos até o lote anterior.
     const evitar = enunciadosParaEvitar(
       itens.map((e) => e.enunciado),
       GERACAO_EVITAR_MAX,
@@ -438,17 +457,22 @@ export async function gerarExercicios({
       lote = await gerarLoteExercicios(gerar, modo, tamanhoLote, texto, evitar);
     } catch (erro) {
       // Erro de infra: com algo acumulado, entrega o parcial (sem re-tentar);
-      // sem nada acumulado, propaga o erro tipado (offline vs falha).
+      // sem nada acumulado, propaga o erro tipado (offline vs falha). Sai ANTES
+      // de tocar `semProgresso` — falha de infra nunca conta como estagnação.
       if (itens.length > 0) break;
       throw erro;
     }
 
+    // Caminho de SUCESSO do await — o único que mexe em `semProgresso`.
     if (lote !== null) {
       const acumulo = acumularComDedup(itens, chavesVistas, lote, n, (e) =>
         chaveDedup(e.enunciado),
       );
       itens = acumulo.itens;
       chavesVistas = acumulo.chavesVistas;
+      semProgresso = acumulo.aceitos > 0 ? 0 : semProgresso + 1;
+    } else {
+      semProgresso += 1; // lote sem itens válidos também é "sem progresso"
     }
     aoProgresso(itens.length, n);
   }

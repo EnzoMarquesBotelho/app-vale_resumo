@@ -1102,6 +1102,28 @@ select {
   color: var(--cor-texto-suave);
 }
 
+/* Contagem do quiz: valores idênticos a .exercicios-contador (visual espelhado). */
+.quiz-contador {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/*
+ * Aviso de resultado parcial (geração veio abaixo do pedido). Tom de atenção —
+ * NÃO é erro (que usa .exercicios-erro, vermelho). Reusa os tokens de aviso e o
+ * padrão visual de .importar-aviso. Distinto de .avaliacao-selo-parcial (selo
+ * do veredito "parcial" da avaliação por IA).
+ */
+.exercicios-aviso-parcial,
+.quiz-aviso-parcial {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--raio-sm);
+  background: var(--cor-aviso-fundo);
+  color: var(--cor-aviso-texto);
+}
+
 .exercicios-lista {
   margin: 0;
   padding-left: 1.5rem;

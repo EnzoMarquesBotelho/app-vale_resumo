@@ -320,9 +320,11 @@ describe("gerarExercicios (geração em lotes)", () => {
     expect(lista).toHaveLength(30);
   });
 
-  it("parcial por teto: modelo repete tudo após o 1º lote (gerar chamado = teto)", async () => {
+  it("parcial por estagnação: modelo repete tudo após o 1º lote (para por K lotes vazios)", async () => {
     // 1º lote válido (15), todos os seguintes repetem A → aceitos=0 por lote.
-    // n=40 → lotes = [15,15,10] (3) + margem 3 = teto 6.
+    // n=40: lote 1 aceita 15; lotes 2,3,4 repetem (semProgresso 1,2,3) → para no
+    // 4º por estagnação (GERACAO_LOTE_SEM_PROGRESSO_MAX = 3). Parcial sinalizado
+    // pela lista curta (15 < 40). O teto absoluto (3 lotes + 6 = 9) não dispara.
     const gerar = vi.fn().mockResolvedValue(loteEx("A", 15));
 
     const lista = await gerarExercicios({
@@ -333,7 +335,7 @@ describe("gerarExercicios (geração em lotes)", () => {
     });
 
     expect(lista).toHaveLength(15);
-    expect(gerar).toHaveBeenCalledTimes(6);
+    expect(gerar).toHaveBeenCalledTimes(4);
   });
 
   it("offline no 1º lote (prontos=0): PROPAGA o erro tipado", async () => {
@@ -377,5 +379,90 @@ describe("gerarExercicios (geração em lotes)", () => {
     });
 
     expect(lista).toHaveLength(30);
+  });
+
+  it("gerou o total (lotes distintos): NÃO corta cedo, entrega N", async () => {
+    // n=40 → lotes [15,15,10]; A/B/C distintos → sem dedup, sem estagnação.
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("B", 15))
+      .mockResolvedValueOnce(loteEx("C", 10));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 40,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(40);
+    expect(gerar).toHaveBeenCalledTimes(3);
+  });
+
+  it("estagnação com progresso intercalado reseta o contador", async () => {
+    // Sequência: aceita / vazio / aceita / vazio / vazio / vazio.
+    // n=60 → lotes [15,15,15,15]. O contador semProgresso só atinge 3 na 3ª
+    // vazia consecutiva (os lotes produtivos o zeram), parando na 6ª chamada.
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15)) // aceita 15 (semProg 0)
+      .mockResolvedValueOnce(loteEx("A", 15)) // repete → vazio (semProg 1)
+      .mockResolvedValueOnce(loteEx("B", 15)) // aceita 15 (semProg 0)
+      .mockResolvedValueOnce(loteEx("B", 15)) // repete → vazio (semProg 1)
+      .mockResolvedValueOnce(loteEx("B", 15)) // repete → vazio (semProg 2)
+      .mockResolvedValueOnce(loteEx("B", 15)); // repete → vazio (semProg 3) → para
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 60,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(30);
+    expect(gerar).toHaveBeenCalledTimes(6);
+  });
+
+  it("lote extra após partição esgotada pede tamanho >= 1 (invariante)", async () => {
+    // n=21 → lotes [15,6]. Lote 1 aceita 15; lote 2 repete (vazio); a partição
+    // esgota e o 3º lote (extra) pede tamanho = min(15, 21-15) = 6. Espiamos o
+    // prompt do 3º lote para confirmar que pediu >= 1 item.
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockResolvedValueOnce(loteEx("A", 6)) // dedup → 0 novos
+      .mockResolvedValueOnce(loteEx("C", 6));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 21,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(21);
+    expect(gerar).toHaveBeenCalledTimes(3);
+    // O prompt do 3º lote (extra) pede "6 exercícios" — nunca 0 nem negativo.
+    expect(gerar.mock.calls[2][0]).toContain("6 exercícios");
+  });
+
+  it("infra falha após progresso: para pelo break, NÃO pela estagnação", async () => {
+    // Lote 1 aceita 15; lote 2 lança erro de infra. Deve parar no break (parcial),
+    // sem rodar mais lotes de estagnação: exatamente 2 chamadas.
+    const gerar = vi
+      .fn()
+      .mockResolvedValueOnce(loteEx("A", 15))
+      .mockRejectedValueOnce(new Error("infra falhou"));
+
+    const lista = await gerarExercicios({
+      texto: "conteúdo",
+      modo: "mista",
+      quantidade: 40,
+      gerar,
+    });
+
+    expect(lista).toHaveLength(15);
+    expect(gerar).toHaveBeenCalledTimes(2);
   });
 });

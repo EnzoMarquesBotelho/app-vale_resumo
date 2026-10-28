@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   acumularComDedup,
+  avisoGeracaoParcial,
   chaveDedup,
+  deveContinuarLotes,
   deveParticionar,
   enunciadosParaEvitar,
   particionarQuantidade,
@@ -156,6 +158,93 @@ describe("enunciadosParaEvitar", () => {
 
   it("devolve [] para lista vazia", () => {
     expect(enunciadosParaEvitar([], 30, 120)).toEqual([]);
+  });
+});
+
+describe("deveContinuarLotes", () => {
+  it("para quando o alvo foi atingido (mesmo sem estagnação)", () => {
+    expect(
+      deveContinuarLotes({
+        prontos: 40,
+        alvo: 40,
+        tentativas: 2,
+        semProgresso: 0,
+        semProgressoMax: 3,
+        tetoAbsoluto: 9,
+      }),
+    ).toBe(false);
+  });
+
+  it("para por estagnação (semProgresso >= semProgressoMax)", () => {
+    expect(
+      deveContinuarLotes({
+        prontos: 15,
+        alvo: 40,
+        tentativas: 4,
+        semProgresso: 3,
+        semProgressoMax: 3,
+        tetoAbsoluto: 9,
+      }),
+    ).toBe(false);
+  });
+
+  it("para pelo teto absoluto (tentativas >= tetoAbsoluto)", () => {
+    expect(
+      deveContinuarLotes({
+        prontos: 15,
+        alvo: 40,
+        tentativas: 9,
+        semProgresso: 1,
+        semProgressoMax: 3,
+        tetoAbsoluto: 9,
+      }),
+    ).toBe(false);
+  });
+
+  it("continua quando faltam itens, sem estagnação e abaixo do teto", () => {
+    expect(
+      deveContinuarLotes({
+        prontos: 15,
+        alvo: 40,
+        tentativas: 2,
+        semProgresso: 1,
+        semProgressoMax: 3,
+        tetoAbsoluto: 9,
+      }),
+    ).toBe(true);
+  });
+
+  it("respeita o ARGUMENTO semProgressoMax (não uma constante embutida)", () => {
+    const base = {
+      prontos: 15,
+      alvo: 40,
+      tentativas: 2,
+      tetoAbsoluto: 9,
+      semProgressoMax: 2,
+    };
+    // semProgresso 1 < 2 → continua.
+    expect(deveContinuarLotes({ ...base, semProgresso: 1 })).toBe(true);
+    // semProgresso 2 >= 2 → para.
+    expect(deveContinuarLotes({ ...base, semProgresso: 2 })).toBe(false);
+  });
+});
+
+describe("avisoGeracaoParcial", () => {
+  it("entregue < pedido → frase pt-BR com os números, o substantivo e a cláusula neutra", () => {
+    const aviso = avisoGeracaoParcial(30, 50, "questões");
+    expect(aviso).not.toBeNull();
+    expect(aviso).toContain("Geramos 30 de 50");
+    expect(aviso).toContain("questões");
+    // Causa-NEUTRA: cobre tanto "modelo repetiu tudo" quanto "geração interrompida".
+    expect(aviso).toContain("ou a geração foi interrompida");
+  });
+
+  it("entregue === pedido → null (não há parcial)", () => {
+    expect(avisoGeracaoParcial(50, 50, "exercícios")).toBeNull();
+  });
+
+  it("entregue > pedido (defensivo) → null", () => {
+    expect(avisoGeracaoParcial(60, 50, "questões")).toBeNull();
   });
 });
 
