@@ -262,10 +262,16 @@ configurar `npm run package` para gerar um executável.
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo
-- [ ] **Plano de estudo guiado por questionário** — `roadmap-plano-estudo-guiado.md`.
-  Questionário (data da prova, tempo disponível, assuntos/mais comuns em
-  ENEM-ENADE, dificuldades/facilidades) + quiz diagnóstico (lacuna na base vs.
-  tópico novo) → plano direcionado. Estende a Agenda/Provas.
+- [ ] **Plano de estudo guiado por questionário** — intent CONFIRMADO em
+  `docs/intent/plano-estudo-guiado.md` (entrevista com `interview-me`), visão em
+  `roadmap-plano-estudo-guiado.md`. Agenda dia-a-dia que decide pelo aluno (o quê/
+  ordem/quanto), com **checkpoints "pré-provas"** (lista de exercícios, modo
+  automático OU lembrete, alterável). Base vs novo pelo ordinal da prova (1ª/2ª/
+  final) e ordem cronológica **mecânica** (data interna do arquivo → mtime, com
+  sobreposição manual). **Quiz diagnóstico** (base vs tópico novo) entra NESTA
+  fatia. Régua: prova longe = foco na base; perto = foco no novo. Distribuição =
+  lógica pura; Ollama só gera diagnóstico/exercícios/frases. Fora: nada online,
+  ENEM/ENADE curado fica p/ depois, IA não ordena. Próximo passo: design.
 - [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
 - [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - [ ] **Geração de IA em lote** (pasta inteira).
@@ -283,6 +289,12 @@ configurar `npm run package` para gerar um executável.
 - [ ] **Rename completo para "Desenrola"** (pequeno): trocar
   `productName`/`appId`/`shortcutName` (electron-builder.yml) e
   `name`/`description` (package.json), hoje ainda "App de Estudos com IA Local".
+- [ ] **Iniciar junto com o computador (auto-start no boot)** — botão nas
+  configurações para o usuário ligar/desligar se o app abre sozinho ao ligar o
+  PC. Pensado para o aluno que esquece de abrir o app (casa com os lembretes/
+  checkpoints do plano guiado — de nada adianta a agenda lembrar se o app nunca
+  abre). Técnico e pequeno no Electron (`app.setLoginItemSettings`), só Windows
+  por ora; preferência persistida. Não iniciado.
 
 ### Plataformas (porte)
 - [ ] **Porte para Linux e macOS** (desktop — a stack Electron já favorece;

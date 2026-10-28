@@ -145,11 +145,19 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
 ## Roadmap restante (não priorizado)
 
 ### Funcionalidades de estudo
-- **Plano de estudo guiado por questionário** (ideia registrada —
-  `roadmap-plano-estudo-guiado.md`): questionário (data da prova, tempo
-  disponível, assuntos que caem / mais comuns em ENEM-ENADE, dificuldades e
-  facilidades) + quiz diagnóstico (lacuna na base vs. dificuldade no tópico
-  novo) → plano/agenda direcionada. Estende a Agenda/Provas atual.
+- **Plano de estudo guiado por questionário** — intent **CONFIRMADO** em
+  `docs/intent/plano-estudo-guiado.md` (entrevista com a skill `interview-me`,
+  2026-10-28); visão em `roadmap-plano-estudo-guiado.md`. Agenda dia-a-dia que
+  decide pelo aluno (o quê/ordem/quanto), encaixada na Agenda atual, com
+  **checkpoints "pré-provas"** (lista de exercícios, modo automático OU lembrete,
+  alterável). Base vs novo pelo ordinal da prova (1ª/2ª/final); ordem cronológica
+  **mecânica** pelo app (data interna do arquivo → mtime; sobreposição manual
+  opcional) — IA NÃO ordena. **Quiz diagnóstico** (lacuna na base vs. tópico
+  novo) entra NESTA fatia. Régua contínua: prova longe → foco na base; perto →
+  foco no novo com toques na base. Distribuição por dias = lógica pura testável;
+  Ollama só gera diagnóstico/exercícios de checkpoint/frases de orientação. Fora
+  de escopo: nada online, ENEM/ENADE curado fica p/ depois, sem promessa de "cai
+  na prova". **Próximo passo: design** (perguntas abertas listadas no intent).
 - **Edição manual dos mapas mentais** (renomear/adicionar/remover nós); exportar
   mapa como imagem.
 - **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
@@ -183,6 +191,11 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   da janela = "Desenrola". Teste do nome atualizado; 514 testes OK. Nota: o
   `appId` mudou — como ainda não há base instalada em produção, foi o momento
   certo (muda o userData e o casamento do auto-update).
+- **Iniciar junto com o computador (auto-start no boot)** — ideia registrada
+  (2026-10-28), não iniciada. Botão nas configurações para ligar/desligar se o
+  app abre sozinho ao ligar o PC, para o aluno que esquece de abrir (casa com os
+  lembretes/checkpoints do plano guiado). Pequeno no Electron
+  (`app.setLoginItemSettings`), só Windows por ora; preferência persistida.
 
 ### Plataformas (porte)
 - **Porte para Linux e macOS** (desktop — a stack Electron já favorece; revisar
