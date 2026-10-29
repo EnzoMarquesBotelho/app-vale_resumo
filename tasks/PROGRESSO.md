@@ -191,7 +191,8 @@
 
 ## Pendência operacional
 
-- As pastas `c:\Dev\.worktrees\agenda`, `correcaoia`, `update` e `geracao-lotes`
+- As pastas `c:\Dev\.worktrees\agenda`, `correcaoia`, `update`, `geracao-lotes` e
+  `plano-f2-questionario`
   ficaram **órfãs e travadas** por um processo do sistema (provável OneDrive/indexador)
   e não puderam ser apagadas. São inócuas (ignoradas por git e ESLint; git já
   não as rastreia como worktree). Apagar manualmente quando o lock soltar
