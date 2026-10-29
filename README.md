@@ -56,6 +56,16 @@ podem ser reabertos a qualquer momento.
   tempo ao que é difícil, e mostra **o que estudar em cada dia e por quanto tempo**. Se o tempo não
   for suficiente para cobrir tudo com qualidade, ele **avisa com honestidade** quantos assuntos
   ficaram de fora, em vez de prometer o impossível. É só reeditar o plano quando quiser.
+- **Diagnóstico rápido do plano** (opcional): com o plano montado, o card **"Diagnóstico"** na
+  Agenda deixa você fazer um quiz curto, só de múltipla escolha (até 18 perguntas), criado pela IA
+  a partir do material dos seus assuntos. Se não souber uma resposta, marque **"Não sei"**. No fim
+  o app mostra **onde está a dificuldade** — na base (o que você já viu) ou no conteúdo novo — e
+  quais assuntos estão mais fracos, e então mostra o **plano ajustado**: mais tempo para o que
+  precisa. Se o resultado não mostrar dificuldade (ou for inconclusivo), o plano continua como
+  estava. Dá para **refazer** o diagnóstico quando quiser; se você mudar os assuntos do plano,
+  o app avisa que o diagnóstico ficou desatualizado. Assuntos digitados à mão (sem material
+  importado) ficam de fora, e a geração pode demorar no modelo local. É uma orientação de
+  estudo, não uma previsão da prova.
 
 > Tudo roda offline. Se o Ollama não estiver rodando, o app mostra um passo a passo
 > para resolver, sem travar. Gerar ou corrigir muitos itens de uma vez pode ser lento no
@@ -130,7 +140,9 @@ A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblio
    responde e pede a correção da IA; no Quiz você responde e revisa com pontuação.
 3. Na **Agenda**, cadastre provas para ver a contagem regressiva, a agenda de revisão e a dica
    do dia. Selecione uma prova e clique em **"Montar plano de estudo"** para responder o
-   questionário e ver o plano dia a dia com o que estudar.
+   questionário e ver o plano dia a dia com o que estudar. Depois, se quiser um plano mais
+   certeiro, use o card **Diagnóstico** logo abaixo para fazer o quiz rápido e ver o plano
+   ajustado.
 4. Tudo o que você gera fica salvo e reabre pela Biblioteca, organizado por caderno.
 5. Use **Exportar** (em cada artefato ou no documento inteiro) para salvar o material em
    **Markdown** ou **PDF** onde você quiser.

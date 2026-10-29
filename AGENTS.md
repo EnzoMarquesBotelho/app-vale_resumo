@@ -62,7 +62,7 @@ npm run package  gera o instalador Windows (NSIS) localmente, sem publicar
 ```
 
 Antes de considerar qualquer tarefa concluída: **`npm run build`, `npm run lint`
-e `npm test` devem passar**. Baseline atual: **673 testes**.
+e `npm test` devem passar**. Baseline atual: **781 testes**.
 
 ## Convenções OBRIGATÓRIAS (seguidas desde o início do projeto)
 

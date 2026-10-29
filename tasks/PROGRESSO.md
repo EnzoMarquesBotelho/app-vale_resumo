@@ -3,17 +3,24 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (master — HEAD `16ea5c0`)
+## Estado atual (Fatia 3/4 pronta na branch `feat/plano-f3-diagnostico`; master em `b4b6cc2` até o merge)
 
-- Build, lint e **673 testes** passando (50 arquivos de teste). Última fatia
-  mergeada (fast-forward): **Plano de estudo guiado — Fatia 2/4** (questionário
-  do plano persistido na prova + régua base/novo + distribuição por dias, tudo
-  puro/sem IA + prévia "o que estudar" na Agenda), dois commits de feature
-  (`48afc38`, `fabd62b`) + dois de docs (`3a3a8de` design/plan/review da fatia,
-  `16ea5c0` baseline do AGENTS.md reconciliada para 673).
-  Baseline da fatia 1 (HEAD `ae729bd` da master) era 614 testes; a fatia 2 levou
-  a 635 (Commit A, persistência) e depois a 673 (Commit B, cálculo). Cresce,
-  nunca encolhe.
+- Build, lint e **781 testes** passando (53 arquivos de teste), conferidos de
+  verdade na branch da fatia 3. Fatia pronta para merge fast-forward:
+  **Plano de estudo guiado — Fatia 3/4** (quiz diagnóstico opcional que mede se
+  a dificuldade está na base ou no conteúdo novo e ajusta a mistura do plano).
+  Referência estável: **commit de implementação `e533d17`** (série
+  `11643fa..e533d17`, 8 commits: régua, tipos/classificação puros, persistência,
+  orquestração, planoCalculo, IPC, extração `PlanoPrevia`, UI) + o commit de
+  docs que o segue na branch (`git log` da branch). O hash do próprio commit de
+  docs não é citado aqui de propósito. Após o merge, o HEAD da master é o do
+  fast-forward (registrar no próximo ajuste de docs).
+  Histórico da contagem: fatia 1 = 614; fatia 2 = 635 → 673; **fatia 3 = 781**
+  (+108). Cresce, nunca encolhe.
+- Fatia anterior (já na master): **Plano de estudo guiado — Fatia 2/4**
+  (questionário + régua base/novo + distribuição por dias), dois commits de
+  feature (`48afc38`, `fabd62b`) + docs (`3a3a8de`, `16ea5c0`), master `16ea5c0`
+  → `b4b6cc2` (docs).
 - Fatia anterior na master: `c6d3852` (geração em lotes — implementação),
   seguida do roadmap/sincronização de docs e da correção de acabamento da
   própria fatia (parcial honesto + contagem no quiz) com seu commit de docs.
@@ -186,6 +193,34 @@
   Fora de escopo (próximas fatias): quiz diagnóstico (3) e geração/lembrete dos
   checkpoints (4); a UI de reordenar manualmente a cronologia (só o contrato
   persistido entrou).
+- **Plano de estudo guiado — Fatia 3/4: quiz diagnóstico + plano ajustado**
+  (`design-f3.md`/`plan-f3.md`, decisões em `roadmap-plano-estudo-guiado-f3.md`;
+  branch `feat/plano-f3-diagnostico`, implementação até `e533d17`): na Agenda,
+  abaixo do plano, um card oferece um **diagnóstico opcional** — até 18 perguntas
+  de múltipla escolha geradas pela IA local a partir dos documentos dos assuntos
+  do plano (até 3 assuntos de base + 3 novos, 3 perguntas cada; opção "Não sei"
+  conta como erro). O resultado diz, em linguagem simples, se a dificuldade
+  parece estar na **base** ou no **conteúdo novo**, quais assuntos estão mais
+  fracos, e o plano é **recalculado** deslocando a mistura base/novo (nunca zera
+  nenhum dos lados). Sem diagnóstico, ou com resultado inconclusivo/sem
+  dificuldade/desatualizado, o plano é idêntico ao da fatia 2. A IA só **gera**
+  as perguntas: o rótulo base/novo é herdado do assunto, a correção é mecânica e
+  a classificação/distribuição são funções puras. Peças: tipos + funções puras
+  (`src/shared/diagnostico.ts`: classificação por limiar inteiro 3/5,
+  intensidade encolhida pela amostra `min(1,total/9)`, frases exatas da UI),
+  param opcional `diagnostico?` na régua/`calcularPlano` (+ `diagnosticoAplicado`
+  só quando de fato mudou a mistura), `Prova.diagnostico?` aditivo (irmão de
+  `plano`, escrita atômica, leitura tolerante, validade por assinatura do
+  plano), orquestração no main (`services/diagnostico.ts`, reusa `gerarQuiz`
+  sem alterá-lo; falha parcial honesta), 2 canais IPC (`gerarDiagnostico`,
+  `responderDiagnostico`) com progresso, extração da prévia para
+  `PlanoPrevia.tsx` e a UI `Diagnostico.tsx`. Refazer substitui o anterior só
+  após sucesso; card oculto para prova já passada. Zero dep nova; 781 testes
+  (673 + 108, Ollama mockado); build/lint verdes. **Verificação manual do
+  usuário (NÃO coberta por testes):** qualidade real das perguntas do
+  `llama3.1`, lentidão da geração (até 6 chamadas sequenciais, sem botão
+  cancelar), comportamento parcial real, e encaixe visual/teclado/tema do card.
+  Teste real contra o Ollama: **não tentado** nesta etapa.
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -236,11 +271,11 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
     `planoCalculo.ts` + IPC `salvarPlano`/`calcularPlano`, e a prévia "o que
     estudar" na Agenda. A **UI de reordenar** manualmente a cronologia ficou
     fora (só o contrato persistido entrou — pode vir depois sem migração).
-  - [ ] **Fatia 3/4 — Quiz diagnóstico (reusa quiz)** — reusa
-    `gerarQuiz`/`parseQuiz` + `avaliarLote`; a parte nova e **pura** classifica
-    o resultado em "lacuna na base" vs. "dificuldade no novo" por tópico/camada.
-    Depende de 1 (ordenação) e 2 (rótulo base/novo). Orquestração nova por cima
-    de `gerarQuiz` (que hoje é por documento).
+  - [x] **Fatia 3/4 — Quiz diagnóstico** — ENTREGUE (ver "Entregue",
+    `roadmap-plano-estudo-guiado-f3.md`; branch `feat/plano-f3-diagnostico`,
+    implementação `e533d17`). Reusou `gerarQuiz` (só múltipla escolha, correção
+    mecânica; `avaliarLote` NÃO foi usado). Classificação pura por camada,
+    ajuste da mistura base/novo, `Prova.diagnostico?` e UI na Agenda.
   - [ ] **Fatia 4/4 — Checkpoints "pré-provas" (reusa exercícios)** — reusa
     `gerarExercicios` (lotes/dedup/progresso) e o `avisoGeracaoParcial`; encaixa
     na `SessaoRevisao` (campo aditivo "checkpoint"); modo automático vs. lembrete

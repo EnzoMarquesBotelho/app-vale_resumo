@@ -6,12 +6,12 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master em `16ea5c0` — Plano de estudo guiado — Fatia 2/4
-> (questionário + régua base/novo + distribuição por dias) **mergeada por
-> fast-forward**, **673 testes** passando, build/lint limpos (dois commits de
-> feature `48afc38`/`fabd62b` + dois de docs). Fatia anterior na master:
-> `d4df16b` (Fatia 1/4 — captura de data + ordenação cronológica) + commit de
-> docs.
+> Estado atual: Plano de estudo guiado — **Fatia 3/4 (quiz diagnóstico + plano
+> ajustado) pronta na branch `feat/plano-f3-diagnostico`** (commit de
+> implementação `e533d17`, base master `b4b6cc2`; merge fast-forward pendente),
+> **781 testes** passando (53 arquivos), build/lint limpos. Restante do plano
+> guiado: **Fatia 4/4 (checkpoints)**. Fatia 2/4 já na master (`48afc38`/
+> `fabd62b` + docs, 673 testes); Fatia 1/4 em `d4df16b` + docs.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -297,6 +297,19 @@ configurar `npm run package` para gerar um executável.
   reordenar manualmente ficou fora (só o contrato persistido entrou). Encaixe
   visual/acessibilidade e a "sensação" com dados reais = verificação manual.
 
+- [x] **Plano de estudo guiado — Fatia 3/4: quiz diagnóstico + plano
+  ajustado** — `design-f3.md`/`plan-f3.md`/`roadmap-plano-estudo-guiado-f3.md`
+  (branch `feat/plano-f3-diagnostico`, implementação `e533d17`). Diagnóstico
+  opcional (até 18 perguntas de múltipla escolha geradas a partir dos documentos
+  dos assuntos, rótulo base/novo herdado do assunto, correção mecânica);
+  classificação pura (`lacuna_base`/`dificuldade_novo`/`sem_dificuldade`/
+  `inconclusivo`) que desloca só a mistura base/novo da régua (novo nunca zera);
+  `Prova.diagnostico?` aditivo com validade por assinatura do plano; orquestração
+  sobre `gerarQuiz` (sem alterá-lo) com falha parcial honesta; 2 canais IPC com
+  progresso; UI `Diagnostico.tsx` na Agenda + `PlanoPrevia.tsx` extraído. Zero
+  dep nova; 781 testes (673 → 781). Qualidade real das perguntas do `llama3.1`,
+  lentidão/parcial reais e encaixe visual = verificação manual.
+
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo
@@ -320,8 +333,9 @@ configurar `npm run package` para gerar um executável.
     `plano?` em `Prova` (+ ordem cronológica manual como array de ids) e a prévia
     na Agenda. A **UI de reordenar** manualmente ficou fora (só o contrato
     persistido entrou — pode vir depois sem migração).
-  - [ ] **Fatia 3/4 — Quiz diagnóstico** — reusa `gerarQuiz`/`avaliarLote`;
-    classificação pura "lacuna na base vs. dificuldade no novo". Depende de 1+2.
+  - [x] **Fatia 3/4 — Quiz diagnóstico** — ENTREGUE (ver "Fases pós-MVP";
+    branch `feat/plano-f3-diagnostico`, implementação `e533d17`). Reusou
+    `gerarQuiz` (só múltipla escolha); `avaliarLote` não foi necessário.
   - [ ] **Fatia 4/4 — Checkpoints "pré-provas"** — reusa `gerarExercicios` +
     `avisoGeracaoParcial`; gancho na `SessaoRevisao`; modo automático vs.
     lembrete; gatilho temporal puro ("faltam X dias → agir").
