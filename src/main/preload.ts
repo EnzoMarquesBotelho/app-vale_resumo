@@ -69,6 +69,8 @@ const api: AppApi = {
   salvarSessoes: (id, sessoes) =>
     ipcRenderer.invoke(IPC_CHANNELS.salvarSessoes, id, sessoes),
   regerarAgenda: (id) => ipcRenderer.invoke(IPC_CHANNELS.regerarAgenda, id),
+  salvarPlano: (id, plano) =>
+    ipcRenderer.invoke(IPC_CHANNELS.salvarPlano, id, plano),
   removerProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.removerProva, id),
   dicaDoDia: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDoDia, id),
   dicaDaIa: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDaIa, id),

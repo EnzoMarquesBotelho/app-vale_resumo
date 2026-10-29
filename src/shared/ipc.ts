@@ -21,6 +21,7 @@ import type {
   NoMapaMental,
   OllamaStatus,
   PerguntaQuiz,
+  PlanoEstudo,
   Prova,
   Quiz,
   Resumo,
@@ -92,6 +93,8 @@ export const IPC_CHANNELS = {
   salvarSessoes: "prova:salvar-sessoes",
   /** Regera as sugestões preservando edições manuais (recomputar explícito). */
   regerarAgenda: "prova:regerar-agenda",
+  /** Sanea e grava as respostas do questionário do plano de estudo na prova. */
+  salvarPlano: "prova:salvar-plano",
   /** Remove uma prova pelo id. */
   removerProva: "prova:remover",
   /** Calcula a dica MECÂNICA do dia de uma prova (sem IA, instantânea). */
@@ -343,6 +346,13 @@ export interface AppApi {
    * rejeita com mensagem amigável se a prova não existir.
    */
   regerarAgenda: (id: string) => Promise<Prova>;
+  /**
+   * Sanea e grava as respostas do questionário do plano de estudo na prova
+   * `id` e resolve com a prova atualizada (com `plano`). O main valida/sanea o
+   * `plano` recebido e recarimba os dois `atualizadoEm`. Rejeita com mensagem
+   * amigável se a prova não existir ou os dados essenciais faltarem.
+   */
+  salvarPlano: (id: string, plano: PlanoEstudo) => Promise<Prova>;
   /** Remove a prova pelo `id` (no-op se já não existe). */
   removerProva: (id: string) => Promise<void>;
   /**

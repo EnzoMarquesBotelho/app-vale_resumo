@@ -31,10 +31,16 @@ import {
   numeroParaDia,
   recomputarAgenda,
 } from "@shared/agenda";
+import { ehIsoPlausivel } from "@shared/cronologia";
+import { slugTopico } from "@shared/slug";
 import type {
+  NivelDificuldade,
+  PlanoEstudo,
+  PreferenciaCheckpoint,
   Prova,
   ResumoProva,
   SessaoRevisao,
+  TopicoPlano,
   VinculoProva,
 } from "@shared/types";
 
@@ -454,6 +460,156 @@ export async function regerarAgenda(
     ...prova,
     sessoes,
     atualizadoEm: new Date().toISOString(),
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/** Limites de saneamento do questionário do plano de estudo. */
+const HORAS_POR_DIA_DEFAULT = 2;
+const DIAS_POR_SEMANA_DEFAULT = 5;
+const TITULO_TOPICO_MAX = 200;
+
+/** Níveis de dificuldade válidos. */
+const NIVEIS: readonly NivelDificuldade[] = ["facil", "media", "dificil"];
+
+/** Preferências de checkpoint válidas. */
+const CHECKPOINTS: readonly PreferenciaCheckpoint[] = [
+  "automatico",
+  "lembrete",
+];
+
+/** Arredonda e aplica clamp a um inteiro num intervalo [min, max]. */
+function inteiroClamp(
+  bruto: unknown,
+  min: number,
+  max: number,
+  padrao: number,
+): number {
+  if (typeof bruto !== "number" || !Number.isFinite(bruto)) return padrao;
+  const arredondado = Math.round(bruto);
+  if (arredondado < min) return min;
+  if (arredondado > max) return max;
+  return arredondado;
+}
+
+/**
+ * Sanea/valida as respostas CRUAS do questionário vindas do renderer e devolve
+ * um `PlanoEstudo` consistente. Segue o padrão de `provas.ts`: regras
+ * silenciosas (valores absurdos viram valores sensatos), EXCETO os campos
+ * essenciais (ordinal e ao menos um assunto), que lançam
+ * `DadosProvaInvalidosError` com frase pronta em português.
+ *
+ * `atualizadoEm` é carimbado com o `agora` recebido (nunca lê o relógio aqui).
+ */
+export function sanearPlano(bruto: unknown, agora: string): PlanoEstudo {
+  const p =
+    typeof bruto === "object" && bruto !== null
+      ? (bruto as Record<string, unknown>)
+      : {};
+
+  const ordinal = p.ordinal;
+  if (ordinal !== "primeira" && ordinal !== "segunda" && ordinal !== "final") {
+    throw new DadosProvaInvalidosError("Informe qual prova é.");
+  }
+
+  const horasPorDia = inteiroClamp(p.horasPorDia, 1, 24, HORAS_POR_DIA_DEFAULT);
+  const diasPorSemana = inteiroClamp(
+    p.diasPorSemana,
+    1,
+    7,
+    DIAS_POR_SEMANA_DEFAULT,
+  );
+
+  const topicosBrutos = Array.isArray(p.topicos) ? p.topicos : [];
+  const topicos: TopicoPlano[] = [];
+  const vistos = new Set<string>();
+  topicosBrutos.forEach((item, i) => {
+    const t =
+      typeof item === "object" && item !== null
+        ? (item as Record<string, unknown>)
+        : {};
+    const tituloBruto = typeof t.titulo === "string" ? t.titulo.trim() : "";
+    if (tituloBruto.length === 0) return; // item sem título é descartado.
+    const titulo = tituloBruto.slice(0, TITULO_TOPICO_MAX);
+
+    // Id: aceita o do doc (não-vazio e sem o prefixo reservado `manual:`);
+    // senão deriva `manual:<slug>-<i>` — espaço disjunto dos ids de documento.
+    const idBruto = typeof t.id === "string" ? t.id.trim() : "";
+    const id =
+      idBruto.length > 0 && !idBruto.startsWith("manual:")
+        ? idBruto
+        : `manual:${slugTopico(titulo)}-${i}`;
+    if (vistos.has(id)) return; // dedup por id, mantendo o 1º.
+    vistos.add(id);
+
+    const novo = ordinal === "primeira" ? false : t.novo === true;
+    const topico: TopicoPlano = { id, titulo, novo };
+    if (typeof t.dificuldade === "string" && NIVEIS.includes(t.dificuldade as NivelDificuldade)) {
+      topico.dificuldade = t.dificuldade as NivelDificuldade;
+    }
+    if (ehIsoPlausivel(t.dataArquivo)) {
+      topico.dataArquivo = t.dataArquivo;
+    }
+    topicos.push(topico);
+  });
+  if (topicos.length === 0) {
+    throw new DadosProvaInvalidosError("Informe ao menos um assunto.");
+  }
+
+  // ordemManual: só ids existentes, dedup; vazio → chave omitida.
+  const idsExistentes = new Set(topicos.map((t) => t.id));
+  const ordemManual: string[] = [];
+  if (Array.isArray(p.ordemManual)) {
+    const vistosOrdem = new Set<string>();
+    for (const valor of p.ordemManual) {
+      if (typeof valor !== "string") continue;
+      if (!idsExistentes.has(valor) || vistosOrdem.has(valor)) continue;
+      vistosOrdem.add(valor);
+      ordemManual.push(valor);
+    }
+  }
+
+  const checkpoint: PreferenciaCheckpoint = CHECKPOINTS.includes(
+    p.checkpoint as PreferenciaCheckpoint,
+  )
+    ? (p.checkpoint as PreferenciaCheckpoint)
+    : "lembrete";
+
+  return {
+    ordinal,
+    horasPorDia,
+    diasPorSemana,
+    topicos,
+    ...(ordemManual.length > 0 ? { ordemManual } : {}),
+    checkpoint,
+    atualizadoEm: agora,
+  };
+}
+
+/**
+ * Sanea as respostas do questionário e grava o bloco `plano` numa prova
+ * existente, de forma atômica. Usa SPREAD CONDICIONAL (`...(plano ? ...)`) no
+ * padrão real de `listarProvas`/`salvarSessoes` — nunca grava `plano:
+ * undefined`. O MESMO `agora` carimba `PlanoEstudo.atualizadoEm` (via
+ * `sanearPlano`) e `Prova.atualizadoEm`, deixando os dois idênticos nesta
+ * operação (divergem depois quando só a agenda muda).
+ *
+ * @throws {ProvaNaoEncontradaError} se a prova não existir.
+ * @throws {DadosProvaInvalidosError} se os dados essenciais faltarem.
+ */
+export async function salvarPlano(
+  id: string,
+  planoBruto: unknown,
+  agora: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  const plano = sanearPlano(planoBruto, agora);
+  const atualizada: Prova = {
+    ...prova,
+    ...(plano ? { plano } : {}),
+    atualizadoEm: agora,
   };
   await escreverProva(atualizada, baseDir);
   return atualizada;

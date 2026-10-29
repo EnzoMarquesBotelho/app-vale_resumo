@@ -21,6 +21,8 @@ import {
   listarProvas,
   regerarAgenda,
   removerProva,
+  salvarPlano,
+  sanearPlano,
   salvarSessoes,
 } from "../../src/main/services/provas.js";
 
@@ -482,5 +484,273 @@ describe("provas: remover", () => {
     await expect(
       removerProva("nao-existe", baseDir),
     ).resolves.toBeUndefined();
+  });
+});
+
+/** Carimbo fixo para os testes de plano (datas determinísticas). */
+const AGORA = "2026-03-10T12:00:00.000Z";
+
+describe("provas: sanearPlano", () => {
+  it("ordinal inválido ou ausente lança DadosProvaInvalidosError", () => {
+    expect(() => sanearPlano({ topicos: [{ titulo: "X" }] }, AGORA)).toThrow(
+      DadosProvaInvalidosError,
+    );
+    expect(() =>
+      sanearPlano({ ordinal: "quarta", topicos: [{ titulo: "X" }] }, AGORA),
+    ).toThrow(DadosProvaInvalidosError);
+  });
+
+  it("topicos vazio (após sanear) lança DadosProvaInvalidosError", () => {
+    expect(() => sanearPlano({ ordinal: "segunda", topicos: [] }, AGORA)).toThrow(
+      "Informe ao menos um assunto.",
+    );
+    // Só títulos em branco → todos descartados → vazio → erro.
+    expect(() =>
+      sanearPlano(
+        { ordinal: "segunda", topicos: [{ titulo: "   " }, { titulo: "" }] },
+        AGORA,
+      ),
+    ).toThrow(DadosProvaInvalidosError);
+  });
+
+  it("ordinal 'primeira' força todos os tópicos a novo:false", () => {
+    const plano = sanearPlano(
+      {
+        ordinal: "primeira",
+        topicos: [
+          { titulo: "Base A", novo: true },
+          { titulo: "Base B", novo: true },
+        ],
+      },
+      AGORA,
+    );
+    expect(plano.topicos.every((t) => t.novo === false)).toBe(true);
+  });
+
+  it("ordinal 'segunda'/'final' respeita o flag novo informado", () => {
+    const plano = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [
+          { titulo: "Velho", novo: false },
+          { titulo: "Recente", novo: true },
+        ],
+      },
+      AGORA,
+    );
+    const porTitulo = new Map(plano.topicos.map((t) => [t.titulo, t]));
+    expect(porTitulo.get("Velho")?.novo).toBe(false);
+    expect(porTitulo.get("Recente")?.novo).toBe(true);
+  });
+
+  it("aplica clamp e arredonda horasPorDia e diasPorSemana (com defaults)", () => {
+    const base = { ordinal: "segunda", topicos: [{ titulo: "X" }] } as const;
+    expect(
+      sanearPlano({ ...base, horasPorDia: 99, diasPorSemana: 0 }, AGORA),
+    ).toMatchObject({ horasPorDia: 24, diasPorSemana: 1 });
+    expect(
+      sanearPlano({ ...base, horasPorDia: 3.4, diasPorSemana: 4.6 }, AGORA),
+    ).toMatchObject({ horasPorDia: 3, diasPorSemana: 5 });
+    // Ausente/não-finito → defaults 2 e 5.
+    expect(sanearPlano({ ...base, horasPorDia: NaN }, AGORA)).toMatchObject({
+      horasPorDia: 2,
+      diasPorSemana: 5,
+    });
+  });
+
+  it("id de tópico digitado à mão vira 'manual:<slug>-<i>' e nunca colide com id de doc", () => {
+    const plano = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [
+          { id: "doc-uuid-1", titulo: "Vindo de doc" },
+          { titulo: "Integração por Partes" }, // sem id → manual
+          { id: "manual:qualquer", titulo: "Id manual rejeitado" }, // prefixo reservado → re-derivado
+        ],
+      },
+      AGORA,
+    );
+    expect(plano.topicos[0].id).toBe("doc-uuid-1");
+    expect(plano.topicos[1].id).toBe("manual:integracao-por-partes-1");
+    expect(plano.topicos[2].id).toBe("manual:id-manual-rejeitado-2");
+    // Nenhum id de doc começa com 'manual:'.
+    const manuais = plano.topicos.filter((t) => t.id.startsWith("manual:"));
+    expect(manuais).toHaveLength(2);
+    expect(manuais.every((t) => t.id !== "doc-uuid-1")).toBe(true);
+  });
+
+  it("dedup de tópicos por id mantém o primeiro", () => {
+    const plano = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [
+          { id: "a", titulo: "Primeiro" },
+          { id: "a", titulo: "Duplicado" },
+          { id: "b", titulo: "Outro" },
+        ],
+      },
+      AGORA,
+    );
+    expect(plano.topicos.map((t) => t.id)).toEqual(["a", "b"]);
+    expect(plano.topicos[0].titulo).toBe("Primeiro");
+  });
+
+  it("dificuldade só se válida; dataArquivo só se ISO canônica UTC", () => {
+    const plano = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [
+          {
+            id: "a",
+            titulo: "Com dados",
+            dificuldade: "dificil",
+            dataArquivo: "2026-03-01T00:00:00.000Z",
+          },
+          {
+            id: "b",
+            titulo: "Inválidos",
+            dificuldade: "impossivel",
+            dataArquivo: "01/15/2023",
+          },
+        ],
+      },
+      AGORA,
+    );
+    expect(plano.topicos[0].dificuldade).toBe("dificil");
+    expect(plano.topicos[0].dataArquivo).toBe("2026-03-01T00:00:00.000Z");
+    expect("dificuldade" in plano.topicos[1]).toBe(false);
+    expect("dataArquivo" in plano.topicos[1]).toBe(false);
+  });
+
+  it("ordemManual filtra ids inexistentes, dedup, e omite a chave quando vazia", () => {
+    const comOrdem = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [
+          { id: "a", titulo: "A" },
+          { id: "b", titulo: "B" },
+        ],
+        ordemManual: ["b", "fantasma", "a", "b"],
+      },
+      AGORA,
+    );
+    expect(comOrdem.ordemManual).toEqual(["b", "a"]);
+
+    const semOrdem = sanearPlano(
+      {
+        ordinal: "segunda",
+        topicos: [{ id: "a", titulo: "A" }],
+        ordemManual: ["fantasma"],
+      },
+      AGORA,
+    );
+    expect("ordemManual" in semOrdem).toBe(false);
+  });
+
+  it("checkpoint usa default 'lembrete' quando inválido/ausente", () => {
+    expect(
+      sanearPlano(
+        { ordinal: "segunda", topicos: [{ titulo: "X" }] },
+        AGORA,
+      ).checkpoint,
+    ).toBe("lembrete");
+    expect(
+      sanearPlano(
+        { ordinal: "segunda", topicos: [{ titulo: "X" }], checkpoint: "automatico" },
+        AGORA,
+      ).checkpoint,
+    ).toBe("automatico");
+  });
+
+  it("carimba atualizadoEm com o 'agora' recebido", () => {
+    const plano = sanearPlano(
+      { ordinal: "segunda", topicos: [{ titulo: "X" }] },
+      AGORA,
+    );
+    expect(plano.atualizadoEm).toBe(AGORA);
+  });
+});
+
+describe("provas: salvarPlano", () => {
+  it("grava o bloco plano e faz round-trip idêntico ao recarregar", async () => {
+    const criada = await criarProva(
+      { titulo: "Prova", data: "2026-03-20", vinculo: vinculoCaderno },
+      HOJE,
+      baseDir,
+    );
+    const salva = await salvarPlano(
+      criada.id,
+      {
+        ordinal: "segunda",
+        horasPorDia: 3,
+        diasPorSemana: 5,
+        topicos: [
+          { id: "a", titulo: "Base", novo: false },
+          { id: "b", titulo: "Novo", novo: true, dificuldade: "dificil" },
+        ],
+        ordemManual: ["b", "a"],
+        checkpoint: "automatico",
+      },
+      AGORA,
+      baseDir,
+    );
+    expect(salva.plano).toBeDefined();
+    const relida = await carregarProva(criada.id, baseDir);
+    expect(relida.plano).toEqual(salva.plano);
+  });
+
+  it("recarimba PlanoEstudo.atualizadoEm e Prova.atualizadoEm com o MESMO timestamp", async () => {
+    const criada = await criarProva(
+      { titulo: "Prova", data: "2026-03-20", vinculo: vinculoCaderno },
+      HOJE,
+      baseDir,
+    );
+    const salva = await salvarPlano(
+      criada.id,
+      { ordinal: "primeira", topicos: [{ titulo: "X" }] },
+      AGORA,
+      baseDir,
+    );
+    expect(salva.atualizadoEm).toBe(AGORA);
+    expect(salva.plano?.atualizadoEm).toBe(AGORA);
+  });
+
+  it("prova antiga sem o campo plano carrega sem erro e expõe plano === undefined", async () => {
+    // Fixture crua: uma prova sem o campo `plano`.
+    const prova = {
+      id: "antiga",
+      titulo: "Antiga",
+      data: "2026-03-20",
+      vinculo: vinculoCaderno,
+      intervalos: [7, 3, 1],
+      sessoes: [],
+      criadoEm: AGORA,
+      atualizadoEm: AGORA,
+    };
+    await escreverJsonCru(baseDir, "antiga.json", JSON.stringify(prova));
+    const carregada = await carregarProva("antiga", baseDir);
+    expect(carregada.plano).toBeUndefined();
+  });
+
+  it("salvarPlano de id ausente lança ProvaNaoEncontradaError", async () => {
+    await expect(
+      salvarPlano(
+        "nao-existe",
+        { ordinal: "segunda", topicos: [{ titulo: "X" }] },
+        AGORA,
+        baseDir,
+      ),
+    ).rejects.toBeInstanceOf(ProvaNaoEncontradaError);
+  });
+
+  it("salvarPlano com dados inválidos lança DadosProvaInvalidosError", async () => {
+    const criada = await criarProva(
+      { titulo: "Prova", data: "2026-03-20", vinculo: vinculoCaderno },
+      HOJE,
+      baseDir,
+    );
+    await expect(
+      salvarPlano(criada.id, { topicos: [] }, AGORA, baseDir),
+    ).rejects.toBeInstanceOf(DadosProvaInvalidosError);
   });
 });

@@ -410,6 +410,65 @@ export interface Prova {
   criadoEm: string;
   /** Data da última atualização em ISO 8601 (timestamp completo). */
   atualizadoEm: string;
+  /** Plano de estudo guiado (questionário), quando o aluno o montou. */
+  plano?: PlanoEstudo;
+}
+
+/** Qual prova é — define o recorte base vs novo (intent). */
+export type OrdinalProva = "primeira" | "segunda" | "final";
+
+/** Preferência de checkpoint (comportamento fica na fatia 4; aqui só persiste). */
+export type PreferenciaCheckpoint = "automatico" | "lembrete";
+
+/** Nível de dificuldade autodeclarada de um tópico pelo aluno. */
+export type NivelDificuldade = "facil" | "media" | "dificil";
+
+/**
+ * Um tópico declarado no questionário. `id` é estável e 1:1 com o documento
+ * de origem quando houver (para casar com a ordenação cronológica da fatia 1);
+ * quando o tópico é digitado à mão, o id é derivado do título com o prefixo
+ * `manual:` (`manual:<slug>-<índice>`), garantindo que os espaços de id "veio
+ * de doc" (um `randomUUID`) e "digitado à mão" sejam disjuntos.
+ */
+export interface TopicoPlano {
+  /** Id estável do tópico (casa com `ItemCronologico.id` quando vem de doc; `manual:<slug>-<i>` quando digitado à mão). */
+  id: string;
+  /** Rótulo em português exibido ao aluno (ex.: "Limites"). */
+  titulo: string;
+  /** `true` se é conteúdo que CAI na prova (o "novo"); `false` = base. */
+  novo: boolean;
+  /** Dificuldade autodeclarada. Ausente = tratada como "media". */
+  dificuldade?: NivelDificuldade;
+  /** Data do arquivo de origem (ISO canônica UTC), quando o tópico vem de doc. */
+  dataArquivo?: string;
+}
+
+/**
+ * Respostas do questionário do plano de estudo, persistidas junto da Prova.
+ * Bloco OPCIONAL e ADITIVO: prova sem plano continua válida. A `Prova.data`
+ * NÃO é duplicada aqui (já existe); a agenda dia-a-dia é DERIVADA destes
+ * campos + da data, recalculada sob demanda (não persistida).
+ */
+export interface PlanoEstudo {
+  /** Qual prova é (define base vs novo). */
+  ordinal: OrdinalProva;
+  /** Horas de estudo disponíveis por dia (inteiro 1–24, saneado). */
+  horasPorDia: number;
+  /** Dias de estudo disponíveis por semana (inteiro 1–7, saneado). */
+  diasPorSemana: number;
+  /** Tópicos declarados (base e novo), já na ordem em que foram informados. */
+  topicos: TopicoPlano[];
+  /**
+   * Ordem cronológica manual OPCIONAL: ids de tópicos na ordem desejada
+   * (menor índice = mais à base). Serializável; reconstruída como
+   * ReadonlyMap no main para alimentar `ordenarCronologicamente`. Ausente/
+   * vazio = ordenação 100% automática por data.
+   */
+  ordemManual?: string[];
+  /** Preferência de checkpoint (só persistida nesta fatia; fatia 4 age). */
+  checkpoint: PreferenciaCheckpoint;
+  /** Carimbo ISO 8601 da última vez que o QUESTIONÁRIO foi salvo. */
+  atualizadoEm: string;
 }
 
 /**

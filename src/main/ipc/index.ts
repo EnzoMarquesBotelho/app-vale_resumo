@@ -95,6 +95,7 @@ import {
   listarProvas,
   regerarAgenda,
   removerProva,
+  salvarPlano,
   salvarSessoes,
 } from "../services/provas.js";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
@@ -921,6 +922,17 @@ export function registerIpcHandlers(): void {
     async (_event, id: string): Promise<Prova> => {
       try {
         return await regerarAgenda(id, hojeLocal());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.salvarPlano,
+    async (_event, id: string, plano: unknown): Promise<Prova> => {
+      try {
+        return await salvarPlano(id, plano, new Date().toISOString());
       } catch (erro) {
         throw new Error(mensagemAmigavelProva(erro));
       }

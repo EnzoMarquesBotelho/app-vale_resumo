@@ -11,6 +11,7 @@ import type {
   VinculoProva,
 } from "@shared/types";
 import { getApi } from "../api";
+import { PlanoEstudo } from "./PlanoEstudo";
 
 /**
  * Extrai uma frase amigável do erro vindo do IPC, removendo o prefixo técnico
@@ -127,6 +128,9 @@ export function Agenda(): React.JSX.Element {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
+  // `true` quando o formulário do plano de estudo está aberto.
+  const [montandoPlano, setMontandoPlano] = useState(false);
+
   // Dica do dia da prova selecionada.
   const [dica, setDica] = useState<DicaDoDia | null>(null);
   const [dicaIa, setDicaIa] = useState<string | null>(null);
@@ -179,6 +183,7 @@ export function Agenda(): React.JSX.Element {
     setDicaIa(null);
     setForm(null);
     setEditandoId(null);
+    setMontandoPlano(false);
     try {
       const [prova, dicaDoDia] = await Promise.all([
         getApi().carregarProva(id),
@@ -198,12 +203,14 @@ export function Agenda(): React.JSX.Element {
     setDicaIa(null);
     setErroDica(null);
     setEditandoId(null);
+    setMontandoPlano(false);
     setForm(formVazio());
   }
 
   /** Abre o formulário já preenchido com a prova selecionada (edição). */
   function editarSelecionada(): void {
     if (provaSelecionada === null) return;
+    setMontandoPlano(false);
     setEditandoId(provaSelecionada.id);
     setForm(formDeProva(provaSelecionada));
   }
@@ -561,10 +568,35 @@ export function Agenda(): React.JSX.Element {
         <div className="agenda-detalhe">
           <header className="agenda-detalhe-header">
             <h3>{provaSelecionada.titulo}</h3>
-            <button type="button" onClick={() => editarSelecionada()}>
-              Editar prova
-            </button>
+            <div className="agenda-detalhe-acoes">
+              <button type="button" onClick={() => editarSelecionada()}>
+                Editar prova
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(null);
+                  setEditandoId(null);
+                  setMontandoPlano(true);
+                }}
+              >
+                {provaSelecionada.plano
+                  ? "Editar plano"
+                  : "Montar plano de estudo"}
+              </button>
+            </div>
           </header>
+
+          {montandoPlano && (
+            <PlanoEstudo
+              prova={provaSelecionada}
+              aoSalvar={(atualizada) => {
+                setProvaSelecionada(atualizada);
+                setMontandoPlano(false);
+              }}
+              aoCancelar={() => setMontandoPlano(false)}
+            />
+          )}
 
           {/* Região 4 — Dica do dia. */}
           {dica !== null && (
