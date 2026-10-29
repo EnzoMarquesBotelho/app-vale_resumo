@@ -16,6 +16,20 @@
 > **Estilo:** cada função pura é descrita como **CONTRATO** (assinatura +
 > invariantes + tabela de casos com entradas e saídas) — não como prosa de
 > algoritmo. Lição da fatia 2.
+>
+> **DECISÃO DO USUÁRIO (ciclo 3 do design, vinculante — não reabrir):** para o
+> MEDIUM 2 da 2ª revisão (limiar 3/5 com `MIN_RESPOSTAS_CAMADA=3`), vale a
+> opção **(a)**: **encolher a intensidade pela amostra**, multiplicando por
+> `min(1, total/9)`, e MANTER `MIN_RESPOSTAS_CAMADA = 3`. NÃO subir o mínimo
+> para 5 (isso exigiria gerar mais perguntas por camada, e o Ollama local é
+> lento e entrega parcial). Atualizar a coluna `intensidade` da tabela §5.3
+> com os valores recalculados à mão e trocar a frase de mitigação do §11 por
+> texto que NÃO afirme redução de ruído do chute (a amostra pequena apenas
+> reduz a CONFIANÇA, não o ruído). O MEDIUM 1 (frase "máximo de foco" falsa
+> quando `calcularPlano` retorna antes da régua) segue o fix do
+> `design-review.json`: campo `planoDistribuido` em `ContextoFrase`, mensagem
+> alternativa "Ainda não há dias de estudo no plano para ajustar" e teste. Os
+> 3 NIT também devem ser aplicados conforme o JSON.
 
 ---
 
@@ -359,7 +373,9 @@ Constantes novas em `src/shared/constants.ts` (doc-comment cada, padrão atual):
 `DIAG_PEDIDO_POR_TOPICO`, `DIAG_TEXTO_MAX`, `MIN_RESPOSTAS_CAMADA=3`,
 `LIMIAR_ACERTO_NUM=3`, `LIMIAR_ACERTO_DEN=5` (limiar 3/5 por inteiros, §5.3),
 `LIMIAR_ACERTO_DIAGNOSTICO = NUM/DEN` (0.6; só para a intensidade),
-`PESO_DIAGNOSTICO=0.5`.
+`PESO_DIAGNOSTICO=0.5`, `DIAG_AMOSTRA_REFERENCIA = DIAG_PERGUNTAS_POR_TOPICO *
+DIAG_TOPICOS_POR_CAMADA` (=9; denominador do fator de encolhimento da
+intensidade pela amostra, §5.3).
 
 ### 5.2 Contratos pequenos
 
@@ -469,9 +485,17 @@ export function classificarDiagnostico(
 6. Caso contrário → `sem_dificuldade` (inclui "base boa e novo não medido": a UI
    avisa que o novo não foi medido; o plano não muda).
 
-`intensidade`: `lacuna_base` → `(L − base.taxa)/L`; `dificuldade_novo` →
-`(L − novo.taxa)/L`; demais → `0` (`L = LIMIAR_ACERTO_DIAGNOSTICO`). Em `[0,1]`,
-contínua no limiar (taxa→L ⇒ intensidade→0, sem salto para `sem_dificuldade`).
+`intensidade` **(encolhida pela amostra; decisão do usuário, ciclo 3)**:
+`lacuna_base` → `((L − base.taxa)/L) · fator(base.total)`; `dificuldade_novo` →
+`((L − novo.taxa)/L) · fator(novo.total)`; demais → `0`
+(`L = LIMIAR_ACERTO_DIAGNOSTICO`), com
+`fator(total) = min(1, total / DIAG_AMOSTRA_REFERENCIA)` e
+`DIAG_AMOSTRA_REFERENCIA = 9`. `MIN_RESPOSTAS_CAMADA` **permanece 3**. Em
+`[0,1]`, contínua no limiar (taxa→L ⇒ intensidade→0, sem salto para
+`sem_dificuldade`). **Por quê:** amostra pequena não reduz o ruído do chute;
+reduz a CONFIANÇA. Com 3 respostas o fator é 1/3, então 1 acerto em 3 não
+empurra o plano como 3 em 9 empurraria: o efeito no plano cresce com a
+quantidade de evidência.
 `topicosFracos`: só em `lacuna_base`/`dificuldade_novo`; tópicos da camada
 decisiva em que `abaixoDoLimiar({acertos, total})` do próprio tópico (mesma
 comparação por inteiros), em ordem da 1ª aparição em `respostas`. Se, por
@@ -483,7 +507,10 @@ veredito nunca usa float.
 **Invariantes:** total e determinística (qualquer lista, inclusive `[]`, nunca
 lança); não depende da ordem de `respostas` exceto na ordem de `topicosFracos`;
 `intensidade ∈ [0,1]`; `veredito ∈ {lacuna_base,dificuldade_novo} ⇔ intensidade>0`
-(taxa estritamente abaixo de L ⇒ intensidade estritamente positiva).
+(taxa estritamente abaixo de L e `total ≥ MIN_RESPOSTAS_CAMADA=3` ⇒ fator ≥ 1/3
+> 0 ⇒ intensidade estritamente positiva; vale com o encolhimento pela amostra).
+**Monotonia na amostra:** com a mesma taxa, mais respostas ⇒ intensidade
+não-menor (fator não-decrescente em `total`).
 
 **Tabela de casos (notação `B a/t`, `N a/t`; L=0.6, MIN=3):**
 
@@ -497,24 +524,23 @@ lança); não depende da ordem de `respostas` exceto na ordem de `topicosFracos`
 | 6 | B 0/9, N 0/9 (tudo errado) | lacuna_base | 1 | |
 | 7 | B 9/9, N 9/9 (tudo certo) | sem_dificuldade | 0 | |
 | 8 | B 3/5 (=0.6), N 9/9 | sem_dificuldade | 0 | limiar estrito |
-| 9 | B 2/5 (=0.4), N 9/9 | lacuna_base | ≈0.3333 | |
+| 9 | B 2/5 (=0.4), N 9/9 | lacuna_base | ≈0.1852 (bruta 0.3333 · 5/9) | amostra pequena encolhe |
 | 10 | B 2/2, N 5/5 | inconclusivo | 0 | base com < 3 respostas |
 | 11 | camada base sem perguntas; N 3/3 | inconclusivo | 0 | só novo medido |
 | 12 | B 5/5, N sem perguntas (1ª prova) | sem_dificuldade | 0 | `novo.medida=false` |
-| 13 | B 1/3 (mínimo), N sem perguntas | lacuna_base | ≈0.4444 | |
+| 13 | B 1/3 (mínimo), N sem perguntas | lacuna_base | ≈0.1481 (bruta 0.4444 · 3/9) | amostra mínima: efeito pequeno |
 | 14 | B 5/5, N 1/2 | sem_dificuldade | 0 | novo com 2 respostas = não medido |
-| 15 | B 6/9, N 3/6 (=0.5) | dificuldade_novo | ≈0.1667 | |
-| 16 | B 5/9 (≈0.556), N 9/9 | lacuna_base | ≈0.0741 | borda baixa, intensidade pequena |
-| 17 | B 3/9 com tópicos A 0/3, B 0/3, C 3/3 | lacuna_base | ≈0.4444 | `topicosFracos=[A,B]` |
+| 15 | B 6/9, N 3/6 (=0.5) | dificuldade_novo | ≈0.1111 (bruta 0.1667 · 6/9) | |
+| 16 | B 5/9 (≈0.556), N 9/9 | lacuna_base | ≈0.0741 (total 9 ⇒ fator 1) | borda baixa, intensidade pequena |
+| 17 | B 3/9 com tópicos A 0/3, B 0/3, C 3/3 | lacuna_base | ≈0.4444 (total 9 ⇒ fator 1) | `topicosFracos=[A,B]` |
 | 18 | respostas embaralhadas do caso 3 | igual ao caso 3 | igual | ordem irrelevante |
 
 ### 5.4 Contrato — `diagnosticoAplicavel` e `estadoDiagnostico`
 
 ```ts
-export type AjusteDiagnostico = {
-  veredito: "lacuna_base" | "dificuldade_novo";
-  intensidade: number; // (0,1]
-};
+// definido em plano.ts (§6.1); aqui só importado (um único lar, sem duplicar):
+import type { AjusteDiagnostico } from "./plano";
+// AjusteDiagnostico = { veredito: "lacuna_base" | "dificuldade_novo"; intensidade: number /* (0,1] */ }
 
 export type EstadoDiagnostico =
   "nenhum" | "pendente" | "concluido" | "desatualizado";
@@ -565,6 +591,10 @@ export interface ContextoFrase {
   /** `PlanoCalculado.diagnosticoAplicado !== undefined` (§6.1): o diagnóstico
    *  MUDOU a mistura. Vem do main; a frase nunca promete o que não ocorreu. */
   efeitoNoPlano: boolean;
+  /** `PlanoCalculado.mistura !== undefined`: `calcularPlano` chegou à régua e
+   *  distribuiu dias. `false` em `sem_dias` (ex.: prova amanhã), `sem_topicos`
+   *  e `prova_passou` (retornos antes da régua). */
+  planoDistribuido: boolean;
 }
 export function fraseResultadoDiagnostico(
   r: ResultadoDiagnostico,
@@ -587,23 +617,25 @@ Cláusula = `; os pontos mais fracos: {lista}` (inserida antes do ponto final da
 
 - `lacuna_base`: `Sua dificuldade parece estar na base. Você acertou {a} de {t}
   perguntas dos conteúdos anteriores{cláusula}.` + final:
+  `!efeitoNoPlano && !planoDistribuido` → ` Ainda não há dias de estudo no plano para ajustar.` (avaliado primeiro);
   `efeitoNoPlano` → ` Por isso o plano dá mais tempo à base antes do conteúdo novo.`;
-  `!efeitoNoPlano && novoPlanejado` → ` O plano já dá o máximo de foco à base que a distância da prova permite.`;
-  `!efeitoNoPlano && !novoPlanejado` → ` Como todo o conteúdo do plano é base, não há conteúdo novo para reequilibrar.`
+  `!efeitoNoPlano && planoDistribuido && novoPlanejado` → ` O plano já dá o máximo de foco à base que a distância da prova permite.`;
+  `!efeitoNoPlano && planoDistribuido && !novoPlanejado` → ` Como todo o conteúdo do plano é base, não há conteúdo novo para reequilibrar.`
 - `dificuldade_novo`: `A base está firme ({ba} de {bt}). A dificuldade parece
   estar no conteúdo novo ({na} de {nt}){cláusula}.` + final:
+  `!efeitoNoPlano && !planoDistribuido` → ` Ainda não há dias de estudo no plano para ajustar.` (avaliado primeiro);
   `efeitoNoPlano` → ` O plano reservou mais tempo para ele.`;
-  `!efeitoNoPlano` → ` O plano já dá o máximo de foco possível ao conteúdo novo.`
+  `!efeitoNoPlano && planoDistribuido` → ` O plano já dá o máximo de foco possível ao conteúdo novo.`
 - `sem_dificuldade`: `Você foi bem nas perguntas. O plano continua como estava.`
   + (` Não deu para medir o conteúdo novo.` somente se `ctx.novoPlanejado &&
-  !r.novo.medida`). `efeitoNoPlano` é ignorado (sempre falso neste veredito).
+  !r.novo.medida`). `efeitoNoPlano` e `planoDistribuido` são ignorados neste veredito.
 - `inconclusivo`: `Não deu para tirar uma conclusão (poucas perguntas sobre a
   base). O plano continua como estava.`
 
 A UI mostra sempre, fora da frase, a nota fixa "Isto é uma orientação de
 estudo, não uma previsão da prova."
 
-**Tabela de casos (títulos: a=Limites, b=Derivadas, c=Integrais, d=Séries;
+**Tabela de casos (16 saídas; títulos: a=Limites, b=Derivadas, c=Integrais, d=Séries;
 `zzz` ∉ `titulos`). Saída exata:**
 
 | # | Entrada | Saída |
@@ -622,6 +654,11 @@ estudo, não uma previsão da prova."
 | 12 | sem_dificuldade, `novo.medida=false`, novoPlanejado=true | `Você foi bem nas perguntas. O plano continua como estava. Não deu para medir o conteúdo novo.` |
 | 13 | sem_dificuldade, `novo.medida=false`, novoPlanejado=false (1ª prova) | `Você foi bem nas perguntas. O plano continua como estava.` |
 | 14 | inconclusivo | `Não deu para tirar uma conclusão (poucas perguntas sobre a base). O plano continua como estava.` |
+| 15 | lacuna_base, B 2/9, fracos `[]`, efeito=false, **planoDistribuido=false**, novoPlanejado=true (prova amanhã: `sem_dias`) | `Sua dificuldade parece estar na base. Você acertou 2 de 9 perguntas dos conteúdos anteriores. Ainda não há dias de estudo no plano para ajustar.` |
+| 16 | dificuldade_novo, B 8/9, N 3/9, fracos `[]`, efeito=false, **planoDistribuido=false** | `A base está firme (8 de 9). A dificuldade parece estar no conteúdo novo (3 de 9). Ainda não há dias de estudo no plano para ajustar.` |
+
+Nos casos 1–14 `planoDistribuido=true`. Invariante: `efeitoNoPlano=true` ⇒
+`planoDistribuido=true` (`diagnosticoAplicado` só existe com `mistura`).
 
 **`fraseDiagnosticoParcial`:** `entregue >= pedido` (ou `pedido <= 0`) → `null`;
 senão `Montei {entregue} de {pedido} perguntas. O resultado vale, mas é menos
@@ -713,8 +750,16 @@ pois só muda `fracaoBase`, que já variava em `[PISO_BASE, TETO_BASE]`.
   (0.475) continua abaixo da metade, e o novo segue dominante; longe da prova a
   base já está no teto e o diagnóstico não muda nada. O teste varre
   `diasRestantes ∈ {0,1,7,15,29,30,60}` e verifica (a), (b) e (c).
-- **Invariantes da fatia 2 (reexecutadas com diagnóstico):** conservação de minutos conforme o §7.3 da fatia 2 (nenhum minuto some em silêncio); nenhum
-  dia excede `capacidadeDia`; todo bloco ≥ 15; terminação de `resolverCamada`.
+- **Invariantes da fatia 2 (reexecutadas com diagnóstico):** nenhum dia excede
+  `capacidadeDia`; todo bloco ≥ 15; terminação de `resolverCamada`; e
+  **conservação de minutos com oráculo computável pela API pública** (o `aviso`
+  só traz contagem, não minutos): com `D` = nº de dias do plano e
+  `capacidadeTotal = D · capacidadeDia`, (i) sempre
+  `Σ minutos dos blocos ≤ capacidadeTotal`; (ii) **sem `aviso`**,
+  `Σ minutos dos blocos ≥ capacidadeTotal − 14 · (nº de dias cuja folga final < 15)`
+  (a folga residual de um dia é < 15, senão caberia mais um bloco). O teste de
+  conservação **exato** já existente da fatia 2 é **reexecutado** com
+  `diagnostico` acrescentado à grade de entradas, sem reescrevê-lo.
 
 ### 6.3 Tabela de casos da régua (ambos os lados > 0; dificuldadeBase=0 salvo indicado)
 
@@ -808,6 +853,13 @@ Para cada tópico `t` na ordem base→novo:
 | `OllamaIndisponivelError` | relança imediatamente (qualquer acumulado) |
 | `GeracaoFalhouError`, `acumuladas.length === 0` | relança imediatamente |
 | `GeracaoFalhouError`, `acumuladas.length > 0` | `ignorados += {t, "nao_gerou"}` **e todos os tópicos planejados ainda não processados** (`nao_gerou`); encerra o laço (sem relançar); segue para o passo 6 |
+
+**Aborto antecipado da camada base (finding 5):** ao terminar o processamento
+da camada **base** com `acumuladas.length < MIN_RESPOSTAS_CAMADA`, o laço
+lança `DiagnosticoInsuficienteError` **sem processar nenhum tópico novo**
+(a base inviável já reprova o passo 6; não gastar até 3 chamadas lentas à toa).
+Exceção: se a base terminou por `GeracaoFalhouError` (encerramento do laço
+abaixo), vale o relançar do erro original descrito a seguir.
 
 Se o laço foi encerrado por `GeracaoFalhouError` e o passo 6 reprova (base < 3),
 relança-se o **`GeracaoFalhouError` original** (causa real), não
@@ -943,7 +995,7 @@ seção do plano, visível quando `provaSelecionada.plano !== undefined`, com pr
 | `nenhum` | Card com o texto do §4.6 (varia com `temNovoNoPlano`; na 1ª prova **não** promete ajuste) + botão **Fazer diagnóstico**. Se a pré-checagem falhar (nenhuma base não manual): botão desabilitado e texto do motivo (`aria-describedby`). Aviso "N assunto(s) digitado(s) à mão ficam de fora" quando houver. |
 | gerando | `role="status"` `aria-live="polite"`: rótulo de progresso (`rotuloProgressoDiagnostico`); botão desabilitado. Assina `aoProgressoGeracao` ANTES do `await`, filtra `artefato==="diagnostico"`, cancela no `finally` (padrão de `Quiz.tsx`). |
 | `pendente` | Perguntas em `<fieldset>/<legend>`, alternativas em `<input type="radio">` + opção **"Não sei"**; botão **Ver resultado** só habilita com todas respondidas. Aviso de parcial (se `perguntas.length < pedido`) e de ignorados. |
-| `concluido` | Primeiro `getApi().calcularPlano(id)`; depois `fraseResultadoDiagnostico(r, titulos, {novoPlanejado: plano.topicos.some(t => t.novo), efeitoNoPlano: calculado.diagnosticoAplicado !== undefined})`, nota "orientação de estudo, não previsão", "Feito em DD/MM/AAAA", `fraseTopicosIgnorados` e `fraseDiagnosticoParcial` quando não `null`, e o **plano**: `PlanoPrevia`. O selo "Plano ajustado pelo diagnóstico" aparece **somente** se `diagnosticoAplicado` estiver presente (nunca em `sem_dificuldade`/`inconclusivo`, nem na 1ª prova, nem com base no teto/piso). Botão **Refazer diagnóstico** (confirmação inline). |
+| `concluido` | Primeiro `getApi().calcularPlano(id)`; depois `fraseResultadoDiagnostico(r, titulos, {novoPlanejado: plano.topicos.some(t => t.novo), efeitoNoPlano: calculado.diagnosticoAplicado !== undefined, planoDistribuido: calculado.mistura !== undefined})`, nota "orientação de estudo, não previsão", "Feito em DD/MM/AAAA", `fraseTopicosIgnorados` e `fraseDiagnosticoParcial` quando não `null`, e o **plano**: `PlanoPrevia`. O selo "Plano ajustado pelo diagnóstico" aparece **somente** se `diagnosticoAplicado` estiver presente (nunca em `sem_dificuldade`/`inconclusivo`, nem na 1ª prova, nem com base no teto/piso). Botão **Refazer diagnóstico** (confirmação inline). |
 | `desatualizado` | Aviso "Você mudou os assuntos desde o diagnóstico; o plano voltou ao cálculo normal. Refaça para ajustar." + **Refazer**. |
 | erro | `<p className="agenda-erro" role="alert">` com a mensagem; diagnóstico anterior (se houver) permanece. |
 
@@ -991,7 +1043,7 @@ claro/escuro por tokens.
 | Amostra de ≤3 tópicos por camada (não cobre todos os tópicos) | UI diz "amostra" | ❌ NÃO coberto (por desenho) |
 | Pergunta ambígua / alternativa errada gerada pelo modelo | só valida forma (1 correta) | ❌ NÃO coberto (limitação do modelo local) |
 | Viés de posição da alternativa correta | sem embaralhar | ❌ NÃO coberto |
-| Chute (acerto ao acaso) | 3 respostas/camada mínimo, limiar 0.6 reduzem mas não eliminam | ❌ NÃO coberto (ruído estatístico) |
+| Chute (acerto ao acaso) | ruído estatístico de amostra pequena (3 perguntas por tópico; mínimo de 3 respostas por camada). Não é reduzido, só **ponderado**: a intensidade é encolhida por `min(1, total/9)` (§5.3), então amostra mínima move o plano pouco. A UI diz "parece" e "orientação" | ❌ NÃO coberto (o ruído existe; só o efeito no plano é atenuado) |
 | Diagnóstico por tópico individual para o plano | só a mistura base/novo muda | ❌ NÃO coberto (fora do escopo) |
 | Expiração por tempo | não existe | ❌ NÃO coberto |
 | Perguntas abertas / correção por IA | fora do escopo | ❌ NÃO coberto |
@@ -1027,9 +1079,11 @@ Todos com **Ollama mockado** (`gerar` injetado); disco em `tmpdir`.
   aplicável ⇔ intensidade>0, nunca lança com `[]`).
 - `estadoDiagnostico` / `diagnosticoAplicavel` / `resultadoDoDiagnostico`
   (tabela §5.4).
-- `fraseResultadoDiagnostico`: **os 14 casos da tabela §5.5 com `toBe` na string
+- `fraseResultadoDiagnostico`: **os 16 casos da tabela §5.5 com `toBe` na string
   exata** (join de 1/2/3/4 fracos, id ausente omitido, `efeitoNoPlano`
-  true/false, `novoPlanejado` true/false, `novo.medida`).
+  true/false, `planoDistribuido` true/false (casos 15–16: `sem_dias`),
+  `novoPlanejado` true/false, `novo.medida`).
+  **`planoDistribuido=false`** (casos 15–16 da tabela §5.5) nunca emite "máximo de foco".
   `fraseDiagnosticoParcial` (`(12,18)`, `(18,18)`, `(20,18)`, `(0,0)`),
   `fraseTopicosIgnorados` (os 2 exemplos + vazio), `rotuloProgressoDiagnostico`
   (`total>0` e `total<=0`).
@@ -1059,8 +1113,11 @@ Todos com **Ollama mockado** (`gerar` injetado); disco em `tmpdir`.
   `intensidade=0`, e quando `diagnostico` é omitido (objeto retornado sem a
   chave).
 - Invariantes da fatia 2 com diagnóstico (grade): nenhum dia > `capacidadeDia`;
-  todo bloco ≥ 15; conservação de minutos (soma dos blocos = soma esperada pelos
-  orçamentos − resíduos declarados em `nao_cabe`); terminação (o teste conclui).
+  todo bloco ≥ 15; terminação (o teste conclui); **conservação de minutos pelo
+  oráculo da API pública (§6.2):** `Σ blocos ≤ capacidadeTotal` sempre, e, sem
+  `aviso`, `Σ blocos ≥ capacidadeTotal − 14·(dias com folga < 15)`; mais a
+  **reexecução do teste de conservação exato da fatia 2** com `diagnostico` na
+  grade.
 - `i=NaN`, `i=2`, `i=-1` (sanitização).
 
 ### 13.3 `tests/main/services/diagnostico.test.ts` (orquestração; `gerar` mock)
@@ -1075,7 +1132,8 @@ Todos com **Ollama mockado** (`gerar` injetado); disco em `tmpdir`.
   nunca chamado**.
 - Parcial: um tópico devolve 2 perguntas ⇒ válido, `pedido > perguntas.length`.
 - Tópico cujo `gerar` devolve lixo duas vezes ⇒ ignorado `nao_gerou`, demais ok.
-- Base < 3 perguntas ⇒ `DiagnosticoInsuficienteError`.
+- Base < 3 perguntas ⇒ `DiagnosticoInsuficienteError` **e `gerar` chamado
+  somente nos tópicos de base** (nenhuma chamada nos tópicos novos).
 - `OllamaIndisponivelError` no 1º tópico ⇒ propaga (offline); idem no meio.
 - `GeracaoFalhouError` no 1º ⇒ propaga (e a mensagem **não** é "offline");
   no 3º com base já ≥ 3 ⇒ parcial válido; no 2º com base < 3 ⇒ relança.
@@ -1169,7 +1227,7 @@ estudo), com HEAD e contagem de testes reais.
 1. Só tópicos **com documento e texto** entram; manuais ficam de fora com aviso; sem base com texto ⇒ indisponível antes de chamar a IA.
 2. **Só múltipla escolha**, mecânica; ≤3 tópicos/camada × 3 perguntas = ≤18, pedido 5 por tópico (mínimo de `gerarQuiz`), sempre caminho curto, texto cortado em 12000 chars.
 3. Rótulo **herdado** de `TopicoPlano.novo`; a IA não vê nem devolve rótulo.
-4. `classificarDiagnostico` puro: limiar 0.6 estrito, ≥3 respostas por camada, base baixa ⇒ `lacuna_base`, senão novo baixo ⇒ `dificuldade_novo`, senão `sem_dificuldade`; base não medida ⇒ `inconclusivo`.
+4. `classificarDiagnostico` puro: limiar 0.6 estrito, ≥3 respostas por camada (intensidade encolhida por `min(1,total/9)`), base baixa ⇒ `lacuna_base`, senão novo baixo ⇒ `dificuldade_novo`, senão `sem_dificuldade`; base não medida ⇒ `inconclusivo`.
 5. Entra na régua como `diagnostico?` que só desloca `fracaoBase` (±`PESO_DIAGNOSTICO`·intensidade da folga até teto/piso); ausente ou intensidade 0 ⇒ idêntico à fatia 2; novo nunca zera.
 6. Diagnóstico **opcional e incentivado**.
 7. Erros: offline × falha distintos; válido com base ≥ 3 perguntas; parcial avisado com frase própria (a de `avisoGeracaoParcial` fala em "reduzir quantidade", inaplicável).
@@ -1189,9 +1247,22 @@ Todos os 10 findings foram **endereçados** (nenhum ignorado, nenhum adiado).
 | 2 | MEDIUM | Bullet trocado por propriedade testável (a)(b)(c): ganho `Δ` não-crescente em `diasRestantes`, 0 em ≥ 30 (`HORIZONTE_DIAS`, `constants.ts` L124), `fracaoNovo ≥ 0.2` | §6.2, §13.2 |
 | 3 | MEDIUM | `mensagemAmigavelDiagnostico` com tabela de textos exatos; texto próprio para `GeracaoFalhouError` (sem "reduza a quantidade") | §4.7, §9, §9.1, §13.3 |
 | 4 | MEDIUM | `carregarTexto` captura qualquer erro e devolve `null`; defesa em profundidade no orquestrador; teste novo | §7.1, §8, §9, §13.3 |
-| 5 | MEDIUM | `fraseResultadoDiagnostico(r, titulos, {novoPlanejado, efeitoNoPlano})` + tabela de 14 saídas exatas; regras de join/limite/id ausente; `fraseTopicosIgnorados` e `fraseDiagnosticoParcial` com exemplos | §5.5, §13.1 |
+| 5 | MEDIUM | `fraseResultadoDiagnostico(r, titulos, {novoPlanejado, efeitoNoPlano})` + tabela de saídas exatas (16 após a revisão 2); regras de join/limite/id ausente; `fraseTopicosIgnorados` e `fraseDiagnosticoParcial` com exemplos | §5.5, §13.1 |
 | 6 | MEDIUM | "gerado" = `acumuladas.length > 0`; tabela do laço; restantes vão a `ignorados[nao_gerou]`; teste "falha no 3º de 4" | §4.7, §7.1, §9, §13.3 |
 | 7 | NIT | Limiar por inteiros (`acertos*DEN < total*NUM`, 3/5); `taxa` só para intensidade | §5.3, §5.1, §13.1 |
 | 8 | NIT | Type guard `p.tipo === "multipla"` especificado + teste | §7.1, §13.3 |
 | 9 | NIT | `assinaturaPlano` com `JSON.stringify` de pares ordenados por code unit; teste de colisão | §5.2, §13.1 |
 | 10 | NIT | Registrado como NÃO coberto: cancelar geração / timeout total | §11 |
+
+## 17. Respostas ao design review (revisão 2)
+
+Todos os 5 findings **endereçados**. O MEDIUM 2 segue a decisão do usuário
+(opção (a), cabeçalho do documento).
+
+| # | Sev. | Resposta | Onde |
+|---|---|---|---|
+| 1 | MEDIUM | `ContextoFrase.planoDistribuido` (`calculado.mistura !== undefined`); sem plano distribuído e sem efeito ⇒ `Ainda não há dias de estudo no plano para ajustar.` (avaliado primeiro); tabela §5.5 passa a 16 casos (15–16 novos); teste em §13.1; wiring §10 | §5.5, §10, §13.1 |
+| 2 | MEDIUM | Opção (a): intensidade encolhida por `min(1, total/9)` (`DIAG_AMOSTRA_REFERENCIA`), `MIN_RESPOSTAS_CAMADA=3` mantido; intensidades dos casos 9, 13, 15 recalculadas (0.1852, 0.1481, 0.1111; casos 3–6, 16 e 17 têm total 9 ⇒ inalterados); frase do §11 reescrita sem afirmar redução de ruído | §5.1, §5.3, §11 |
+| 3 | NIT | Oráculo executável pela API pública (`Σ ≤ capacidadeTotal`; sem aviso `Σ ≥ capacidadeTotal − 14·dias com folga<15`) + reexecução do teste exato da fatia 2 com `diagnostico` na grade | §6.2, §13.2 |
+| 4 | NIT | `AjusteDiagnostico` definido só em `plano.ts`; §5.4 apenas importa | §5.4 |
+| 5 | NIT | Aborto antecipado: base < 3 ao fim da camada base ⇒ `DiagnosticoInsuficienteError` sem tocar nos tópicos novos; teste `gerar` só nos tópicos de base | §7.1, §13.3 |
