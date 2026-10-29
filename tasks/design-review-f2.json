@@ -1,0 +1,48 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "MEDIUM-1",
+      "severity": "MEDIUM",
+      "location": "§7.3 passos 5 e 7; §7.5",
+      "problem": "O passo 5 garante Σ minutosTopico === capacidadeTotal E todo minutosTopico >= 15, mas o passo 7 descarta folga de fim de dia (folga < 15) como capacidade morta. Por conservação, qualquer fragmentação força minutos residuais que viram topicosForaDoPlano → aviso nao_cabe. Logo o caso 'Cabe tudo, sem aviso' (§7.5) só ocorre com fragmentação zero, condição que o design não define. O autor do teste 'cabe → mistura presente, sem aviso' (§12) não tem um predicado construível para aviso === undefined, e um resíduo de 10 min marcar um tópico como 'fora' exagera o aviso honesto que o intent pede.",
+      "fix": "Fixar uma regra explícita: (a) resíduo de um tópico < MINUTOS_BLOCO_MIN ao fim do passo 7 NÃO conta como 'fora' (folga aceita, não marca tópico); K = tópicos removidos no passo 4/5 + tópicos com resíduo >= 15 ao fim do passo 7; e (b) definir na §7.5 o predicado de 'cabe tudo': nenhum tópico removido no passo 4/5 E nenhum resíduo >= 15 ao fim do passo 7. Qualquer outra coisa ⇒ nao_cabe."
+    },
+    {
+      "id": "MEDIUM-2",
+      "severity": "MEDIUM",
+      "location": "§7.3 passo 5",
+      "problem": "O laço de reconciliação piso×largest-remainder ('se algum minutosTopico < 15, remove-se o de menor prioridade e repete do passo 4; converge porque reduz o nº de tópicos') não tem terminação demonstrada. Remover 'o de menor prioridade' pode remover um tópico que cabia (>=15) e deixar o problemático (<15) no plano, caindo em laço sem resolver o <15. Além disso, repetir 'do passo 4' faz os alvo dos remanescentes subirem (somaPesos menor), podendo reintroduzir o floor→14 em outro tópico; a convergência depende de detalhes não fixados.",
+      "fix": "Tornar o piso de 15 uma restrição do próprio passo: após o largest-remainder, remover EXATAMENTE o(s) tópico(s) com minutosTopico < 15 (não 'o de menor prioridade'), recomputar e repetir. Como cada volta remove >=1 tópico <15 e nunca reintroduz, o laço termina em <= (nº de tópicos da camada) voltas; declarar esse limite superior explícito no documento."
+    },
+    {
+      "id": "NIT-1",
+      "severity": "NIT",
+      "location": "§7.3 passos 2-5",
+      "problem": "capacidadeTotal = D * capacidadeDia trata a capacidade como contínua ao orçar, mas a alocação (passo 7) é em baldes por dia (fragmentação). A aproximação contínuo→baldes é a origem da folga morta e não é nomeada no documento.",
+      "fix": "Uma frase no início do §7.3 declarando a aproximação (orça-se sobre o contínuo; a fragmentação por dia é reconciliada como folga aceita/nao_cabe no passo 7), após resolver o MEDIUM-1."
+    },
+    {
+      "id": "NIT-2",
+      "severity": "NIT",
+      "location": "§6.1, §8.3, §1.2",
+      "problem": "nivelParaPeso (facil→0, media→0.5, dificil→1, undefined→0.5) é consumido de dois jeitos: na régua como intensidade (facil=0=neutro absoluto, via média dificuldadeBase) e na distribuição como w = 1 + dificuldade (facil=0 vira peso 1, ainda recebe tempo). O mesmo número tem semânticas sutilmente diferentes; o design não chama a atenção para isso e um implementador poderia 'corrigir' a suposta inconsistência.",
+      "fix": "Nota em §8.3 ou §1.2 explicitando os dois consumos deliberados do mesmo peso (régua = intensidade 0..1; distribuição = 1 + peso)."
+    },
+    {
+      "id": "NIT-3",
+      "severity": "NIT",
+      "location": "§5.3, §11",
+      "problem": "dataArquivo saneada com ehIsoPlausivel (estrita); o design não declara o efeito da omissão (quando inválida) sobre a ordenação cronológica — o tópico cai no grupo 'sem data' de ordenarCronologicamente (vai ao final), o que é correto mas implícito.",
+      "fix": "Uma linha na tabela §5.3 (campo dataArquivo) ou em §11: omitida se inválida ⇒ tópico ordenado como 'sem data' (ao final), nunca erro."
+    },
+    {
+      "id": "NIT-4",
+      "severity": "NIT",
+      "location": "§8.2, §8.3",
+      "problem": "A UI chama calcularPlano para a prévia 'após salvar'; calcularPlano lança 'Monte o plano antes de ver a prévia' quando plano === undefined. Se salvarPlano rejeitar (ex.: 'Informe ao menos um assunto') e a UI ainda disparar a prévia, o usuário verá a mensagem enganosa de 'monte o plano' logo após tentar montá-lo. O design não fixa a sequência.",
+      "fix": "Em §8.2, declarar que a prévia só é chamada após salvarPlano resolver com sucesso (a Prova retornada); se salvarPlano rejeitar, exibir o erro do saneamento e NÃO chamar calcularPlano."
+    }
+  ],
+  "reviewDoc": "c:\\Dev\\.worktrees\\plano-f2-questionario\\tasks\\design-review-f2.md"
+}

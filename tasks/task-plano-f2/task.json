@@ -1,0 +1,7 @@
+{
+  "task_id": "task-plano-f2",
+  "task_description": "Fatia 2/4 do plano de estudo guiado do app Desenrola: persistir o questionario do plano de estudo num bloco opcional/aditivo plano? em Prova (modelo + saneamento + IPC + UI minima), e adicionar a logica pura nova em src/shared/plano.ts (regua base/novo + distribuicao por dias) com o serial de orquestracao no main e a previa na Agenda. Tudo APROVADO em tasks/design-f2.md (3a versao). Nada usa Ollama. Zero dependencia nova. Dois commits, uma fatia (design 13.1): FEAT-001 persistencia, FEAT-002 distribuicao.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

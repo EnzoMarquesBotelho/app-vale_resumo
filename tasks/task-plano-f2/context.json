@@ -1,0 +1,30 @@
+{
+  "project_type": "Desenrola — app de desktop Electron + React + TypeScript, 100% local/offline. Esta fatia NAO usa IA/Ollama: tudo e logica pura + persistencia JSON + UI.",
+  "language": "TypeScript (identificadores em ingles; textos de UI/conteudo em portugues do Brasil).",
+  "build_system": "electron-vite (Vite). Aliases de import: @shared -> src/shared, verificado em uso (ex.: import ... from \"@shared/constants\"). No main, imports relativos de servicos usam sufixo .js (ex.: \"../services/provas.js\") por ESM — seguir o padrao existente em src/main/ipc/index.ts.",
+  "test_framework": "Vitest (vitest run). Testes em tests/ espelham src/. Padrao de teste do main usa tmpdir e baseDir injetavel; o relogio e injetado como parametro hoje (as funcoes puras nunca leem Date.now()).",
+  "build_command": "npm run build (tsc --noEmit + electron-vite build)",
+  "test_command": "npm test (vitest run)",
+  "verification_instructions": "Rodar SEMPRE de dentro do worktree (cwd = c:\\Dev\\.worktrees\\plano-f2-questionario), nunca da raiz c:\\Dev — .worktrees/ e ignorado por git e ESLint. Antes de concluir cada FEAT: npm run build, npm run lint e npm test devem passar. Para iterar rapido em logica pura: npx vitest run tests/shared/<arquivo>.test.ts.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "SO Windows, shell PowerShell. NAO rodar comandos da raiz c:\\Dev (eh outro checkout). git -C c:\\Dev\\.worktrees\\plano-f2-questionario para qualquer operacao git. Nunca fazer push (so commit local). A pasta C:\\Users\\enzom\\OneDrive\\Desktop\\Facul e somente-leitura e NAO e usada pelos testes.",
+  "contribution_requirements": "AGENTS.md: (1) pt-BR na UI, ingles no codigo; (2) ZERO dependencia nova; (3) renderer fala com o main SO via getApi() (sem window.api?.); (6) logica pura em src/shared/ sem Electron/disco/IA; (7) persistencia atomica (.tmp+rename) + leitura tolerante. Ao FINAL da fatia entregue, atualizar tasks/PROGRESSO.md, tasks/todo.md e README.md consistentes com o estado real (git log + contagem real de npm test).",
+  "key_patterns": "Saneamento no main lanca DadosProvaInvalidosError('frase pronta pt-BR'), convertida por mensagemAmigavelProva no handler de ipc/index.ts. Gravacao de campo opcional via SPREAD CONDICIONAL — padrao REAL confirmado em provas.ts: listarProvas usa ...(prova.vinculo.tipo === 'caderno' ? { cadernoNome } : {}) e salvarSessoes usa ...(s.concluida === true ? { concluida: true } : {}). escreverProva ja e atomico (.tmp+rename); carregarProva ja e JSON.parse tolerante — campo opcional cai naturalmente, prova antiga sem o campo carrega. hojeLocal() (exportado de provas.ts) e o UNICO leitor do relogio real; funcoes puras recebem hoje/datas por parametro. IPC: const em IPC_CHANNELS (ipc.ts) + metodo em AppApi (ipc.ts) + wrapper ipcRenderer.invoke (preload.ts) + ipcMain.handle (ipc/index.ts). renderer/api.ts NAO muda (PreloadApi = AppApi). ordenarCronologicamente (cronologia.ts) aceita ordemManual?: ReadonlyMap<string,number> e desempata por id.localeCompare. ehIsoPlausivel exportado de cronologia.ts valida ISO canonica UTC. agenda.ts tem diaParaNumero/numeroParaDia/diferencaDias (puras, validam 'YYYY-MM-DD'). ResumoDocumentoSalvo tem os campos id, nome, dataArquivo? (NAO tem 'titulo').",
+  "relevant_files": [
+    "tasks/design-f2.md (APROVADO — fonte de verdade; 5.1/5.3/5.4 persistencia, 6 regua, 7 distribuicao, 8 UI+IPC, 12 testes, 13 arquivos)",
+    "tasks/plan-f2.md (plano ordenado item a item)",
+    "src/shared/types.ts (adicionar OrdinalProva/PreferenciaCheckpoint/NivelDificuldade/TopicoPlano/PlanoEstudo e plano? em Prova)",
+    "src/main/services/provas.ts (adicionar sanearPlano/salvarPlano; estudar sanearVinculo, criarProva, escreverProva, salvarSessoes, hojeLocal, DadosProvaInvalidosError)",
+    "src/shared/cronologia.ts (reusar ordenarCronologicamente e ehIsoPlausivel — NAO muda)",
+    "src/shared/agenda.ts (adicionar datasEntre puro; reusar diaParaNumero/numeroParaDia/diferencaDias)",
+    "src/shared/constants.ts (adicionar HORIZONTE_DIAS/PISO_BASE/TETO_BASE/PESO_DIFICULDADE/MINUTOS_BLOCO_MIN)",
+    "src/shared/ipc.ts (canais salvarPlano/calcularPlano + metodos AppApi)",
+    "src/main/preload.ts (wrappers dos dois canais)",
+    "src/main/ipc/index.ts (handlers; estudar mensagemAmigavelProva e o bloco dos handlers de prova ~linhas 860-956)",
+    "src/renderer/api.ts (getApi — NAO muda)",
+    "src/renderer/views/Agenda.tsx (botao no header do bloco provaSelecionada !== null / agenda-detalhe-header, ao lado de 'Editar prova')",
+    "src/renderer/styles.css (classes novas, so tokens de tema)",
+    "tests/main/services/provas.test.ts (estender), tests/shared/agenda.test.ts (estender), tests/shared/slug.test.ts (novo), tests/shared/plano.test.ts (novo), tests/main/services/planoCalculo.test.ts (novo)"
+  ],
+  "directory_structure": "src/main/ (processo principal: ipc/index.ts handlers, services/ com provas.ts e o novo planoCalculo.ts, preload.ts); src/renderer/ (UI React: api.ts, views/ com Agenda.tsx e o novo PlanoEstudo.tsx, styles.css); src/shared/ (puro: types.ts, ipc.ts, agenda.ts, cronologia.ts, constants.ts, o novo plano.ts e o novo slug.ts); tests/ espelha src/. Baseline real deste worktree: npm test = 614 testes, 47 arquivos, verde (HEAD ae729bd). O total apos a fatia DEVE ficar > 614."
+}
