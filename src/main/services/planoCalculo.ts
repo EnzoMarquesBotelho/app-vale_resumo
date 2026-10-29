@@ -12,13 +12,19 @@
 
 import { datasEntre, diferencaDias } from "@shared/agenda";
 import { ordenarCronologicamente } from "@shared/cronologia";
+import { diagnosticoAplicavel } from "@shared/diagnostico";
 import { calcularPlano } from "@shared/plano";
 import type {
   CalcularPlanoParams,
   PlanoCalculado,
   TopicoDistribuivel,
 } from "@shared/plano";
-import type { NivelDificuldade, Prova, TopicoPlano } from "@shared/types";
+import type {
+  NivelDificuldade,
+  PlanoEstudo,
+  Prova,
+  TopicoPlano,
+} from "@shared/types";
 import { DadosProvaInvalidosError } from "./provas.js";
 
 /**
@@ -36,6 +42,23 @@ export function nivelParaPeso(n?: NivelDificuldade): number {
     default:
       return 0.5;
   }
+}
+
+/**
+ * Ordena os tópicos do plano base→novo (cronologia + ordem manual). Único
+ * lugar dessa regra: o cálculo do plano e o diagnóstico usam a mesma ordem.
+ */
+export function ordenarTopicosDoPlano(plano: PlanoEstudo): TopicoPlano[] {
+  // Ordem manual (ids → índice) reconstruída como ReadonlyMap para a cronologia.
+  const ordemManual =
+    plano.ordemManual !== undefined && plano.ordemManual.length > 0
+      ? new Map(plano.ordemManual.map((id, i) => [id, i] as const))
+      : undefined;
+
+  return ordenarCronologicamente<TopicoPlano>({
+    itens: plano.topicos,
+    ...(ordemManual !== undefined ? { ordemManual } : {}),
+  });
 }
 
 /**
@@ -69,16 +92,7 @@ export function montarPlanoCalculado(prova: Prova, hoje: string): PlanoCalculado
   const corridas = datasEntre(hoje, prova.data);
   const datasDisponiveis = corridas.filter((_, i) => i % 7 < plano.diasPorSemana);
 
-  // Ordem manual (ids → índice) reconstruída como ReadonlyMap para a cronologia.
-  const ordemManual =
-    plano.ordemManual !== undefined && plano.ordemManual.length > 0
-      ? new Map(plano.ordemManual.map((id, i) => [id, i] as const))
-      : undefined;
-
-  const ordenados = ordenarCronologicamente<TopicoPlano>({
-    itens: plano.topicos,
-    ...(ordemManual !== undefined ? { ordemManual } : {}),
-  });
+  const ordenados = ordenarTopicosDoPlano(plano);
 
   const topicos: TopicoDistribuivel[] = ordenados.map((t) => ({
     id: t.id,
@@ -87,12 +101,15 @@ export function montarPlanoCalculado(prova: Prova, hoje: string): PlanoCalculado
     dificuldade: nivelParaPeso(t.dificuldade),
   }));
 
+  const ajuste = diagnosticoAplicavel(plano, prova.diagnostico);
   const params: CalcularPlanoParams = {
     topicos,
     datasDisponiveis,
     horasPorDia: plano.horasPorDia,
     diasRestantes,
     ordinal: plano.ordinal,
+    // Diagnóstico só entra se concluído, atual e com efeito (senão: fatia 2).
+    ...(ajuste !== undefined ? { diagnostico: ajuste } : {}),
   };
   return calcularPlano(params);
 }

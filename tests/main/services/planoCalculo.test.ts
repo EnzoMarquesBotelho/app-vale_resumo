@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { tmpdir } from "node:os";
-import type { PlanoEstudo, Prova, TopicoPlano } from "@shared/types";
+import { assinaturaPlano } from "@shared/diagnostico";
+import type {
+  DiagnosticoPlano,
+  PerguntaDiagnostico,
+  PlanoEstudo,
+  Prova,
+  TopicoPlano,
+} from "@shared/types";
 
 // `planoCalculo.ts` importa `DadosProvaInvalidosError` de `provas.ts`, que por
 // sua vez importa `app` do Electron só para o diretório default. Mockamos o
@@ -124,5 +131,89 @@ describe("montarPlanoCalculado", () => {
     const r = montarPlanoCalculado(prova, "2026-03-10");
     const primeiroBloco = r.dias.flatMap((d) => d.blocos)[0];
     expect(primeiroBloco.topicoId).toBe("b");
+  });
+});
+
+describe("montarPlanoCalculado — diagnóstico (fatia 3)", () => {
+  const pergunta = (
+    topicoId: string,
+    camada: "base" | "novo",
+  ): PerguntaDiagnostico => ({
+    tipo: "multipla",
+    enunciado: "Q?",
+    alternativas: [
+      { texto: "A", correta: true },
+      { texto: "B", correta: false },
+    ],
+    topicoId,
+    camada,
+  });
+  const plano = planoDe({
+    topicos: [
+      topico({ id: "a", novo: false }),
+      topico({ id: "b", novo: true }),
+    ],
+  });
+  const diag = (
+    respostas?: number[],
+    assinatura = assinaturaPlano(plano),
+  ): DiagnosticoPlano => ({
+    assinatura,
+    geradoEm: "2026-01-02T00:00:00.000Z",
+    perguntas: [
+      pergunta("a", "base"),
+      pergunta("a", "base"),
+      pergunta("a", "base"),
+      pergunta("b", "novo"),
+    ],
+    pedido: 6,
+    ignorados: [],
+    ...(respostas !== undefined
+      ? { respostas, concluidoEm: "2026-01-03T00:00:00.000Z" }
+      : {}),
+  });
+  const comDiag = (data: string, d?: DiagnosticoPlano): Prova => ({
+    ...provaDe(data, plano),
+    ...(d !== undefined ? { diagnostico: d } : {}),
+  });
+  const HOJE = "2026-03-10";
+  const DATA = "2026-03-25"; // 15 dias
+  // base toda errada (alternativa B = índice 1), novo certo.
+  const lacuna = [1, 1, 1, 0];
+
+  it("lacuna_base concluída ⇒ mais base e diagnosticoAplicado", () => {
+    const sem = montarPlanoCalculado(comDiag(DATA), HOJE);
+    const com = montarPlanoCalculado(comDiag(DATA, diag(lacuna)), HOJE);
+    expect(com.mistura!.fracaoBase).toBeGreaterThan(sem.mistura!.fracaoBase);
+    expect(com.diagnosticoAplicado?.veredito).toBe("lacuna_base");
+  });
+
+  it("pendente, desatualizado, inconclusivo e sem_dificuldade ⇒ idêntico ao sem diagnóstico", () => {
+    const sem = montarPlanoCalculado(comDiag(DATA), HOJE);
+    expect(montarPlanoCalculado(comDiag(DATA, diag()), HOJE)).toEqual(sem);
+    expect(
+      montarPlanoCalculado(comDiag(DATA, diag(lacuna, "outra")), HOJE),
+    ).toEqual(sem);
+    // todas certas (alternativa A = índice 0) ⇒ sem_dificuldade
+    expect(
+      montarPlanoCalculado(comDiag(DATA, diag([0, 0, 0, 0])), HOJE),
+    ).toEqual(sem);
+    // só 2 perguntas de base ⇒ inconclusivo
+    const curto: DiagnosticoPlano = {
+      ...diag([1, 1]),
+      perguntas: [pergunta("a", "base"), pergunta("a", "base")],
+    };
+    expect(montarPlanoCalculado(comDiag(DATA, curto), HOJE)).toEqual(sem);
+  });
+
+  it("prova passada ⇒ prova_passou, sem diagnosticoAplicado", () => {
+    const r = montarPlanoCalculado(comDiag("2026-03-01", diag(lacuna)), HOJE);
+    expect(r).toEqual({ dias: [], aviso: { tipo: "prova_passou" } });
+  });
+
+  it("prova antiga (sem o bloco) ⇒ idêntica à fatia 2", () => {
+    const r = montarPlanoCalculado(provaDe(DATA, plano), HOJE);
+    expect("diagnosticoAplicado" in r).toBe(false);
+    expect(r.mistura).toBeDefined();
   });
 });
