@@ -11,6 +11,7 @@ import type {
   VinculoProva,
 } from "@shared/types";
 import { getApi } from "../api";
+import { Diagnostico } from "./Diagnostico";
 import { PlanoEstudo } from "./PlanoEstudo";
 
 /**
@@ -598,6 +599,18 @@ export function Agenda(): React.JSX.Element {
               aoCancelar={() => setMontandoPlano(false)}
             />
           )}
+
+          {/* Diagnóstico do plano: só com plano montado, fora do formulário e
+              enquanto a prova não passou (nunca duas prévias ao mesmo tempo). */}
+          {provaSelecionada.plano !== undefined &&
+            !montandoPlano &&
+            provas.find((p) => p.id === provaSelecionada.id)?.estado !==
+              "passada" && (
+              <Diagnostico
+                prova={provaSelecionada}
+                aoAtualizar={setProvaSelecionada}
+              />
+            )}
 
           {/* Região 4 — Dica do dia. */}
           {dica !== null && (
