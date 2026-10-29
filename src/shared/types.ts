@@ -412,6 +412,8 @@ export interface Prova {
   atualizadoEm: string;
   /** Plano de estudo guiado (questionário), quando o aluno o montou. */
   plano?: PlanoEstudo;
+  /** Diagnóstico do plano (quiz de múltipla escolha), quando o aluno o fez. */
+  diagnostico?: DiagnosticoPlano;
 }
 
 /** Qual prova é — define o recorte base vs novo (intent). */
@@ -532,4 +534,43 @@ export interface DicaDoDia {
   cadernosEmFoco: CadernoEmFoco[];
   /** Frase pronta em português para exibir. */
   mensagem: string;
+}
+
+/** Pergunta de múltipla escolha (estreitamento de `PerguntaQuiz`). */
+export type PerguntaMultipla = Extract<PerguntaQuiz, { tipo: "multipla" }>;
+
+/** Camada de uma pergunta do diagnóstico: base ou conteúdo novo. */
+export type CamadaDiagnostico = "base" | "novo";
+
+/** Pergunta de múltipla escolha rotulada pelo tópico de origem (nunca pela IA). */
+export type PerguntaDiagnostico = PerguntaMultipla & {
+  topicoId: string;
+  camada: CamadaDiagnostico;
+};
+
+/** Por que um tópico não entrou no diagnóstico. */
+export type MotivoTopicoIgnorado = "manual" | "sem_texto" | "nao_gerou";
+
+/** Tópico do plano que ficou de fora do diagnóstico, com o motivo. */
+export interface TopicoIgnorado {
+  id: string;
+  titulo: string;
+  motivo: MotivoTopicoIgnorado;
+}
+
+/** Bloco opcional e aditivo, irmão de `plano` em `Prova`. */
+export interface DiagnosticoPlano {
+  /** Ver `assinaturaPlano` (shared/diagnostico). */
+  assinatura: string;
+  /** Data de geração em ISO 8601. */
+  geradoEm: string;
+  /** Perguntas, base primeiro. */
+  perguntas: PerguntaDiagnostico[];
+  /** Nº de perguntas planejadas (tópicos selecionados × perguntas por tópico). */
+  pedido: number;
+  ignorados: TopicoIgnorado[];
+  /** Escolhas do aluno alinhadas a `perguntas`; -1 = "Não sei". Ausente = pendente. */
+  respostas?: number[];
+  /** ISO 8601; presente se, e somente se, `respostas` está presente. */
+  concluidoEm?: string;
 }
