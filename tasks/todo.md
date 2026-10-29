@@ -6,9 +6,12 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: master na fatia `c6d3852` (geração em lotes — implementação) +
-> docs/roadmap + correção de acabamento (parcial honesto + contagem no quiz) e
-> seu commit de docs, **579 testes** passando, build/lint limpos.
+> Estado atual: branch `feat/plano-f1-cronologia` na fatia `d4df16b` (Plano de
+> estudo guiado — Fatia 1/4: captura de data + ordenação cronológica) + este
+> commit de docs, **614 testes** passando, build/lint limpos. Será
+> fast-forwardada na master pelo orquestrador. Fatia anterior na master:
+> `c6d3852` (geração em lotes — implementação) + docs/roadmap + correção de
+> acabamento (parcial honesto + contagem no quiz) e seu commit de docs.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -258,20 +261,47 @@ configurar `npm run package` para gerar um executável.
     renderer sem mudar o contrato `AppApi`; (c) **contagem no topo do quiz**
     (`N questões · Modo`). 579 testes (563 + 16). Ollama real = verificação
     manual do usuário.
+- [x] **Plano de estudo guiado — Fatia 1/4: captura de data + ordenação
+  mecânica** — `roadmap-plano-estudo-guiado-f1.md` (fatia `d4df16b` + commit de
+  docs). Fundação 100% pura/sem IA da ordenação base→novo: captura de uma data
+  por documento na importação (data interna do PDF via `getMetadata()` →
+  `mtime` do disco → indefinida; `.txt`/`.md` vão direto ao mtime), campo novo
+  `dataArquivo?` (ISO 8601 UTC) aditivo/retrocompatível em `Documento`,
+  `DocumentoSalvo`, `ArquivoImportado` e `ResumoDocumentoSalvo`, e a função pura
+  `ordenarCronologicamente` (`src/shared/cronologia.ts`: determinística,
+  estável, não muta a entrada, não lê o relógio; sem data → ao final por `id`;
+  sobreposição manual opcional por parâmetro, semântica de prefixo). Parsing
+  tolerante da data do PDF em `src/shared/pdfDate.ts` + guarda `ehIsoPlausivel`.
+  Zero dep nova; 614 testes (579 + 35, Ollama não envolvido). A ordenação é
+  **interna** (nada perceptível na UI ainda). PDF real end-to-end = verificação
+  manual do usuário.
 
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo
-- [ ] **Plano de estudo guiado por questionário** — intent CONFIRMADO em
+- **Plano de estudo guiado por questionário** — intent CONFIRMADO em
   `docs/intent/plano-estudo-guiado.md` (entrevista com `interview-me`), visão em
   `roadmap-plano-estudo-guiado.md`. Agenda dia-a-dia que decide pelo aluno (o quê/
   ordem/quanto), com **checkpoints "pré-provas"** (lista de exercícios, modo
   automático OU lembrete, alterável). Base vs novo pelo ordinal da prova (1ª/2ª/
   final) e ordem cronológica **mecânica** (data interna do arquivo → mtime, com
-  sobreposição manual). **Quiz diagnóstico** (base vs tópico novo) entra NESTA
-  fatia. Régua: prova longe = foco na base; perto = foco no novo. Distribuição =
+  sobreposição manual). **Quiz diagnóstico** (base vs tópico novo) entra NA fatia
+  3. Régua: prova longe = foco na base; perto = foco no novo. Distribuição =
   lógica pura; Ollama só gera diagnóstico/exercícios/frases. Fora: nada online,
-  ENEM/ENADE curado fica p/ depois, IA não ordena. Próximo passo: design.
+  ENEM/ENADE curado fica p/ depois, IA não ordena.
+  **Decomposto em 4 sub-fatias sequenciais (design validado — detalhe em
+  `roadmap-plano-estudo-guiado-f1.md`):**
+  - [x] **Fatia 1/4 — Captura de data + ordenação mecânica** — ENTREGUE (ver
+    "Fases pós-MVP"; fatia `d4df16b` + commit de docs).
+  - [ ] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — fórmula
+    da régua contínua base/novo + distribuição; **lar da persistência do plano**
+    (campos aditivos em `Prova`) **e da ordem cronológica manual** (alimenta o
+    `ordemManual` da fatia 1) + UI de reordenar.
+  - [ ] **Fatia 3/4 — Quiz diagnóstico** — reusa `gerarQuiz`/`avaliarLote`;
+    classificação pura "lacuna na base vs. dificuldade no novo". Depende de 1+2.
+  - [ ] **Fatia 4/4 — Checkpoints "pré-provas"** — reusa `gerarExercicios` +
+    `avisoGeracaoParcial`; gancho na `SessaoRevisao`; modo automático vs.
+    lembrete; gatilho temporal puro ("faltam X dias → agir").
 - [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
 - [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - [ ] **Geração de IA em lote** (pasta inteira).

@@ -1,14 +1,19 @@
 # Progresso do App "Desenrola"
 
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
-> Onde paramos — atualizado em 2026-10-28.
+> Onde paramos — atualizado em 2026-10-29.
 
-## Estado atual (branch master)
+## Estado atual (branch feat/plano-f1-cronologia → fast-forward p/ master)
 
-- Build, lint e **579 testes** passando. Última fatia na master: `c6d3852`
-  (geração em lotes — implementação), seguida do roadmap/sincronização de docs e
-  da correção de acabamento da própria fatia (parcial honesto + contagem no
-  quiz) com seu commit de docs.
+- Build, lint e **614 testes** passando (47 arquivos de teste). Fatia atual:
+  **Plano de estudo guiado — Fatia 1/4** (captura da data do arquivo na
+  importação + função pura de ordenação cronológica base→novo), na fatia
+  `d4df16b` (implementação) + este commit de docs. Baseline anterior era 579
+  testes → agora 614 (cresce, nunca encolhe). O orquestrador fará o
+  fast-forward na master depois.
+- Fatia anterior na master: `c6d3852` (geração em lotes — implementação),
+  seguida do roadmap/sincronização de docs e da correção de acabamento da
+  própria fatia (parcial honesto + contagem no quiz) com seu commit de docs.
 - **Publicado no GitHub:** `EnzoMarquesBotelho/app-vale_resumo`. Release pública
   `v0.1.1` (com `latest.yml`); versão atual do `package.json` = `0.1.1`.
 - Ollama local do usuário tem `llama3.1:latest`, `qwen2.5`, `gemma2` (e também
@@ -121,6 +126,30 @@
   579 testes (563 + 16, Ollama mockado); build/lint verdes. A validação com o
   Ollama real (pedir 50 e ver o aviso + a contagem) é verificação **manual** do
   usuário (CI sem GUI/modelo).
+- **Plano de estudo guiado — Fatia 1/4: captura de data + ordenação mecânica**
+  (`roadmap-plano-estudo-guiado-f1.md`; fatia `d4df16b` + commit de docs):
+  fundação 100% mecânica/lógica pura, **sem IA**, para a ordenação base→novo do
+  plano guiado. Três peças: (a) **captura de uma data por documento na
+  importação** (arquivo único e pasta), no main, com hierarquia de fonte — data
+  interna do PDF (`CreationDate`, fallback `ModDate`) via `getMetadata()` do
+  `pdfjs-dist` já instalado; senão o `mtime` do disco (reaproveitando o `stat`
+  existente, sem syscall extra); senão indefinida. `.txt`/`.md` vão direto ao
+  mtime. (b) **Campo novo `dataArquivo?`** (ISO 8601 UTC canônica) adicionado de
+  forma **aditiva/retrocompatível** em `Documento`, `DocumentoSalvo`,
+  `ArquivoImportado` e `ResumoDocumentoSalvo`; documentos antigos sem o campo
+  carregam normalmente (leitura tolerante; sem backfill). (c) **Função pura
+  `ordenarCronologicamente`** (`src/shared/cronologia.ts`): ordena do mais antigo
+  (base) ao mais recente (novo), determinística, estável, não muta a entrada,
+  não lê o relógio; itens sem data vão ao final por `id`. Acomoda uma
+  **sobreposição manual opcional** por parâmetro (`ordemManual: Map<id, posição>`,
+  semântica de prefixo — fixados vêm à frente na ordem pedida, o resto por data);
+  quando omitida, a ordenação é 100% por data (regra padrão automática).
+  Parsing tolerante da data do PDF em `src/shared/pdfDate.ts` (`parsearDataPdf`)
+  e guarda `ehIsoPlausivel` (round-trip de `toISOString()`). Zero dep nova. 614
+  testes (579 + 35, Ollama não envolvido); build/lint verdes. **Verificação
+  manual do usuário:** a extração de data de um PDF **real** end-to-end (os
+  testes usam a fixture `com-data.pdf`, não PDFs reais variados). A ordenação é
+  **interna** — nada perceptível ainda na UI nesta fatia.
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -157,7 +186,32 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   foco no novo com toques na base. Distribuição por dias = lógica pura testável;
   Ollama só gera diagnóstico/exercícios de checkpoint/frases de orientação. Fora
   de escopo: nada online, ENEM/ENADE curado fica p/ depois, sem promessa de "cai
-  na prova". **Próximo passo: design** (perguntas abertas listadas no intent).
+  na prova".
+  **Decomposto em 4 sub-fatias sequenciais (design validado contra o código):**
+  - [x] **Fatia 1/4 — Captura de data + ordenação mecânica** — ENTREGUE
+    (ver "Entregue", `roadmap-plano-estudo-guiado-f1.md`; fatia `d4df16b` +
+    commit de docs). Fundação pura/sem IA: `dataArquivo?` + `cronologia.ts`.
+  - [ ] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — consome
+    `cronologia.ts` da fatia 1 e encaixa na `Prova`/`agenda.ts` existentes.
+    Novo: fórmula pura da régua contínua base/novo (prova longe → base; perto →
+    novo) e a distribuição por dias. **Lar da persistência do plano** (campos
+    opcionais aditivos em `Prova`, recomendado) **e da ordem cronológica
+    manual** (array de ids / mapa `id→posição`, 1:1 com a prova, alimenta o
+    `ordemManual` da função pura) + a UI de reordenar. Dentro da fatia, separar
+    em dois commits: persistência do questionário, depois a fórmula.
+  - [ ] **Fatia 3/4 — Quiz diagnóstico (reusa quiz)** — reusa
+    `gerarQuiz`/`parseQuiz` + `avaliarLote`; a parte nova e **pura** classifica
+    o resultado em "lacuna na base" vs. "dificuldade no novo" por tópico/camada.
+    Depende de 1 (ordenação) e 2 (rótulo base/novo). Orquestração nova por cima
+    de `gerarQuiz` (que hoje é por documento).
+  - [ ] **Fatia 4/4 — Checkpoints "pré-provas" (reusa exercícios)** — reusa
+    `gerarExercicios` (lotes/dedup/progresso) e o `avisoGeracaoParcial`; encaixa
+    na `SessaoRevisao` (campo aditivo "checkpoint"); modo automático vs. lembrete
+    (alterável) como config do plano. Gatilho temporal ("faltam X dias → agir")
+    é lógica pura sobre as datas (reusa `diferencaDias`/`diasRestantes`).
+  - **Fronteira vinculante (todas 2–4):** a distribuição NÃO depende do modelo;
+    só a geração de texto/perguntas/exercícios usa Ollama. Ordem 1 → 2 → 3 → 4
+    confirmada (3 depende de 1+2).
 - **Edição manual dos mapas mentais** (renomear/adicionar/remover nós); exportar
   mapa como imagem.
 - **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
