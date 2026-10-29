@@ -72,6 +72,10 @@ const api: AppApi = {
   salvarPlano: (id, plano) =>
     ipcRenderer.invoke(IPC_CHANNELS.salvarPlano, id, plano),
   calcularPlano: (id) => ipcRenderer.invoke(IPC_CHANNELS.calcularPlano, id),
+  gerarDiagnostico: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarDiagnostico, id),
+  responderDiagnostico: (id, escolhas) =>
+    ipcRenderer.invoke(IPC_CHANNELS.responderDiagnostico, id, escolhas),
   removerProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.removerProva, id),
   dicaDoDia: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDoDia, id),
   dicaDaIa: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDaIa, id),

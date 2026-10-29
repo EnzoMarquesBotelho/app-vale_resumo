@@ -98,6 +98,10 @@ export const IPC_CHANNELS = {
   salvarPlano: "prova:salvar-plano",
   /** Recalcula (sob demanda) a agenda dia-a-dia do plano de estudo da prova. */
   calcularPlano: "prova:calcular-plano",
+  /** Gera (IA, múltipla escolha) o diagnóstico do plano e o persiste pendente. */
+  gerarDiagnostico: "prova:gerar-diagnostico",
+  /** Grava as escolhas do aluno no diagnóstico (a correção é mecânica). */
+  responderDiagnostico: "prova:responder-diagnostico",
   /** Remove uma prova pelo id. */
   removerProva: "prova:remover",
   /** Calcula a dica MECÂNICA do dia de uma prova (sem IA, instantânea). */
@@ -364,6 +368,17 @@ export interface AppApi {
    * montado (o questionário precisa ter sido salvo antes).
    */
   calcularPlano: (id: string) => Promise<PlanoCalculado>;
+  /**
+   * Gera o diagnóstico (perguntas de múltipla escolha rotuladas base/novo pelo
+   * plano) da prova `id` e resolve com a prova (diagnóstico pendente). Empurra
+   * progresso com `artefato: "diagnostico"`. Rejeita com mensagem amigável.
+   */
+  gerarDiagnostico: (id: string) => Promise<Prova>;
+  /**
+   * Grava as `escolhas` (índice da alternativa; `-1` = "Não sei") do
+   * diagnóstico da prova `id` e resolve com a prova (diagnóstico concluído).
+   */
+  responderDiagnostico: (id: string, escolhas: number[]) => Promise<Prova>;
   /** Remove a prova pelo `id` (no-op se já não existe). */
   removerProva: (id: string) => Promise<void>;
   /**

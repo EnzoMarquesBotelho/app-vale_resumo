@@ -94,10 +94,17 @@ import {
   hojeLocal,
   listarProvas,
   regerarAgenda,
+  registrarRespostasDiagnostico,
   removerProva,
+  salvarDiagnostico,
   salvarPlano,
   salvarSessoes,
 } from "../services/provas.js";
+import {
+  DiagnosticoEmAndamentoError,
+  gerarDiagnostico,
+  mensagemAmigavelDiagnostico,
+} from "../services/diagnostico.js";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
 import { montarPlanoCalculado } from "../services/planoCalculo.js";
 import type { PlanoCalculado } from "@shared/plano";
@@ -476,6 +483,9 @@ async function obterStatusOllama(): Promise<OllamaStatus> {
   }
   return { disponivel, modelos, modeloSelecionado };
 }
+
+/** Provas com geração de diagnóstico em andamento (guarda de concorrência). */
+const diagnosticosEmGeracao = new Set<string>();
 
 /**
  * Resolve, no momento da geração, um modelo que realmente exista no Ollama.
@@ -949,6 +959,59 @@ export function registerIpcHandlers(): void {
         return montarPlanoCalculado(prova, hojeLocal());
       } catch (erro) {
         throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.gerarDiagnostico,
+    async (event, id: string): Promise<Prova> => {
+      if (diagnosticosEmGeracao.has(id)) {
+        throw new Error(mensagemAmigavelDiagnostico(new DiagnosticoEmAndamentoError()));
+      }
+      diagnosticosEmGeracao.add(id);
+      try {
+        const prova = await carregarProva(id);
+        if (prova.plano === undefined) {
+          throw new DadosProvaInvalidosError(
+            "Monte o plano de estudo antes de fazer o diagnóstico.",
+          );
+        }
+        const model = await modeloParaGeracao();
+        const diagnostico = await gerarDiagnostico({
+          plano: prova.plano,
+          // QUALQUER erro de leitura (ausente, corrompido, EACCES) = sem texto.
+          carregarTexto: async (docId) => {
+            try {
+              return (await carregarDocumento(docId)).texto;
+            } catch {
+              return null;
+            }
+          },
+          gerar: (prompt, format) => generate({ prompt, model, format }),
+          aoProgresso: empurrarProgresso(event, "diagnostico"),
+          agora: new Date().toISOString(),
+        });
+        return await salvarDiagnostico(id, diagnostico);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelDiagnostico(erro));
+      } finally {
+        diagnosticosEmGeracao.delete(id);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.responderDiagnostico,
+    async (_event, id: string, escolhas: number[]): Promise<Prova> => {
+      try {
+        return await registrarRespostasDiagnostico(
+          id,
+          escolhas,
+          new Date().toISOString(),
+        );
+      } catch (erro) {
+        throw new Error(mensagemAmigavelDiagnostico(erro));
       }
     },
   );
