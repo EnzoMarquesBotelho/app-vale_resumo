@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SessaoRevisao, VinculoProva } from "@shared/types";
+import { assinaturaPlano, estadoDiagnostico } from "@shared/diagnostico";
+import type {
+  DiagnosticoPlano,
+  SessaoRevisao,
+  VinculoProva,
+} from "@shared/types";
 
 // `provas.ts` importa `app` do Electron só para o diretório default. Nos
 // testes passamos um `baseDir` temporário, então `app.getPath` não é chamado;
@@ -21,7 +26,10 @@ import {
   listarProvas,
   regerarAgenda,
   removerProva,
+  registrarRespostasDiagnostico,
+  salvarDiagnostico,
   salvarPlano,
+  sanearDiagnosticoPersistido,
   sanearPlano,
   salvarSessoes,
 } from "../../src/main/services/provas.js";
@@ -752,5 +760,253 @@ describe("provas: salvarPlano", () => {
     await expect(
       salvarPlano(criada.id, { topicos: [] }, AGORA, baseDir),
     ).rejects.toBeInstanceOf(DadosProvaInvalidosError);
+  });
+});
+
+describe("provas: diagnóstico (fatia 3)", () => {
+  const planoBruto = {
+    ordinal: "segunda",
+    horasPorDia: 2,
+    diasPorSemana: 5,
+    topicos: [
+      { id: "a", titulo: "Base", novo: false },
+      { id: "b", titulo: "Novo", novo: true },
+    ],
+    checkpoint: "lembrete",
+  };
+
+  const pergunta = (topicoId: string, camada: "base" | "novo") => ({
+    tipo: "multipla" as const,
+    enunciado: "Pergunta?",
+    alternativas: [
+      { texto: "A", correta: true },
+      { texto: "B", correta: false },
+      { texto: "C", correta: false },
+    ],
+    topicoId,
+    camada,
+  });
+
+  async function provaComPlano() {
+    const criada = await criarProva(
+      { titulo: "Prova", data: "2026-03-20", vinculo: vinculoCaderno },
+      HOJE,
+      baseDir,
+    );
+    return salvarPlano(criada.id, planoBruto, AGORA, baseDir);
+  }
+
+  function diagnosticoDe(prova: { plano?: Parameters<typeof assinaturaPlano>[0] }): DiagnosticoPlano {
+    return {
+      assinatura: assinaturaPlano(prova.plano!),
+      geradoEm: AGORA,
+      perguntas: [
+        pergunta("a", "base"),
+        pergunta("a", "base"),
+        pergunta("a", "base"),
+        pergunta("b", "novo"),
+      ],
+      pedido: 6,
+      ignorados: [{ id: "manual:x-0", titulo: "X", motivo: "manual" }],
+    };
+  }
+
+  it("round-trip: salvar → carregar devolve o mesmo bloco, sem .tmp órfão", async () => {
+    const prova = await provaComPlano();
+    const d = diagnosticoDe(prova);
+    const salva = await salvarDiagnostico(prova.id, d, baseDir);
+    expect(salva.diagnostico).toEqual(d);
+    const relida = await carregarProva(prova.id, baseDir);
+    expect(relida.diagnostico).toEqual(d);
+    expect(Object.keys(relida.diagnostico!)).not.toContain("respostas");
+    const { readdir } = await import("node:fs/promises");
+    const arquivos = await readdir(join(baseDir, "provas"));
+    expect(arquivos.filter((a) => a.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("registra respostas e preserva o bloco", async () => {
+    const prova = await provaComPlano();
+    await salvarDiagnostico(prova.id, diagnosticoDe(prova), baseDir);
+    const salva = await registrarRespostasDiagnostico(
+      prova.id,
+      [0, -1, 1, 0],
+      AGORA,
+      baseDir,
+    );
+    expect(salva.diagnostico?.respostas).toEqual([0, -1, 1, 0]);
+    expect(salva.diagnostico?.concluidoEm).toBe(AGORA);
+    const relida = await carregarProva(prova.id, baseDir);
+    expect(relida.diagnostico).toEqual(salva.diagnostico);
+    expect(estadoDiagnostico(relida.plano, relida.diagnostico)).toBe("concluido");
+  });
+
+  it("prova ANTIGA (sem o bloco, com e sem plano) carrega como antes", async () => {
+    const antiga = {
+      id: "antiga2",
+      titulo: "Antiga",
+      data: "2026-03-20",
+      vinculo: vinculoCaderno,
+      intervalos: [7, 3, 1],
+      sessoes: [],
+      criadoEm: AGORA,
+      atualizadoEm: AGORA,
+    };
+    await escreverJsonCru(baseDir, "antiga2.json", JSON.stringify(antiga));
+    const carregada = await carregarProva("antiga2", baseDir);
+    expect(carregada).toEqual(antiga);
+    expect("diagnostico" in carregada).toBe(false);
+
+    const comPlano = await provaComPlano();
+    const relida = await carregarProva(comPlano.id, baseDir);
+    expect("diagnostico" in relida).toBe(false);
+  });
+
+  it("bloco corrompido é descartado sem lançar e sem chave undefined", async () => {
+    const prova = await provaComPlano();
+    const dir = join(baseDir, "provas");
+    const cru = JSON.parse(
+      await (await import("node:fs/promises")).readFile(
+        join(dir, `${prova.id}.json`),
+        "utf-8",
+      ),
+    );
+    for (const ruim of ["x", 42, null, [], { assinatura: "s" }, {
+      assinatura: "s",
+      geradoEm: AGORA,
+      perguntas: [{ tipo: "multipla", enunciado: "" }],
+    }]) {
+      await escreverJsonCru(
+        baseDir,
+        `${prova.id}.json`,
+        JSON.stringify({ ...cru, diagnostico: ruim }),
+      );
+      const lida = await carregarProva(prova.id, baseDir);
+      expect("diagnostico" in lida).toBe(false);
+      expect(lida.plano).toBeDefined();
+    }
+  });
+
+  it("sanearDiagnosticoPersistido: pergunta inválida ou respostas desalinhadas ⇒ pendente", () => {
+    const base = {
+      assinatura: "s",
+      geradoEm: AGORA,
+      perguntas: [pergunta("a", "base"), pergunta("b", "novo")],
+      pedido: 2,
+      ignorados: [{ id: "q", titulo: "Q", motivo: "invalido" }],
+    };
+    const ok = sanearDiagnosticoPersistido({
+      ...base,
+      respostas: [0, 1],
+      concluidoEm: AGORA,
+    });
+    expect(ok?.respostas).toEqual([0, 1]);
+    expect(ok?.ignorados).toEqual([]);
+
+    const desalinhada = sanearDiagnosticoPersistido({
+      ...base,
+      respostas: [0],
+      concluidoEm: AGORA,
+    });
+    expect(desalinhada).toBeDefined();
+    expect("respostas" in desalinhada!).toBe(false);
+    expect("concluidoEm" in desalinhada!).toBe(false);
+
+    const foraDeFaixa = sanearDiagnosticoPersistido({
+      ...base,
+      respostas: [0, 9],
+    });
+    expect("respostas" in foraDeFaixa!).toBe(false);
+
+    const descartou = sanearDiagnosticoPersistido({
+      ...base,
+      perguntas: [...base.perguntas, { tipo: "multipla", enunciado: "x" }],
+      respostas: [0, 1, 0],
+    });
+    expect(descartou?.perguntas).toHaveLength(2);
+    expect("respostas" in descartou!).toBe(false);
+
+    expect(sanearDiagnosticoPersistido({ ...base, pedido: 0 })?.pedido).toBe(2);
+    expect(
+      sanearDiagnosticoPersistido({
+        ...base,
+        perguntas: [{ ...pergunta("a", "base"), alternativas: [] }],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("salvarPlano preserva o diagnóstico; só mudar 'novo' o invalida", async () => {
+    const prova = await provaComPlano();
+    await salvarDiagnostico(prova.id, diagnosticoDe(prova), baseDir);
+
+    const horas = await salvarPlano(
+      prova.id,
+      { ...planoBruto, horasPorDia: 4, diasPorSemana: 3 },
+      AGORA,
+      baseDir,
+    );
+    expect(horas.diagnostico).toBeDefined();
+    expect(estadoDiagnostico(horas.plano, horas.diagnostico)).toBe("pendente");
+
+    const mudou = await salvarPlano(
+      prova.id,
+      {
+        ...planoBruto,
+        topicos: [
+          { id: "a", titulo: "Base", novo: true },
+          { id: "b", titulo: "Novo", novo: true },
+        ],
+      },
+      AGORA,
+      baseDir,
+    );
+    expect(mudou.diagnostico).toBeDefined();
+    expect(estadoDiagnostico(mudou.plano, mudou.diagnostico)).toBe(
+      "desatualizado",
+    );
+  });
+
+  it("salvarDiagnostico com assinatura divergente ou sem plano lança e não toca o arquivo", async () => {
+    const prova = await provaComPlano();
+    const d = { ...diagnosticoDe(prova), assinatura: "outra" };
+    await expect(salvarDiagnostico(prova.id, d, baseDir)).rejects.toBeInstanceOf(
+      DadosProvaInvalidosError,
+    );
+    const relida = await carregarProva(prova.id, baseDir);
+    expect("diagnostico" in relida).toBe(false);
+
+    const semPlano = await criarProva(
+      { titulo: "Sem plano", data: "2026-03-20", vinculo: vinculoCaderno },
+      HOJE,
+      baseDir,
+    );
+    await expect(
+      salvarDiagnostico(semPlano.id, diagnosticoDe(prova), baseDir),
+    ).rejects.toBeInstanceOf(DadosProvaInvalidosError);
+  });
+
+  it("refazer substitui o diagnóstico anterior", async () => {
+    const prova = await provaComPlano();
+    const d = diagnosticoDe(prova);
+    await salvarDiagnostico(prova.id, d, baseDir);
+    await registrarRespostasDiagnostico(prova.id, [0, 0, 0, 0], AGORA, baseDir);
+    const novo = { ...d, geradoEm: "2026-03-11T00:00:00.000Z" };
+    const salva = await salvarDiagnostico(prova.id, novo, baseDir);
+    expect(salva.diagnostico).toEqual(novo);
+    expect("respostas" in salva.diagnostico!).toBe(false);
+  });
+
+  it("registrarRespostasDiagnostico valida as escolhas e a existência do bloco", async () => {
+    const prova = await provaComPlano();
+    await expect(
+      registrarRespostasDiagnostico(prova.id, [0, 0, 0, 0], AGORA, baseDir),
+    ).rejects.toThrow("Não há diagnóstico para responder");
+    await salvarDiagnostico(prova.id, diagnosticoDe(prova), baseDir);
+    for (const ruim of [[0, 0, 0], [0, 0, 0, 3], [0, 0, 0, -2], [0, 0, 0, 1.5], "x", null]) {
+      await expect(
+        registrarRespostasDiagnostico(prova.id, ruim, AGORA, baseDir),
+      ).rejects.toThrow("Responda todas as perguntas para ver o resultado.");
+    }
+    const relida = await carregarProva(prova.id, baseDir);
+    expect("respostas" in relida.diagnostico!).toBe(false);
   });
 });

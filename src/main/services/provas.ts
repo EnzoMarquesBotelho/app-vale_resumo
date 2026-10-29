@@ -32,9 +32,15 @@ import {
   recomputarAgenda,
 } from "@shared/agenda";
 import { ehIsoPlausivel } from "@shared/cronologia";
+import { assinaturaPlano } from "@shared/diagnostico";
 import { slugTopico } from "@shared/slug";
 import type {
+  AlternativaQuiz,
+  DiagnosticoPlano,
+  MotivoTopicoIgnorado,
   NivelDificuldade,
+  PerguntaDiagnostico,
+  TopicoIgnorado,
   PlanoEstudo,
   PreferenciaCheckpoint,
   Prova,
@@ -239,7 +245,18 @@ export async function carregarProva(
 ): Promise<Prova> {
   try {
     const conteudo = await readFile(caminhoProva(id, baseDir), "utf-8");
-    return JSON.parse(conteudo) as Prova;
+    const prova = JSON.parse(conteudo) as Prova;
+    // Bloco aditivo da fatia 3: só toca se a chave existir (prova antiga volta
+    // idêntica). Bloco corrompido é descartado, nunca derruba a leitura.
+    if (typeof prova === "object" && prova !== null && "diagnostico" in prova) {
+      const saneado = sanearDiagnosticoPersistido(prova.diagnostico);
+      if (saneado === undefined) {
+        delete prova.diagnostico;
+      } else {
+        prova.diagnostico = saneado;
+      }
+    }
+    return prova;
   } catch (erro) {
     if (
       typeof erro === "object" &&
@@ -609,6 +626,196 @@ export async function salvarPlano(
   const atualizada: Prova = {
     ...prova,
     ...(plano ? { plano } : {}),
+    atualizadoEm: agora,
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+// --- Diagnóstico do plano (fatia 3) -----------------------------------------
+
+const MOTIVOS_IGNORADO: readonly MotivoTopicoIgnorado[] = [
+  "manual",
+  "sem_texto",
+  "nao_gerou",
+];
+
+function objetoOuNulo(v: unknown): Record<string, unknown> | null {
+  return typeof v === "object" && v !== null && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null;
+}
+
+/** Valida uma pergunta persistida do diagnóstico; `null` se inválida. */
+function sanearPerguntaDiagnostico(bruta: unknown): PerguntaDiagnostico | null {
+  const p = objetoOuNulo(bruta);
+  if (p === null) return null;
+  if (typeof p.topicoId !== "string" || p.topicoId.length === 0) return null;
+  if (p.camada !== "base" && p.camada !== "novo") return null;
+  if (typeof p.enunciado !== "string" || p.enunciado.trim().length === 0) {
+    return null;
+  }
+  if (!Array.isArray(p.alternativas)) return null;
+  if (p.alternativas.length < 2 || p.alternativas.length > 6) return null;
+  const alternativas: AlternativaQuiz[] = [];
+  for (const a of p.alternativas) {
+    const alt = objetoOuNulo(a);
+    if (alt === null) return null;
+    if (typeof alt.texto !== "string" || alt.texto.trim().length === 0) {
+      return null;
+    }
+    alternativas.push({ texto: alt.texto, correta: alt.correta === true });
+  }
+  if (alternativas.filter((a) => a.correta).length !== 1) return null;
+  return {
+    tipo: "multipla",
+    enunciado: p.enunciado.trim(),
+    alternativas,
+    topicoId: p.topicoId,
+    camada: p.camada,
+  };
+}
+
+/**
+ * Leitura tolerante do bloco `diagnostico` persistido. Nunca lança: bloco
+ * inválido ⇒ `undefined`; pergunta inválida é descartada e, se algo foi
+ * descartado ou `respostas` está desalinhada, volta a PENDENTE (respostas e
+ * concluidoEm omitidos). Chaves opcionais por spread condicional.
+ */
+export function sanearDiagnosticoPersistido(
+  bruto: unknown,
+): DiagnosticoPlano | undefined {
+  const d = objetoOuNulo(bruto);
+  if (d === null) return undefined;
+  if (typeof d.assinatura !== "string" || typeof d.geradoEm !== "string") {
+    return undefined;
+  }
+  const brutas = Array.isArray(d.perguntas) ? d.perguntas : [];
+  const perguntas: PerguntaDiagnostico[] = [];
+  for (const b of brutas) {
+    const p = sanearPerguntaDiagnostico(b);
+    if (p !== null) perguntas.push(p);
+  }
+  if (perguntas.length === 0) return undefined;
+
+  const pedido =
+    typeof d.pedido === "number" && Number.isInteger(d.pedido) && d.pedido >= 1
+      ? d.pedido
+      : perguntas.length;
+
+  const ignorados: TopicoIgnorado[] = [];
+  if (Array.isArray(d.ignorados)) {
+    for (const b of d.ignorados) {
+      const ig = objetoOuNulo(b);
+      if (
+        ig !== null &&
+        typeof ig.id === "string" &&
+        typeof ig.titulo === "string" &&
+        MOTIVOS_IGNORADO.includes(ig.motivo as MotivoTopicoIgnorado)
+      ) {
+        ignorados.push({
+          id: ig.id,
+          titulo: ig.titulo,
+          motivo: ig.motivo as MotivoTopicoIgnorado,
+        });
+      }
+    }
+  }
+
+  const respostasValidas =
+    perguntas.length === brutas.length &&
+    Array.isArray(d.respostas) &&
+    d.respostas.length === perguntas.length &&
+    d.respostas.every(
+      (r, i) =>
+        typeof r === "number" &&
+        Number.isInteger(r) &&
+        r >= -1 &&
+        r < perguntas[i].alternativas.length,
+    );
+
+  return {
+    assinatura: d.assinatura,
+    geradoEm: d.geradoEm,
+    perguntas,
+    pedido,
+    ignorados,
+    ...(respostasValidas
+      ? {
+          respostas: d.respostas as number[],
+          ...(typeof d.concluidoEm === "string"
+            ? { concluidoEm: d.concluidoEm }
+            : {}),
+        }
+      : {}),
+  };
+}
+
+/**
+ * Persiste um diagnóstico recém-gerado (substitui o anterior). Recarrega a
+ * prova e só grava se o plano ainda tem a assinatura usada na geração.
+ *
+ * @throws {DadosProvaInvalidosError} se o plano sumiu ou mudou.
+ */
+export async function salvarDiagnostico(
+  id: string,
+  d: DiagnosticoPlano,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  if (
+    prova.plano === undefined ||
+    d.assinatura !== assinaturaPlano(prova.plano)
+  ) {
+    throw new DadosProvaInvalidosError(
+      "Os assuntos do plano mudaram enquanto eu preparava o diagnóstico. Tente de novo.",
+    );
+  }
+  const atualizada: Prova = {
+    ...prova,
+    diagnostico: d,
+    atualizadoEm: d.geradoEm,
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Grava as escolhas do aluno no diagnóstico (`-1` = "Não sei").
+ *
+ * @throws {DadosProvaInvalidosError} sem diagnóstico ou com escolhas inválidas.
+ */
+export async function registrarRespostasDiagnostico(
+  id: string,
+  escolhas: unknown,
+  agora: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  const d = prova.diagnostico;
+  if (d === undefined) {
+    throw new DadosProvaInvalidosError(
+      "Não há diagnóstico para responder. Faça o diagnóstico primeiro.",
+    );
+  }
+  const validas =
+    Array.isArray(escolhas) &&
+    escolhas.length === d.perguntas.length &&
+    escolhas.every(
+      (e, i) =>
+        typeof e === "number" &&
+        Number.isInteger(e) &&
+        e >= -1 &&
+        e < d.perguntas[i].alternativas.length,
+    );
+  if (!validas) {
+    throw new DadosProvaInvalidosError(
+      "Responda todas as perguntas para ver o resultado.",
+    );
+  }
+  const atualizada: Prova = {
+    ...prova,
+    diagnostico: { ...d, respostas: escolhas as number[], concluidoEm: agora },
     atualizadoEm: agora,
   };
   await escreverProva(atualizada, baseDir);
