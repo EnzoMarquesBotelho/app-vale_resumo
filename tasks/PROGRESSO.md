@@ -3,16 +3,17 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (branch feat/plano-f2-questionario → fast-forward p/ master)
+## Estado atual (master — HEAD `16ea5c0`)
 
-- Build, lint e **673 testes** passando (50 arquivos de teste). Fatia atual:
-  **Plano de estudo guiado — Fatia 2/4** (questionário do plano persistido na
-  prova + régua base/novo + distribuição por dias, tudo puro/sem IA + prévia
-  "o que estudar" na Agenda), em dois commits no worktree
-  `.worktrees/plano-f2-questionario` (branch `feat/plano-f2-questionario`).
+- Build, lint e **673 testes** passando (50 arquivos de teste). Última fatia
+  mergeada (fast-forward): **Plano de estudo guiado — Fatia 2/4** (questionário
+  do plano persistido na prova + régua base/novo + distribuição por dias, tudo
+  puro/sem IA + prévia "o que estudar" na Agenda), dois commits de feature
+  (`48afc38`, `fabd62b`) + dois de docs (`3a3a8de` design/plan/review da fatia,
+  `16ea5c0` baseline do AGENTS.md reconciliada para 673).
   Baseline da fatia 1 (HEAD `ae729bd` da master) era 614 testes; a fatia 2 levou
   a 635 (Commit A, persistência) e depois a 673 (Commit B, cálculo). Cresce,
-  nunca encolhe. O orquestrador fará o fast-forward na master depois.
+  nunca encolhe.
 - Fatia anterior na master: `c6d3852` (geração em lotes — implementação),
   seguida do roadmap/sincronização de docs e da correção de acabamento da
   própria fatia (parcial honesto + contagem no quiz) com seu commit de docs.
