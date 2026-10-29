@@ -3,18 +3,18 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (Fatia 3/4 pronta na branch `feat/plano-f3-diagnostico`; master em `b4b6cc2` até o merge)
+## Estado atual (branch master; Fatia 3/4 do plano guiado já mergeada)
 
 - Build, lint e **781 testes** passando (53 arquivos de teste), conferidos de
-  verdade na branch da fatia 3. Fatia pronta para merge fast-forward:
+  verdade na master após o merge fast-forward da fatia 3 (a master estava em
+  `b4b6cc2` antes do merge). Entregue e na master:
   **Plano de estudo guiado — Fatia 3/4** (quiz diagnóstico opcional que mede se
   a dificuldade está na base ou no conteúdo novo e ajusta a mistura do plano).
   Referência estável: **commit de implementação `e533d17`** (série
   `11643fa..e533d17`, 8 commits: régua, tipos/classificação puros, persistência,
   orquestração, planoCalculo, IPC, extração `PlanoPrevia`, UI) + o commit de
-  docs que o segue na branch (`git log` da branch). O hash do próprio commit de
-  docs não é citado aqui de propósito. Após o merge, o HEAD da master é o do
-  fast-forward (registrar no próximo ajuste de docs).
+  docs da fatia (`d2193f8`). O hash do commit que atualiza este cabeçalho não é
+  citado aqui de propósito (autorreferência).
   Histórico da contagem: fatia 1 = 614; fatia 2 = 635 → 673; **fatia 3 = 781**
   (+108). Cresce, nunca encolhe.
 - Fatia anterior (já na master): **Plano de estudo guiado — Fatia 2/4**

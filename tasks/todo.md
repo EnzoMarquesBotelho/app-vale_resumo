@@ -7,8 +7,8 @@
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
 > Estado atual: Plano de estudo guiado — **Fatia 3/4 (quiz diagnóstico + plano
-> ajustado) pronta na branch `feat/plano-f3-diagnostico`** (commit de
-> implementação `e533d17`, base master `b4b6cc2`; merge fast-forward pendente),
+> ajustado) já na master** (commit de implementação `e533d17` + docs
+> `d2193f8`, mergeada por fast-forward sobre `b4b6cc2`),
 > **781 testes** passando (53 arquivos), build/lint limpos. Restante do plano
 > guiado: **Fatia 4/4 (checkpoints)**. Fatia 2/4 já na master (`48afc38`/
 > `fabd62b` + docs, 673 testes); Fatia 1/4 em `d4df16b` + docs.
