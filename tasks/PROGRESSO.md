@@ -1,16 +1,18 @@
 # Progresso do App "Desenrola"
 
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
-> Onde paramos — atualizado em 2026-10-29.
+> Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (branch feat/plano-f1-cronologia → fast-forward p/ master)
+## Estado atual (branch feat/plano-f2-questionario → fast-forward p/ master)
 
-- Build, lint e **614 testes** passando (47 arquivos de teste). Fatia atual:
-  **Plano de estudo guiado — Fatia 1/4** (captura da data do arquivo na
-  importação + função pura de ordenação cronológica base→novo), na fatia
-  `d4df16b` (implementação) + este commit de docs. Baseline anterior era 579
-  testes → agora 614 (cresce, nunca encolhe). O orquestrador fará o
-  fast-forward na master depois.
+- Build, lint e **673 testes** passando (50 arquivos de teste). Fatia atual:
+  **Plano de estudo guiado — Fatia 2/4** (questionário do plano persistido na
+  prova + régua base/novo + distribuição por dias, tudo puro/sem IA + prévia
+  "o que estudar" na Agenda), em dois commits no worktree
+  `.worktrees/plano-f2-questionario` (branch `feat/plano-f2-questionario`).
+  Baseline da fatia 1 (HEAD `ae729bd` da master) era 614 testes; a fatia 2 levou
+  a 635 (Commit A, persistência) e depois a 673 (Commit B, cálculo). Cresce,
+  nunca encolhe. O orquestrador fará o fast-forward na master depois.
 - Fatia anterior na master: `c6d3852` (geração em lotes — implementação),
   seguida do roadmap/sincronização de docs e da correção de acabamento da
   própria fatia (parcial honesto + contagem no quiz) com seu commit de docs.
@@ -150,6 +152,39 @@
   manual do usuário:** a extração de data de um PDF **real** end-to-end (os
   testes usam a fixture `com-data.pdf`, não PDFs reais variados). A ordenação é
   **interna** — nada perceptível ainda na UI nesta fatia.
+- **Plano de estudo guiado — Fatia 2/4: questionário + distribuição por dias**
+  (`design-f2.md`/`plan-f2.md`; branch `feat/plano-f2-questionario`, dois
+  commits): o aluno monta um **plano de estudo** a partir de uma prova já
+  cadastrada na Agenda e vê uma **prévia dia-a-dia do que estudar**. Sem IA —
+  tudo é lógica pura + persistência JSON + UI. **Commit A (persistência):** bloco
+  opcional/aditivo `plano?` em `Prova` com as respostas do questionário (qual
+  prova é — 1ª/2ª/final; horas/dia; dias/semana; assuntos com dificuldade e
+  "cai na prova"; preferência de checkpoint), saneado no padrão de `provas.ts`
+  (clamps silenciosos; ordinal e ≥1 assunto obrigatórios), gravação por spread
+  condicional (prova antiga sem plano continua válida), canal IPC `salvarPlano`
+  tipado ponta-a-ponta, e o formulário acessível `PlanoEstudo.tsx` encaixado no
+  header da prova selecionada. **Commit B (cálculo):** a **régua base/novo**
+  pura (`src/shared/plano.ts`) — proporção contínua de esforço que, quanto mais
+  longe a prova, mais foca na base (até um teto de 80%, nunca 100%: o conteúdo
+  novo nunca zera) e, quanto mais perto, mais no conteúdo novo com alguns toques
+  na base; base difícil puxa mais tempo para a base. A **distribuição por dias**
+  pura reparte o tempo entre os assuntos ao longo dos dias úteis até a véspera,
+  prioriza o difícil, nunca cria dias que não existem nem blocos curtos demais, e
+  é **honesta quando não cabe** (avisa quantos assuntos ficaram de fora). O
+  serviço `planoCalculo.ts` (no main, sem IA) monta as datas disponíveis, ordena
+  os assuntos base→novo (reusando `cronologia.ts` + a ordem manual) e chama o
+  puro; o canal IPC `calcularPlano` recalcula sob demanda (nada é persistido). A
+  prévia aparece no próprio formulário após salvar ("plano montado em {data}", a
+  divisão base/novo em %, os dias com os blocos e as frases honestas de aviso).
+  Helpers puros novos: `datasEntre` (`agenda.ts`) e as constantes da régua
+  (`HORIZONTE_DIAS`/`PISO_BASE`/`TETO_BASE`/`PESO_DIFICULDADE`/
+  `MINUTOS_BLOCO_MIN`). Zero dependência nova. 673 testes (614 → 635 → 673);
+  build/lint verdes. **Verificação manual do usuário:** o encaixe visual e a
+  acessibilidade do formulário/prévia na Agenda e a "sensação" do plano com
+  dados reais (o cálculo tem testes de borda próprios, mas a aparência não).
+  Fora de escopo (próximas fatias): quiz diagnóstico (3) e geração/lembrete dos
+  checkpoints (4); a UI de reordenar manualmente a cronologia (só o contrato
+  persistido entrou).
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -191,14 +226,14 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
   - [x] **Fatia 1/4 — Captura de data + ordenação mecânica** — ENTREGUE
     (ver "Entregue", `roadmap-plano-estudo-guiado-f1.md`; fatia `d4df16b` +
     commit de docs). Fundação pura/sem IA: `dataArquivo?` + `cronologia.ts`.
-  - [ ] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — consome
-    `cronologia.ts` da fatia 1 e encaixa na `Prova`/`agenda.ts` existentes.
-    Novo: fórmula pura da régua contínua base/novo (prova longe → base; perto →
-    novo) e a distribuição por dias. **Lar da persistência do plano** (campos
-    opcionais aditivos em `Prova`, recomendado) **e da ordem cronológica
-    manual** (array de ids / mapa `id→posição`, 1:1 com a prova, alimenta o
-    `ordemManual` da função pura) + a UI de reordenar. Dentro da fatia, separar
-    em dois commits: persistência do questionário, depois a fórmula.
+  - [x] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — ENTREGUE
+    (ver "Entregue", `design-f2.md`/`plan-f2.md`; branch
+    `feat/plano-f2-questionario`, dois commits). Bloco `plano?` aditivo em
+    `Prova` (questionário + ordem cronológica manual como array de ids), régua
+    contínua base/novo e distribuição por dias (puras), serviço
+    `planoCalculo.ts` + IPC `salvarPlano`/`calcularPlano`, e a prévia "o que
+    estudar" na Agenda. A **UI de reordenar** manualmente a cronologia ficou
+    fora (só o contrato persistido entrou — pode vir depois sem migração).
   - [ ] **Fatia 3/4 — Quiz diagnóstico (reusa quiz)** — reusa
     `gerarQuiz`/`parseQuiz` + `avaliarLote`; a parte nova e **pura** classifica
     o resultado em "lacuna na base" vs. "dificuldade no novo" por tópico/camada.

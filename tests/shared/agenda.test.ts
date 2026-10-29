@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { INTERVALOS_REVISAO_PADRAO } from "@shared/constants";
 import {
   calcularDicaDoDia,
+  datasEntre,
   diaParaNumero,
   diasRestantes,
   diferencaDias,
@@ -66,6 +67,35 @@ describe("aritmética de dias", () => {
     expect(() => diaParaNumero("2026-02-30")).toThrow();
     expect(() => diaParaNumero("2026-13-01")).toThrow();
     expect(() => diaParaNumero("2026-00-10")).toThrow();
+  });
+});
+
+describe("datasEntre", () => {
+  it("devolve as datas ESTRITAMENTE entre as pontas (ambas excluídas)", () => {
+    expect(datasEntre("2026-03-01", "2026-03-05")).toEqual([
+      "2026-03-02",
+      "2026-03-03",
+      "2026-03-04",
+    ]);
+  });
+
+  it("intervalo curto (fim <= inicio+1) → []", () => {
+    expect(datasEntre("2026-03-01", "2026-03-02")).toEqual([]);
+    expect(datasEntre("2026-03-01", "2026-03-01")).toEqual([]);
+    expect(datasEntre("2026-03-05", "2026-03-01")).toEqual([]);
+  });
+
+  it("ordem crescente e atravessa fronteira de mês", () => {
+    const r = datasEntre("2026-02-27", "2026-03-02");
+    expect(r).toEqual(["2026-02-28", "2026-03-01"]);
+    for (let i = 1; i < r.length; i++) {
+      expect(r[i] > r[i - 1]).toBe(true);
+    }
+  });
+
+  it("lança em data inválida (reusa diaParaNumero)", () => {
+    expect(() => datasEntre("2026-02-30", "2026-03-05")).toThrow();
+    expect(() => datasEntre("2026-03-01", "nope")).toThrow();
   });
 });
 

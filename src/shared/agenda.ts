@@ -68,6 +68,26 @@ export function diferencaDias(a: string, b: string): number {
   return diaParaNumero(a) - diaParaNumero(b);
 }
 
+/**
+ * Datas-calendário "YYYY-MM-DD" ESTRITAMENTE entre `inicioExclusivo` e
+ * `fimExclusivo` (ambas as pontas excluídas), em ordem crescente. Pura.
+ * Ex.: `datasEntre("2026-03-01", "2026-03-05")` = `["2026-03-02","2026-03-03","2026-03-04"]`.
+ * Se `fim <= inicio + 1` → `[]`. Reusa `diaParaNumero`/`numeroParaDia` (que
+ * validam o formato e lançam em data inválida).
+ */
+export function datasEntre(
+  inicioExclusivo: string,
+  fimExclusivo: string,
+): string[] {
+  const inicio = diaParaNumero(inicioExclusivo);
+  const fim = diaParaNumero(fimExclusivo);
+  const datas: string[] = [];
+  for (let n = inicio + 1; n < fim; n++) {
+    datas.push(numeroParaDia(n));
+  }
+  return datas;
+}
+
 // --- Intervalos (parsing + saneamento) ------------------------------------
 
 /**

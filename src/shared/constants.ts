@@ -115,3 +115,34 @@ export const INTERVALOS_REVISAO_PADRAO = [7, 3, 1] as const;
 export const INTERVALOS_MAX = 10;
 /** Maior "dias antes" aceito (defesa contra valores absurdos). */
 export const DIAS_ANTES_MAX = 365;
+
+/**
+ * Horizonte (em dias) a partir do qual a prova é "longe" para a régua base/novo
+ * (`plano.ts`). Um mês é o horizonte típico de preparação de prova de
+ * faculdade: acima disso, `prox` satura em 0 e a base atinge o teto.
+ */
+export const HORIZONTE_DIAS = 30;
+/**
+ * Fração MÍNIMA de esforço dedicada à base, atingida quando a prova está em
+ * cima da hora (`prox=1`): os "alguns toques na base" que o intent pede mesmo
+ * com foco no novo. Em [0,1].
+ */
+export const PISO_BASE = 0.15;
+/**
+ * Fração MÁXIMA de esforço dedicada à base, atingida quando a prova está longe
+ * (`prox=0`): o foco PESADO — nunca total — na base. Fica abaixo de 1 de
+ * propósito, para o conteúdo novo nunca zerar quando ele existe. Em [0,1].
+ */
+export const TETO_BASE = 0.8;
+/**
+ * Peso do ajuste por dificuldade da base na régua: quanto da folga entre a
+ * base bruta e `TETO_BASE` a dificuldade máxima (1) fecha. 0.5 = metade da
+ * folga quando a base é toda difícil. Em [0,1].
+ */
+export const PESO_DIFICULDADE = 0.5;
+/**
+ * Duração mínima (em minutos) de um bloco de estudo na distribuição por dias
+ * (`plano.ts`). Um tópico cujo alvo cai abaixo disto é adiado (não comprimido),
+ * e nenhum bloco é criado abaixo deste piso.
+ */
+export const MINUTOS_BLOCO_MIN = 15;

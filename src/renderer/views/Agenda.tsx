@@ -591,8 +591,9 @@ export function Agenda(): React.JSX.Element {
             <PlanoEstudo
               prova={provaSelecionada}
               aoSalvar={(atualizada) => {
+                // Mantém o formulário aberto para exibir a prévia "o que
+                // estudar" logo após salvar; o usuário fecha pelo "Fechar".
                 setProvaSelecionada(atualizada);
-                setMontandoPlano(false);
               }}
               aoCancelar={() => setMontandoPlano(false)}
             />

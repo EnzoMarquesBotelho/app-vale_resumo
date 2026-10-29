@@ -99,6 +99,8 @@ import {
   salvarSessoes,
 } from "../services/provas.js";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
+import { montarPlanoCalculado } from "../services/planoCalculo.js";
+import type { PlanoCalculado } from "@shared/plano";
 import { gerarDicaIa } from "../services/dica.js";
 import {
   carregarPreferenciaTema,
@@ -933,6 +935,18 @@ export function registerIpcHandlers(): void {
     async (_event, id: string, plano: unknown): Promise<Prova> => {
       try {
         return await salvarPlano(id, plano, new Date().toISOString());
+      } catch (erro) {
+        throw new Error(mensagemAmigavelProva(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.calcularPlano,
+    async (_event, id: string): Promise<PlanoCalculado> => {
+      try {
+        const prova = await carregarProva(id);
+        return montarPlanoCalculado(prova, hojeLocal());
       } catch (erro) {
         throw new Error(mensagemAmigavelProva(erro));
       }

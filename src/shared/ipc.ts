@@ -33,6 +33,7 @@ import type {
   VinculoProva,
 } from "./types";
 import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
+import type { PlanoCalculado } from "./plano";
 import type { ProgressoGeracao } from "./geracaoLotes";
 import type { EstadoTema, ThemePreference } from "./theme";
 import type { UpdaterStatus } from "./updater";
@@ -95,6 +96,8 @@ export const IPC_CHANNELS = {
   regerarAgenda: "prova:regerar-agenda",
   /** Sanea e grava as respostas do questionário do plano de estudo na prova. */
   salvarPlano: "prova:salvar-plano",
+  /** Recalcula (sob demanda) a agenda dia-a-dia do plano de estudo da prova. */
+  calcularPlano: "prova:calcular-plano",
   /** Remove uma prova pelo id. */
   removerProva: "prova:remover",
   /** Calcula a dica MECÂNICA do dia de uma prova (sem IA, instantânea). */
@@ -353,6 +356,14 @@ export interface AppApi {
    * amigável se a prova não existir ou os dados essenciais faltarem.
    */
   salvarPlano: (id: string, plano: PlanoEstudo) => Promise<Prova>;
+  /**
+   * Recalcula sob demanda a agenda dia-a-dia do plano de estudo da prova `id`
+   * (nada é persistido): monta as datas disponíveis com o `hoje` injetado no
+   * main, ordena os tópicos base→novo e distribui o tempo. Rejeita com
+   * mensagem amigável se a prova não existir ou ainda não tiver um plano
+   * montado (o questionário precisa ter sido salvo antes).
+   */
+  calcularPlano: (id: string) => Promise<PlanoCalculado>;
   /** Remove a prova pelo `id` (no-op se já não existe). */
   removerProva: (id: string) => Promise<void>;
   /**

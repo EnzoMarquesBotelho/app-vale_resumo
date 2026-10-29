@@ -30,6 +30,7 @@ const carregarProva = vi.fn();
 const editarProva = vi.fn();
 const salvarSessoes = vi.fn();
 const regerarAgenda = vi.fn();
+const salvarPlano = vi.fn();
 const removerProva = vi.fn();
 
 vi.mock("../../src/main/services/provas.js", () => ({
@@ -57,6 +58,7 @@ vi.mock("../../src/main/services/provas.js", () => ({
   editarProva: (...args: unknown[]) => editarProva(...args),
   salvarSessoes: (...args: unknown[]) => salvarSessoes(...args),
   regerarAgenda: (...args: unknown[]) => regerarAgenda(...args),
+  salvarPlano: (...args: unknown[]) => salvarPlano(...args),
   removerProva: (...args: unknown[]) => removerProva(...args),
 }));
 
@@ -65,6 +67,14 @@ vi.mock("../../src/main/services/provas.js", () => ({
 const gerarDicaIa = vi.fn();
 vi.mock("../../src/main/services/dica.js", () => ({
   gerarDicaIa: (...args: unknown[]) => gerarDicaIa(...args),
+}));
+
+// Serviço de cálculo do plano mockado: o teste de IPC valida o wiring (carrega
+// a prova, injeta `hoje`, devolve o PlanoCalculado); a matemática é coberta em
+// plano.test.ts / planoCalculo.test.ts.
+const montarPlanoCalculado = vi.fn();
+vi.mock("../../src/main/services/planoCalculo.js", () => ({
+  montarPlanoCalculado: (...args: unknown[]) => montarPlanoCalculado(...args),
 }));
 
 // Storage mockado para o helper cadernosEmFocoDisponiveis (dicaDoDia/dicaDaIa).
@@ -147,6 +157,8 @@ describe("IPC: provas (agenda)", () => {
     editarProva.mockReset();
     salvarSessoes.mockReset();
     regerarAgenda.mockReset();
+    salvarPlano.mockReset();
+    montarPlanoCalculado.mockReset();
     removerProva.mockReset();
     gerarDicaIa.mockReset();
     listarCadernos.mockReset();
@@ -156,13 +168,15 @@ describe("IPC: provas (agenda)", () => {
     registerIpcHandlers();
   });
 
-  it("registra todos os 9 canais de prova", () => {
+  it("registra todos os 11 canais de prova", () => {
     expect(registered.has(IPC_CHANNELS.criarProva)).toBe(true);
     expect(registered.has(IPC_CHANNELS.listarProvas)).toBe(true);
     expect(registered.has(IPC_CHANNELS.carregarProva)).toBe(true);
     expect(registered.has(IPC_CHANNELS.editarProva)).toBe(true);
     expect(registered.has(IPC_CHANNELS.salvarSessoes)).toBe(true);
     expect(registered.has(IPC_CHANNELS.regerarAgenda)).toBe(true);
+    expect(registered.has(IPC_CHANNELS.salvarPlano)).toBe(true);
+    expect(registered.has(IPC_CHANNELS.calcularPlano)).toBe(true);
     expect(registered.has(IPC_CHANNELS.removerProva)).toBe(true);
     expect(registered.has(IPC_CHANNELS.dicaDoDia)).toBe(true);
     expect(registered.has(IPC_CHANNELS.dicaDaIa)).toBe(true);
@@ -227,6 +241,55 @@ describe("IPC: provas (agenda)", () => {
     const resultado = await chamar(IPC_CHANNELS.regerarAgenda, "p1");
     expect(resultado).toEqual(provaExemplo);
     expect(regerarAgenda).toHaveBeenCalledWith("p1", "2026-03-10");
+  });
+
+  it("salvarPlano repassa id/plano/agora e devolve a prova", async () => {
+    salvarPlano.mockResolvedValue(provaExemplo);
+    const plano = { ordinal: "primeira", topicos: [{ titulo: "Limites" }] };
+    const resultado = await chamar(IPC_CHANNELS.salvarPlano, "p1", plano);
+    expect(resultado).toEqual(provaExemplo);
+    const [id, planoArg, agora] = salvarPlano.mock.calls[0];
+    expect(id).toBe("p1");
+    expect(planoArg).toEqual(plano);
+    expect(typeof agora).toBe("string");
+  });
+
+  it("salvarPlano converte DadosProvaInvalidosError em mensagem amigável", async () => {
+    salvarPlano.mockRejectedValue(
+      new DadosProvaInvalidosError("Informe ao menos um assunto."),
+    );
+    await expect(
+      chamar(IPC_CHANNELS.salvarPlano, "p1", {}),
+    ).rejects.toThrow(/Informe ao menos um assunto/);
+  });
+
+  it("calcularPlano carrega a prova, injeta hoje e devolve o PlanoCalculado", async () => {
+    carregarProva.mockResolvedValue(provaExemplo);
+    const calculado = { dias: [], aviso: { tipo: "prova_passou" } };
+    montarPlanoCalculado.mockReturnValue(calculado);
+    const resultado = await chamar(IPC_CHANNELS.calcularPlano, "p1");
+    expect(resultado).toEqual(calculado);
+    expect(carregarProva).toHaveBeenCalledWith("p1");
+    expect(montarPlanoCalculado).toHaveBeenCalledWith(provaExemplo, "2026-03-10");
+  });
+
+  it("calcularPlano converte prova inexistente em mensagem amigável", async () => {
+    carregarProva.mockRejectedValue(new ProvaNaoEncontradaError());
+    await expect(
+      chamar(IPC_CHANNELS.calcularPlano, "x"),
+    ).rejects.toThrow(/Prova não encontrada/);
+  });
+
+  it("calcularPlano converte plano ausente (DadosProvaInvalidosError) em mensagem amigável", async () => {
+    carregarProva.mockResolvedValue(provaExemplo);
+    montarPlanoCalculado.mockImplementation(() => {
+      throw new DadosProvaInvalidosError(
+        "Monte o plano de estudo antes de ver a prévia.",
+      );
+    });
+    await expect(
+      chamar(IPC_CHANNELS.calcularPlano, "p1"),
+    ).rejects.toThrow(/Monte o plano de estudo antes de ver a prévia/);
   });
 
   it("removerProva chama o serviço com o id", async () => {

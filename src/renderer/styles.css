@@ -1805,6 +1805,44 @@ select {
   flex-wrap: wrap;
 }
 
+.plano-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-2);
+}
+
+.plano-previa h4 {
+  margin: 0;
+}
+
+.plano-previa-dias {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.plano-previa-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.plano-previa-blocos {
+  list-style: disc;
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 .agenda-dica {
   display: flex;
   flex-direction: column;

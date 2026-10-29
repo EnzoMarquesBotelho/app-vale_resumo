@@ -6,12 +6,12 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: branch `feat/plano-f1-cronologia` na fatia `d4df16b` (Plano de
-> estudo guiado — Fatia 1/4: captura de data + ordenação cronológica) + este
-> commit de docs, **614 testes** passando, build/lint limpos. Será
-> fast-forwardada na master pelo orquestrador. Fatia anterior na master:
-> `c6d3852` (geração em lotes — implementação) + docs/roadmap + correção de
-> acabamento (parcial honesto + contagem no quiz) e seu commit de docs.
+> Estado atual: branch `feat/plano-f2-questionario` (Plano de estudo guiado —
+> Fatia 2/4: questionário + régua base/novo + distribuição por dias, dois
+> commits), **673 testes** passando, build/lint limpos. Será fast-forwardada na
+> master pelo orquestrador (base: HEAD `ae729bd` da master, fatia 1). Fatia
+> anterior na master: `d4df16b` (Fatia 1/4 — captura de data + ordenação
+> cronológica) + commit de docs.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -275,6 +275,27 @@ configurar `npm run package` para gerar um executável.
   Zero dep nova; 614 testes (579 + 35, Ollama não envolvido). A ordenação é
   **interna** (nada perceptível na UI ainda). PDF real end-to-end = verificação
   manual do usuário.
+- [x] **Plano de estudo guiado — Fatia 2/4: questionário + distribuição por
+  dias** — `design-f2.md`/`plan-f2.md` (branch `feat/plano-f2-questionario`,
+  dois commits). Sem IA: lógica pura + persistência JSON + UI. **Commit A:**
+  bloco opcional/aditivo `plano?` em `Prova` (qual prova é — 1ª/2ª/final; horas/
+  dia; dias/semana; assuntos com dificuldade e "cai na prova"; preferência de
+  checkpoint), saneado no padrão de `provas.ts` (clamps silenciosos; ordinal e
+  ≥1 assunto obrigatórios; gravação por spread condicional; prova antiga sem
+  plano continua válida), canal IPC `salvarPlano`, e o formulário acessível
+  `PlanoEstudo.tsx` no header da prova selecionada. **Commit B:** régua base/
+  novo pura (`src/shared/plano.ts`: foco na base quanto mais longe a prova, até
+  80% — o novo nunca zera; foco no novo com toques na base quando perto; base
+  difícil puxa mais tempo) + distribuição por dias pura (reparte o tempo pelos
+  dias úteis, prioriza o difícil, não inventa dias nem blocos curtos demais, e
+  avisa quantos assuntos não couberam), serviço `planoCalculo.ts` (monta datas,
+  ordena base→novo via `cronologia.ts` + ordem manual, chama o puro) + IPC
+  `calcularPlano` (recalcula sob demanda, nada persistido), e a prévia "o que
+  estudar" no formulário (plano montado em {data}, divisão base/novo %, dias com
+  blocos, frases honestas de aviso). Helpers novos: `datasEntre` (`agenda.ts`) e
+  as constantes da régua. Zero dep nova; 673 testes (614 → 635 → 673). A UI de
+  reordenar manualmente ficou fora (só o contrato persistido entrou). Encaixe
+  visual/acessibilidade e a "sensação" com dados reais = verificação manual.
 
 ## Roadmap restante (complementos — não iniciados)
 
@@ -293,10 +314,12 @@ configurar `npm run package` para gerar um executável.
   `roadmap-plano-estudo-guiado-f1.md`):**
   - [x] **Fatia 1/4 — Captura de data + ordenação mecânica** — ENTREGUE (ver
     "Fases pós-MVP"; fatia `d4df16b` + commit de docs).
-  - [ ] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — fórmula
-    da régua contínua base/novo + distribuição; **lar da persistência do plano**
-    (campos aditivos em `Prova`) **e da ordem cronológica manual** (alimenta o
-    `ordemManual` da fatia 1) + UI de reordenar.
+  - [x] **Fatia 2/4 — Questionário + distribuição por dias (pura)** — ENTREGUE
+    (ver "Fases pós-MVP"; branch `feat/plano-f2-questionario`, dois commits).
+    Régua contínua base/novo + distribuição por dias (puras), persistência do
+    `plano?` em `Prova` (+ ordem cronológica manual como array de ids) e a prévia
+    na Agenda. A **UI de reordenar** manualmente ficou fora (só o contrato
+    persistido entrou — pode vir depois sem migração).
   - [ ] **Fatia 3/4 — Quiz diagnóstico** — reusa `gerarQuiz`/`avaliarLote`;
     classificação pura "lacuna na base vs. dificuldade no novo". Depende de 1+2.
   - [ ] **Fatia 4/4 — Checkpoints "pré-provas"** — reusa `gerarExercicios` +

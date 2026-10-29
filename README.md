@@ -48,6 +48,14 @@ podem ser reabertos a qualquer momento.
   **agenda de revisão** (revisar alguns dias antes da prova), que você pode ajustar à mão, e dá
   uma **dica do dia** — rápida (automática) ou mais elaborada (pela IA). Provas podem ser de uma
   matéria específica ou abrangentes (tipo ENEM/ENADE, cobrindo todas as matérias).
+- **Plano de estudo guiado**: a partir de uma prova cadastrada, clique em **"Montar plano de
+  estudo"** e responda um questionário curto — qual prova é (1ª, 2ª ou final), quantas horas por
+  dia e quantos dias por semana você consegue estudar, e quais assuntos caem (marcando a
+  dificuldade de cada um). O app monta sozinho a **agenda dia a dia**: ele divide o tempo entre a
+  **base** (o que você já viu) e o **conteúdo novo** conforme a prova está longe ou perto, dá mais
+  tempo ao que é difícil, e mostra **o que estudar em cada dia e por quanto tempo**. Se o tempo não
+  for suficiente para cobrir tudo com qualidade, ele **avisa com honestidade** quantos assuntos
+  ficaram de fora, em vez de prometer o impossível. É só reeditar o plano quando quiser.
 
 > Tudo roda offline. Se o Ollama não estiver rodando, o app mostra um passo a passo
 > para resolver, sem travar. Gerar ou corrigir muitos itens de uma vez pode ser lento no
@@ -121,7 +129,8 @@ A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblio
    **Exercícios**, **Mapa mental** e **Quiz** — clique em gerar em cada um. Em Exercícios você
    responde e pede a correção da IA; no Quiz você responde e revisa com pontuação.
 3. Na **Agenda**, cadastre provas para ver a contagem regressiva, a agenda de revisão e a dica
-   do dia.
+   do dia. Selecione uma prova e clique em **"Montar plano de estudo"** para responder o
+   questionário e ver o plano dia a dia com o que estudar.
 4. Tudo o que você gera fica salvo e reabre pela Biblioteca, organizado por caderno.
 5. Use **Exportar** (em cada artefato ou no documento inteiro) para salvar o material em
    **Markdown** ou **PDF** onde você quiser.

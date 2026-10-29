@@ -7,6 +7,7 @@ import type {
   Prova,
   TopicoPlano,
 } from "@shared/types";
+import type { AvisoPlano, PlanoCalculado } from "@shared/plano";
 import { getApi } from "../api";
 
 /**
@@ -25,6 +26,57 @@ function mensagemDeErro(e: unknown): string {
   const partes = e.message.split("Error: ");
   const limpo = (partes[partes.length - 1] ?? e.message).trim();
   return limpo.length > 0 ? limpo : "Falha ao salvar o plano de estudo.";
+}
+
+/** Formata minutos como "Xh Ymin" / "Xh" / "Ymin" (pt-BR, compacto). */
+function formatarMinutos(min: number): string {
+  const horas = Math.floor(min / 60);
+  const resto = min % 60;
+  if (horas > 0 && resto > 0) return `${horas}h ${resto}min`;
+  if (horas > 0) return `${horas}h`;
+  return `${resto}min`;
+}
+
+/** Formata uma data "YYYY-MM-DD" como "DD/MM/YYYY" (sem fuso). */
+function formatarData(data: string): string {
+  const partes = data.split("-");
+  if (partes.length !== 3) return data;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+/** Formata um carimbo ISO como "DD/MM/YYYY" (local), tolerante a inválido. */
+function formatarCarimbo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dia = d.getDate().toString().padStart(2, "0");
+  const mes = (d.getMonth() + 1).toString().padStart(2, "0");
+  const ano = d.getFullYear().toString().padStart(4, "0");
+  return `${dia}/${mes}/${ano}`;
+}
+
+/** Frase honesta em pt-BR para cada aviso do plano calculado (§7.4). */
+function fraseAviso(
+  aviso: AvisoPlano,
+  horasPorDia: number,
+  diasPorSemana: number,
+): string {
+  switch (aviso.tipo) {
+    case "prova_passou":
+      return "Esta prova já passou — não há mais dias para planejar.";
+    case "sem_topicos":
+      return "Adicione ao menos um assunto para montar a prévia do plano.";
+    case "sem_dias":
+      return "Não há dias de estudo entre hoje e a prova. Considere começar antes ou ajustar a data.";
+    case "nao_cabe":
+      return (
+        `Com ${horasPorDia}h/dia e ${diasPorSemana} dias por semana não dá para ` +
+        `cobrir tudo com qualidade. Priorizei os assuntos mais críticos; ` +
+        `${aviso.topicosForaDoPlano} ficaram de fora — considere mais tempo por ` +
+        `dia ou comece antes.`
+      );
+    default:
+      return "";
+  }
 }
 
 /** Rótulos em português de cada ordinal de prova. */
@@ -104,6 +156,11 @@ export function PlanoEstudo({
   const [novoTitulo, setNovoTitulo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [previa, setPrevia] = useState<PlanoCalculado | null>(null);
+  const [montadoEm, setMontadoEm] = useState<string | null>(
+    planoAtual?.atualizadoEm ?? null,
+  );
+  const [erroPrevia, setErroPrevia] = useState<string | null>(null);
 
   // Sugere tópicos a partir dos documentos do caderno vinculado (ou de todos,
   // quando a prova é abrangente). Só adiciona os que ainda não estão na lista.
@@ -181,6 +238,16 @@ export function PlanoEstudo({
       };
       const atualizada = await getApi().salvarPlano(prova.id, plano);
       aoSalvar(atualizada);
+      setMontadoEm(atualizada.plano?.atualizadoEm ?? null);
+      // Prévia "o que estudar": recalculada sob demanda, nunca persistida.
+      setErroPrevia(null);
+      try {
+        const calculada = await getApi().calcularPlano(prova.id);
+        setPrevia(calculada);
+      } catch (ePrevia) {
+        setPrevia(null);
+        setErroPrevia(mensagemDeErro(ePrevia));
+      }
     } catch (e) {
       setErro(mensagemDeErro(e));
     } finally {
@@ -339,9 +406,54 @@ export function PlanoEstudo({
           {salvando ? "Salvando…" : "Salvar plano"}
         </button>
         <button type="button" onClick={() => aoCancelar()}>
-          Cancelar
+          {previa !== null ? "Fechar" : "Cancelar"}
         </button>
       </div>
+
+      {erroPrevia !== null && (
+        <p className="agenda-erro" role="alert">
+          {erroPrevia}
+        </p>
+      )}
+
+      {previa !== null && (
+        <section className="plano-previa" aria-label="Prévia do plano de estudo">
+          <h4>O que estudar</h4>
+          {montadoEm !== null && (
+            <p className="app-meta">Plano montado em {formatarCarimbo(montadoEm)}.</p>
+          )}
+          {previa.mistura !== undefined && (
+            <p className="app-meta">
+              Divisão do tempo: {Math.round(previa.mistura.fracaoBase * 100)}% base,{" "}
+              {Math.round(previa.mistura.fracaoNovo * 100)}% conteúdo novo.
+            </p>
+          )}
+          {previa.aviso !== undefined && (
+            <p className="agenda-erro" role="alert">
+              {fraseAviso(previa.aviso, horasPorDia, diasPorSemana)}
+            </p>
+          )}
+          {previa.dias.length > 0 && (
+            <ul className="plano-previa-dias">
+              {previa.dias
+                .filter((d) => d.blocos.length > 0)
+                .map((d) => (
+                  <li key={d.data} className="plano-previa-dia">
+                    <strong>{formatarData(d.data)}</strong>
+                    <ul className="plano-previa-blocos">
+                      {d.blocos.map((b, i) => (
+                        <li key={`${b.topicoId}-${i}`}>
+                          {b.titulo} — {formatarMinutos(b.minutos)}
+                          {b.novo ? " (novo)" : " (base)"}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </section>
+      )}
     </form>
   );
 }
