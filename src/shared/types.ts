@@ -33,6 +33,8 @@ export interface Documento {
   cadernoNome: string;
   /** Caminho de origem no disco, quando conhecido (best-effort). */
   caminhoOrigem?: string;
+  /** Data do arquivo (melhor fonte disponível: metadado interno do PDF ou mtime do disco) em ISO 8601, quando conhecida. */
+  dataArquivo?: string;
 }
 
 /** Resumo gerado a partir de um documento. */
@@ -198,6 +200,8 @@ export interface ArquivoImportado {
   semTextoExtraivel: boolean;
   /** Caminho de origem no disco, quando conhecido (fluxo de import). */
   caminhoOrigem?: string;
+  /** Data do arquivo (melhor fonte disponível: metadado interno do PDF ou mtime do disco) em ISO 8601, quando conhecida. */
+  dataArquivo?: string;
   /** Id do caderno sugerido a partir da pasta-mãe (fluxo de import). */
   cadernoIdSugerido?: string;
   /** Nome do caderno sugerido a partir da pasta-mãe (fluxo de import). */
@@ -231,6 +235,8 @@ export interface DocumentoSalvo {
   cadernoNome: string;
   /** Caminho de origem no disco, quando conhecido (best-effort). */
   caminhoOrigem?: string;
+  /** Data do arquivo (melhor fonte disponível: metadado interno do PDF ou mtime do disco) em ISO 8601, quando conhecida. */
+  dataArquivo?: string;
   /** Resumo gerado, se houver. */
   resumo?: Resumo;
   /** Flashcards gerados, se houver. */
@@ -262,6 +268,8 @@ export interface ResumoDocumentoSalvo {
   cadernoId: string;
   /** Nome de exibição do caderno (grafia escolhida pelo usuário). */
   cadernoNome: string;
+  /** Data do arquivo (melhor fonte disponível: metadado interno do PDF ou mtime do disco) em ISO 8601, quando conhecida. */
+  dataArquivo?: string;
   /** `true` se o documento tem um resumo salvo. */
   temResumo: boolean;
   /** `true` se o documento tem flashcards salvos. */

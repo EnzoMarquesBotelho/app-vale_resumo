@@ -34,7 +34,7 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarQuiz, texto, modo, quantidade),
   avaliarRespostas: (entradas) =>
     ipcRenderer.invoke(IPC_CHANNELS.avaliarRespostas, entradas),
-  criarDocumento: (nome, formato, texto, cadernoNome, caminhoOrigem) =>
+  criarDocumento: (nome, formato, texto, cadernoNome, caminhoOrigem, dataArquivo) =>
     ipcRenderer.invoke(
       IPC_CHANNELS.criarDocumento,
       nome,
@@ -42,6 +42,7 @@ const api: AppApi = {
       texto,
       cadernoNome,
       caminhoOrigem,
+      dataArquivo,
     ),
   salvarResumo: (id, resumo) =>
     ipcRenderer.invoke(IPC_CHANNELS.salvarResumo, id, resumo),

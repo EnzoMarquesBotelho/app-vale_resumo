@@ -78,6 +78,7 @@ export function App(): React.JSX.Element {
         arquivo.texto,
         cadernoNome,
         arquivo.caminhoOrigem,
+        arquivo.dataArquivo,
       );
       setDocumento(salvo);
       setVersaoHistorico((v) => v + 1);

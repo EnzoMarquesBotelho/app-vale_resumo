@@ -12,6 +12,7 @@ import { defaultModel, extensoesSuportadas } from "@shared/constants";
 import type { ArtefatoLote } from "@shared/geracaoLotes";
 import { montarCaderno } from "@shared/notebooks";
 import { calcularDicaDoDia } from "@shared/agenda";
+import { ehIsoPlausivel } from "@shared/cronologia";
 import type {
   ArquivoImportado,
   AvaliacaoResposta,
@@ -722,6 +723,7 @@ export function registerIpcHandlers(): void {
       texto: string,
       cadernoNome: string,
       caminhoOrigem?: string,
+      dataArquivo?: string,
     ): Promise<DocumentoSalvo> => {
       try {
         // O id do caderno é derivado server-side a partir da grafia escolhida.
@@ -734,6 +736,9 @@ export function registerIpcHandlers(): void {
           cadernoId,
           cadernoNome: nomeMontado,
           caminhoOrigem,
+          // Dica opcional transportada pelo renderer: só grava se for ISO
+          // canônica plausível; senão omite (não re-deriva, não lança).
+          ...(ehIsoPlausivel(dataArquivo) ? { dataArquivo } : {}),
         });
       } catch (erro) {
         throw new Error(mensagemAmigavelPersistencia(erro));

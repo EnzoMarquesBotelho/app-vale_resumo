@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -150,6 +150,25 @@ describe("importarPasta: round-trip e cadernos", () => {
       [...r.cadernosTocados].sort((a, b) => a.localeCompare(b)),
     );
     expect(new Set(r.cadernosTocados).size).toBe(r.cadernosTocados.length);
+  });
+
+  it("preenche dataArquivo de cada documento pela mesma hierarquia", async () => {
+    const txt = await arquivoTexto("nota", "nota.txt");
+    await copyFile(fixture("com-data.pdf"), join(raiz, "com-data.pdf"));
+
+    const r = await importarPasta(raiz, baseDir);
+    expect(r.importados).toBe(2);
+
+    const docs = await listarDocumentos(undefined, baseDir);
+    const porNome = new Map(docs.map((d) => [d.nome, d]));
+
+    // PDF com metadado interno → CreationDate convertida (13:30 UTC).
+    expect(porNome.get("com-data.pdf")?.dataArquivo).toBe(
+      "2023-01-15T13:30:00.000Z",
+    );
+    // .txt → mtime do disco em ISO.
+    const esperadoTxt = (await stat(txt)).mtime.toISOString();
+    expect(porNome.get("nota.txt")?.dataArquivo).toBe(esperadoTxt);
   });
 
   it("reimportar a mesma pasta pula tudo por duplicata", async () => {

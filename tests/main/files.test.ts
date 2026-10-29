@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -94,6 +94,35 @@ describe("importarArquivo: PDF", () => {
     expect(r.formato).toBe("pdf");
     expect(r.texto).toBe("");
     expect(r.semTextoExtraivel).toBe(true);
+  });
+});
+
+describe("importarArquivo: captura da data do arquivo (dataArquivo)", () => {
+  it("usa a data interna (CreationDate) de um PDF que a possui", async () => {
+    const r = await importarArquivo(fixture("com-data.pdf"));
+    // CreationDate D:20230115103000-03'00' → 13:30 UTC.
+    expect(r.dataArquivo).toBe("2023-01-15T13:30:00.000Z");
+  });
+
+  it("cai no mtime do disco para um PDF sem metadado de data", async () => {
+    const caminho = fixture("com-texto.pdf");
+    const r = await importarArquivo(caminho);
+    const esperado = (await stat(caminho)).mtime.toISOString();
+    expect(r.dataArquivo).toBe(esperado);
+  });
+
+  it("usa o mtime do disco para .txt (não tenta metadado interno)", async () => {
+    const caminho = fixture("amostra.txt");
+    const r = await importarArquivo(caminho);
+    const esperado = (await stat(caminho)).mtime.toISOString();
+    expect(r.dataArquivo).toBe(esperado);
+  });
+
+  it("usa o mtime do disco para .md", async () => {
+    const caminho = fixture("amostra.md");
+    const r = await importarArquivo(caminho);
+    const esperado = (await stat(caminho)).mtime.toISOString();
+    expect(r.dataArquivo).toBe(esperado);
   });
 });
 

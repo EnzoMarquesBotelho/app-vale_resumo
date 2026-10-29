@@ -12,6 +12,7 @@ import { basename, extname } from "node:path";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extensoesSuportadas, tamanhoMaximoArquivoBytes } from "@shared/constants";
 import { derivarCadernoDeCaminho } from "@shared/notebooks";
+import { parsearDataPdf } from "@shared/pdfDate";
 import type { ArquivoImportado, FormatoArquivo } from "@shared/types";
 
 /** Erro lançado quando o formato do arquivo não é suportado no MVP. */
@@ -53,8 +54,16 @@ export function detectarFormato(caminho: string): FormatoArquivo {
   return extensao as FormatoArquivo;
 }
 
-/** Extrai o texto de um PDF usando `pdfjs-dist`, concatenando as páginas. */
-export async function extrairTextoPdf(dados: Uint8Array): Promise<string> {
+/**
+ * Abre um PDF UMA vez via `pdfjs-dist`, extrai o texto (concatenando as
+ * páginas) e tenta ler a data interna dos metadados (Info dictionary:
+ * `CreationDate`, com fallback `ModDate`). A leitura de metadados é
+ * best-effort: qualquer falha ao obter/parsear vira `dataInterna` ausente, sem
+ * derrubar a extração de texto.
+ */
+export async function extrairPdf(
+  dados: Uint8Array,
+): Promise<{ texto: string; dataInterna?: string }> {
   const task = getDocument({
     data: dados,
     // Segurança/estabilidade em ambiente Node/Electron sem DOM:
@@ -63,6 +72,19 @@ export async function extrairTextoPdf(dados: Uint8Array): Promise<string> {
   });
   try {
     const doc = await task.promise;
+
+    // Data interna (best-effort): nunca derruba a extração de texto.
+    let dataInterna: string | undefined;
+    try {
+      const { info } = await doc.getMetadata();
+      // `getMetadata()` tipa `info` como `object` (não indexável) sob TS
+      // estrito; o cast é obrigatório para acessar as chaves do dicionário.
+      const infoRec = (info ?? {}) as Record<string, unknown>;
+      dataInterna = parsearDataPdf(infoRec.CreationDate ?? infoRec.ModDate);
+    } catch {
+      dataInterna = undefined;
+    }
+
     const paginas: string[] = [];
     for (let numero = 1; numero <= doc.numPages; numero += 1) {
       const pagina = await doc.getPage(numero);
@@ -72,10 +94,19 @@ export async function extrairTextoPdf(dados: Uint8Array): Promise<string> {
         .join(" ");
       paginas.push(textoPagina);
     }
-    return paginas.join("\n").trim();
+    return { texto: paginas.join("\n").trim(), dataInterna };
   } finally {
     await task.destroy();
   }
+}
+
+/**
+ * Extrai apenas o texto de um PDF. Wrapper fino sobre `extrairPdf`, mantido
+ * para os consumidores que só precisam do texto (e para o teste existente).
+ */
+export async function extrairTextoPdf(dados: Uint8Array): Promise<string> {
+  const { texto } = await extrairPdf(dados);
+  return texto;
 }
 
 /**
@@ -93,27 +124,37 @@ export async function importarArquivo(
     derivarCadernoDeCaminho(caminho);
 
   // Guarda de tamanho: evita carregar arquivos enormes inteiros na memória.
-  const { size } = await stat(caminho);
+  // Reaproveita o `stat` (sem segunda syscall) para também capturar o `mtime`,
+  // fallback universal da data do arquivo.
+  const { size, mtime } = await stat(caminho);
   if (size > tamanhoMaximoArquivoBytes) {
     throw new ArquivoMuitoGrandeError(size);
   }
+  const dataMtime = Number.isNaN(mtime.getTime())
+    ? undefined
+    : mtime.toISOString();
 
   if (formato === "pdf") {
     const buffer = await readFile(caminho);
-    const texto = await extrairTextoPdf(new Uint8Array(buffer));
+    const { texto, dataInterna } = await extrairPdf(new Uint8Array(buffer));
     const semTextoExtraivel = texto.length === 0;
+    // Hierarquia: data interna do PDF, senão o mtime do disco.
+    const dataArquivo = dataInterna ?? dataMtime;
     return {
       nome,
       formato,
       texto,
       semTextoExtraivel,
       caminhoOrigem: caminho,
+      // Spread condicional: nunca grava `dataArquivo: undefined`.
+      ...(dataArquivo !== undefined ? { dataArquivo } : {}),
       cadernoIdSugerido,
       cadernoNomeSugerido,
     };
   }
 
-  // .txt e .md: texto puro em UTF-8.
+  // .txt e .md: texto puro em UTF-8. Sem metadado interno de data confiável →
+  // usa direto o mtime do disco.
   const texto = (await readFile(caminho, "utf-8")).trim();
   return {
     nome,
@@ -121,6 +162,7 @@ export async function importarArquivo(
     texto,
     semTextoExtraivel: false,
     caminhoOrigem: caminho,
+    ...(dataMtime !== undefined ? { dataArquivo: dataMtime } : {}),
     cadernoIdSugerido,
     cadernoNomeSugerido,
   };

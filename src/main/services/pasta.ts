@@ -216,6 +216,10 @@ export async function importarPasta(
           cadernoId,
           cadernoNome,
           caminhoOrigem: arquivo.caminhoAbsoluto,
+          // Spread condicional: nunca passa `dataArquivo: undefined`.
+          ...(extraido.dataArquivo !== undefined
+            ? { dataArquivo: extraido.dataArquivo }
+            : {}),
         },
         baseDir,
       );

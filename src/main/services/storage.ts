@@ -85,6 +85,8 @@ export interface NovoDocumento {
   cadernoNome: string;
   /** Caminho de origem no disco, quando conhecido (best-effort). */
   caminhoOrigem?: string;
+  /** Data do arquivo em ISO 8601, quando conhecida (metadado do PDF ou mtime). */
+  dataArquivo?: string;
 }
 
 /**
@@ -109,6 +111,10 @@ export async function criarDocumento(
     // origem simplesmente não tem a chave (em memória e em disco batem).
     ...(novo.caminhoOrigem !== undefined
       ? { caminhoOrigem: novo.caminhoOrigem }
+      : {}),
+    // Mesmo padrão de spread condicional: documento sem data não tem a chave.
+    ...(novo.dataArquivo !== undefined
+      ? { dataArquivo: novo.dataArquivo }
       : {}),
   };
   // Devolve o registro efetivamente gravado (com `atualizadoEm` já carimbado
@@ -263,6 +269,11 @@ export async function listarDocumentos(
       atualizadoEm: documento.atualizadoEm,
       cadernoId: idEfetivo,
       cadernoNome: cadernoNomeEfetivo(documento),
+      // Bloco condicional embutido no literal (não spread de outro objeto):
+      // mantém o resumo leve sem gravar `dataArquivo: undefined`.
+      ...(documento.dataArquivo !== undefined
+        ? { dataArquivo: documento.dataArquivo }
+        : {}),
       temResumo: documento.resumo !== undefined,
       temFlashcards:
         documento.flashcards !== undefined && documento.flashcards.length > 0,

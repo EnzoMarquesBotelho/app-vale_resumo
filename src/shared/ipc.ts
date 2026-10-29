@@ -240,7 +240,9 @@ export interface AppApi {
    * Cria e salva um novo documento (sem artefatos ainda) a partir do arquivo
    * importado, para que os artefatos gerados possam ser anexados e persistidos.
    * O `cadernoNome` é a grafia escolhida/editada na importação; o main deriva
-   * o `cadernoId` server-side via `montarCaderno`.
+   * o `cadernoId` server-side via `montarCaderno`. `dataArquivo` é apenas
+   * TRANSPORTADA pelo renderer (originada no `importarArquivo` do main); o
+   * handler a valida com `ehIsoPlausivel` e grava sem data se for inválida.
    * @returns o documento salvo criado (com `id` gerado).
    */
   criarDocumento: (
@@ -249,6 +251,7 @@ export interface AppApi {
     texto: string,
     cadernoNome: string,
     caminhoOrigem?: string,
+    dataArquivo?: string,
   ) => Promise<DocumentoSalvo>;
   /**
    * Salva o resumo gerado no documento `id` e devolve o registro atualizado.

@@ -188,6 +188,73 @@ describe("storage: criar e carregar documento", () => {
     expect(carregado.cadernoNome).toBe("Cálculo");
   });
 
+  it("grava dataArquivo quando informada (round-trip)", async () => {
+    const criado = await criarDocumento(
+      {
+        nome: "com-data.pdf",
+        formato: "pdf",
+        texto: "x",
+        cadernoId: "geral",
+        cadernoNome: "Geral",
+        dataArquivo: "2023-01-15T13:30:00.000Z",
+      },
+      baseDir,
+    );
+    expect(criado.dataArquivo).toBe("2023-01-15T13:30:00.000Z");
+    const carregado = await carregarDocumento(criado.id, baseDir);
+    expect(carregado.dataArquivo).toBe("2023-01-15T13:30:00.000Z");
+  });
+
+  it("não grava a chave dataArquivo quando ausente", async () => {
+    const criado = await criarDocumento(
+      novoDoc("sem-data.txt", "txt", "x"),
+      baseDir,
+    );
+    expect("dataArquivo" in criado).toBe(false);
+    const carregado = await carregarDocumento(criado.id, baseDir);
+    expect("dataArquivo" in carregado).toBe(false);
+  });
+
+  it("carrega um documento ANTIGO sem dataArquivo sem quebrar (retrocompat)", async () => {
+    const agora = new Date().toISOString();
+    // JSON de documento gravado antes desta fatia: sem a chave dataArquivo.
+    await escreverJsonLegado(baseDir, {
+      id: "legado-sem-data",
+      nome: "antigo.txt",
+      formato: "txt",
+      texto: "conteúdo antigo",
+      importadoEm: agora,
+      atualizadoEm: agora,
+      cadernoId: "geral",
+      cadernoNome: "Geral",
+    });
+    const carregado = await carregarDocumento("legado-sem-data", baseDir);
+    expect(carregado.dataArquivo).toBeUndefined();
+    expect(carregado.nome).toBe("antigo.txt");
+    // E a listagem leve também não quebra e reporta data ausente.
+    const resumos = await listarDocumentos(undefined, baseDir);
+    const resumo = resumos.find((r) => r.id === "legado-sem-data");
+    expect(resumo).toBeDefined();
+    expect(resumo?.dataArquivo).toBeUndefined();
+  });
+
+  it("propaga dataArquivo ao resumo leve de listarDocumentos", async () => {
+    await criarDocumento(
+      {
+        nome: "com-data.pdf",
+        formato: "pdf",
+        texto: "x",
+        cadernoId: "geral",
+        cadernoNome: "Geral",
+        dataArquivo: "2023-02-20T09:00:00.000Z",
+      },
+      baseDir,
+    );
+    const resumos = await listarDocumentos(undefined, baseDir);
+    const resumo = resumos.find((r) => r.nome === "com-data.pdf");
+    expect(resumo?.dataArquivo).toBe("2023-02-20T09:00:00.000Z");
+  });
+
   it("lança DocumentoNaoEncontradoError para um id inexistente", async () => {
     await expect(
       carregarDocumento("nao-existe", baseDir),

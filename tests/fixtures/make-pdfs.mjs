@@ -7,8 +7,13 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** Monta um PDF a partir de uma lista de objetos (corpo) com xref/trailer. */
-function buildPdf(objects) {
+/**
+ * Monta um PDF a partir de uma lista de objetos (corpo) com xref/trailer.
+ * `infoObjNumber`, quando informado, adiciona `/Info N 0 R` ao trailer para
+ * que o objeto correspondente (um dicionário com CreationDate etc.) seja lido
+ * por `getMetadata()`.
+ */
+function buildPdf(objects, infoObjNumber) {
   const header = "%PDF-1.4\n";
   let body = "";
   const offsets = [];
@@ -22,9 +27,10 @@ function buildPdf(objects) {
   for (const offset of offsets) {
     xref += `${String(offset).padStart(10, "0")} 00000 n \n`;
   }
+  const infoRef = infoObjNumber ? ` /Info ${infoObjNumber} 0 R` : "";
   const trailer = `trailer\n<< /Size ${
     objects.length + 1
-  } /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  } /Root 1 0 R${infoRef} >>\nstartxref\n${xrefStart}\n%%EOF\n`;
   return header + body + xref + trailer;
 }
 
@@ -71,5 +77,19 @@ const noText = buildPdf([
   "<< /Length 0 >>\nstream\n\nendstream",
 ]);
 writeFileSync(resolve(here, "sem-texto.pdf"), noText, "latin1");
+
+// PDF com data interna (Info dictionary com CreationDate). O 6º objeto é o
+// dicionário Info, referenciado pelo trailer (/Info 6 0 R).
+const withDateObjects = [
+  ...pageObjects(
+    textStream([
+      "Documento com data interna.",
+      "Usado para testar a captura de CreationDate.",
+    ]),
+  ),
+  "<< /CreationDate (D:20230115103000-03'00') /ModDate (D:20230116080000-03'00') >>",
+];
+const withDate = buildPdf(withDateObjects, withDateObjects.length);
+writeFileSync(resolve(here, "com-data.pdf"), withDate, "latin1");
 
 console.log("Fixtures PDF gerados em tests/fixtures/");
