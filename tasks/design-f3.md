@@ -30,6 +30,47 @@
 > `design-review.json`: campo `planoDistribuido` em `ContextoFrase`, mensagem
 > alternativa "Ainda não há dias de estudo no plano para ajustar" e teste. Os
 > 3 NIT também devem ser aplicados conforme o JSON.
+>
+> **NOTA DO ORQUESTRADOR (design-loop ENCERRADO por decisão do usuário após o
+> 3º ciclo; ler antes de implementar):** a 3ª revisão
+> (`.agents/tasks/plano-f3/design-review.json`) ficou com 1 MEDIUM + 7 NIT, 0
+> HIGH, e confirmou que os 9 pontos do brief estão resolvidos e que as tabelas
+> §5.3 e §6.3 conferem com o código. Arquitetura, classificação, régua e
+> persistência estão APROVADAS — NÃO reabrir. Os itens abaixo são detalhe e
+> DEVEM ser aplicados na implementação exatamente assim:
+> - **MEDIUM (posição do card na Agenda):** em `Agenda.tsx` o plano só aparece
+>   dentro de `<PlanoEstudo>` quando `montandoPlano` é true. Montar o card
+>   `Diagnostico` logo APÓS `{montandoPlano && <PlanoEstudo/>}` e ANTES da Dica
+>   do dia, com a condição `plano !== undefined && !montandoPlano` (assim nunca
+>   há duas prévias, uma velha). `aoAtualizar = setProvaSelecionada`. Acrescentar
+>   o passo manual correspondente ao §13.5.
+> - **DECISÃO DO USUÁRIO no NIT 8 (prova já passada):** OCULTAR o card do
+>   diagnóstico quando a prova já passou (não faz sentido diagnosticar para uma
+>   prova que já aconteceu). Isso elimina a frase "Ainda não há dias de estudo"
+>   para o caso `prova_passou`; não criar `provaPassou` no `ContextoFrase`.
+> - **NIT 2:** exportar `PerguntaMultipla = Extract<PerguntaQuiz, {tipo:'multipla'}>`
+>   em `types.ts` e reutilizar em `PerguntaDiagnostico` e no type guard (o tipo
+>   citado no §7.1 não existe hoje).
+> - **NIT 3:** corrigir a frase de pureza do §5: `diagnostico.ts` pode importar
+>   os módulos puros `./constants`, `./quizScore` e TIPOS de `./plano`/`./types`.
+>   Sem ciclo. Fixar `DIAG_PEDIDO_POR_TOPICO = 5` sem importar de `types.ts`.
+> - **NIT 4:** marcar as linhas "prova hoje" (§6.3/§13.2) como nível PURO (a
+>   régua em si), pois `montarPlanoCalculado` já devolve `prova_passou` para
+>   `diasRestantes <= 0` e a régua nunca roda com 0 pelo caminho real; trocar o
+>   exemplo do §11 pela menor distância alcançável pelo main.
+> - **NIT 5:** `registrarRespostasDiagnostico` usa mensagem PRÓPRIA para
+>   "diagnóstico ausente" (distinta de "escolhas inválidas"); remover o
+>   parâmetro `assinaturaUsada` de `salvarDiagnostico` e comparar
+>   `d.assinatura` com `assinaturaPlano(prova.plano)`.
+> - **NIT 6:** onde o §4.2 diz "6 chamadas", escrever "6 chamadas (até 12 com a
+>   corretiva de `gerarLotePerguntas`)", cada uma com timeout próprio.
+> - **NIT 7:** `fraseTopicosIgnorados` usa o MESMO join e a MESMA abreviação "e
+>   mais N" de `listaFracos`, título vazio vira "(sem título)", NUNCA omite
+>   tópico; adicionar caso de teste com 4 ignorados.
+> - **Testes do diagnóstico:** o oráculo de conservação de minutos (NIT 1 da 2ª
+>   revisão) é: Σ blocos ≤ capacidadeTotal; sem aviso, Σ blocos ≥
+>   capacidadeTotal − 14·(dias com folga < 15); ou reexecutar o teste de
+>   conservação da fatia 2 com `diagnostico` na grade.
 
 ---
 
