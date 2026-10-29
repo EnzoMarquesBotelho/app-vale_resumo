@@ -12,6 +12,7 @@
 import {
   HORIZONTE_DIAS,
   MINUTOS_BLOCO_MIN,
+  PESO_DIAGNOSTICO,
   PESO_DIFICULDADE,
   PISO_BASE,
   TETO_BASE,
@@ -19,6 +20,16 @@ import {
 import type { OrdinalProva } from "./types";
 
 // --- Régua base/novo (§6) --------------------------------------------------
+
+/**
+ * Insumo OPCIONAL e PURO do diagnóstico (fatia 3) para a régua: o veredito
+ * mecânico e sua intensidade em (0,1]. Ausente ⇒ resultado idêntico ao da
+ * fatia 2. Definido aqui (e importado por `diagnostico.ts`) para evitar ciclo.
+ */
+export interface AjusteDiagnostico {
+  veredito: "lacuna_base" | "dificuldade_novo";
+  intensidade: number;
+}
 
 /** Entrada da régua base/novo (tudo já saneado pelo chamador). */
 export interface MisturaBaseNovoParams {
@@ -33,6 +44,8 @@ export interface MisturaBaseNovoParams {
    * difícil). Derivado pelo chamador via `nivelParaPeso`. Base vazia → 0.
    */
   dificuldadeBase: number;
+  /** Opcional. Ausente ⇒ resultado IDÊNTICO ao da fatia 2. */
+  diagnostico?: AjusteDiagnostico;
 }
 
 /** Saída: proporção de ESFORÇO (tempo/dias) dedicada a base vs novo. */
@@ -90,8 +103,22 @@ export function calcularMisturaBaseNovo(
   const baseAjustada =
     baseBruta + PESO_DIFICULDADE * dificuldade * (TETO_BASE - baseBruta);
 
+  // Passo 3b — ajuste opcional pelo diagnóstico (só desloca em torno da régua).
+  let baseFinal = baseAjustada;
+  if (p.diagnostico !== undefined) {
+    const bruta = p.diagnostico.intensidade;
+    const i = clamp(Number.isFinite(bruta) ? bruta : 0, 0, 1);
+    if (p.diagnostico.veredito === "lacuna_base") {
+      baseFinal =
+        baseAjustada + PESO_DIAGNOSTICO * i * (TETO_BASE - baseAjustada);
+    } else {
+      baseFinal =
+        baseAjustada - PESO_DIAGNOSTICO * i * (baseAjustada - PISO_BASE);
+    }
+  }
+
   // Passo 4 — resultado (novo derivado para soma exata).
-  const fracaoBase = arredondar4(baseAjustada);
+  const fracaoBase = arredondar4(baseFinal);
   return { fracaoBase, fracaoNovo: arredondar4(1 - fracaoBase) };
 }
 
@@ -121,6 +148,8 @@ export interface CalcularPlanoParams {
   diasRestantes: number;
   /** Ordinal (define, com `topicos[].novo`, a partição base/novo). */
   ordinal: OrdinalProva;
+  /** Opcional (fatia 3). Ausente ⇒ plano IDÊNTICO ao da fatia 2. */
+  diagnostico?: AjusteDiagnostico;
 }
 
 /** Um bloco de estudo de um tópico, em um dia. */
@@ -157,6 +186,11 @@ export interface PlanoCalculado {
   mistura?: MisturaBaseNovo;
   /** Aviso honesto; ausente = tudo coube e há o que planejar. */
   aviso?: AvisoPlano;
+  /**
+   * Presente SOMENTE se o diagnóstico foi passado E mudou de fato a
+   * `fracaoBase` em relação ao cálculo sem ele.
+   */
+  diagnosticoAplicado?: AjusteDiagnostico;
 }
 
 /** Estado interno de um tópico durante a distribuição. */
@@ -303,6 +337,7 @@ export function calcularPlano(p: CalcularPlanoParams): PlanoCalculado {
     totalBase: base.length,
     totalNovo: novo.length,
     dificuldadeBase,
+    ...(p.diagnostico !== undefined ? { diagnostico: p.diagnostico } : {}),
   });
 
   const D = p.datasDisponiveis.length;
@@ -376,6 +411,17 @@ export function calcularPlano(p: CalcularPlanoParams): PlanoCalculado {
   }
 
   const resultado: PlanoCalculado = { dias, mistura };
+  if (p.diagnostico !== undefined) {
+    const semDiag = calcularMisturaBaseNovo({
+      diasRestantes: p.diasRestantes,
+      totalBase: base.length,
+      totalNovo: novo.length,
+      dificuldadeBase,
+    });
+    if (semDiag.fracaoBase !== mistura.fracaoBase) {
+      resultado.diagnosticoAplicado = p.diagnostico;
+    }
+  }
   if (removidos > 0) {
     resultado.aviso = { tipo: "nao_cabe", topicosForaDoPlano: removidos };
   }

@@ -146,3 +146,36 @@ export const PESO_DIFICULDADE = 0.5;
  * e nenhum bloco é criado abaixo deste piso.
  */
 export const MINUTOS_BLOCO_MIN = 15;
+
+// --- Diagnóstico do plano de estudo (fatia 3) --------------------------------
+
+/** Máximo de tópicos amostrados por camada (base / novo) no diagnóstico. */
+export const DIAG_TOPICOS_POR_CAMADA = 3;
+/** Perguntas mantidas por tópico no diagnóstico. */
+export const DIAG_PERGUNTAS_POR_TOPICO = 3;
+/**
+ * Quantidade pedida a `gerarQuiz` por tópico (igual a `QUANTIDADE_MINIMA`, o
+ * menor pedido aceito por `normalizarQuantidade`); sobras são descartadas.
+ */
+export const DIAG_PEDIDO_POR_TOPICO = 5;
+/** Corte (em caracteres) do texto-base de cada tópico: evita condensação. */
+export const DIAG_TEXTO_MAX = tamanhoMaximoChunkCaracteres;
+/** Mínimo de respostas numa camada para ela contar como "medida". */
+export const MIN_RESPOSTAS_CAMADA = 3;
+/** Numerador do limiar de acerto (3/5 = 60%), comparado por inteiros. */
+export const LIMIAR_ACERTO_NUM = 3;
+/** Denominador do limiar de acerto (3/5 = 60%), comparado por inteiros. */
+export const LIMIAR_ACERTO_DEN = 5;
+/** Limiar de acerto em ponto flutuante: só para a intensidade, nunca decisão. */
+export const LIMIAR_ACERTO_DIAGNOSTICO = LIMIAR_ACERTO_NUM / LIMIAR_ACERTO_DEN;
+/**
+ * Peso do diagnóstico na régua base/novo: quanto da folga até o teto (ou até o
+ * piso) a intensidade máxima (1) fecha. Em [0,1].
+ */
+export const PESO_DIAGNOSTICO = 0.5;
+/**
+ * Amostra de referência (3 tópicos × 3 perguntas) para encolher a intensidade:
+ * `min(1, total / DIAG_AMOSTRA_REFERENCIA)`. Amostra pequena reduz a CONFIANÇA.
+ */
+export const DIAG_AMOSTRA_REFERENCIA =
+  DIAG_PERGUNTAS_POR_TOPICO * DIAG_TOPICOS_POR_CAMADA;

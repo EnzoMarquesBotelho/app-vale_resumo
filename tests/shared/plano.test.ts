@@ -348,3 +348,234 @@ describe("calcularPlano — distribuição", () => {
     }
   });
 });
+
+// --- Fatia 3: diagnóstico como insumo opcional da régua ----------------------
+
+describe("diagnóstico na régua — regressão e tabela", () => {
+  const diasGrade = [0, 1, 7, 15, 30, 60];
+  const difGrade = [0, 0.5, 1];
+  const totaisGrade: Array<[number, number]> = [
+    [1, 1],
+    [3, 2],
+    [0, 2],
+    [2, 0],
+  ];
+
+  it("sem diagnóstico (ausente ou intensidade 0) ⇒ saída idêntica à da fatia 2", () => {
+    for (const dias of diasGrade) {
+      for (const dif of difGrade) {
+        for (const [tb, tn] of totaisGrade) {
+          const p = {
+            diasRestantes: dias,
+            totalBase: tb,
+            totalNovo: tn,
+            dificuldadeBase: dif,
+          };
+          const sem = calcularMisturaBaseNovo(p);
+          for (const v of ["lacuna_base", "dificuldade_novo"] as const) {
+            expect(
+              calcularMisturaBaseNovo({
+                ...p,
+                diagnostico: { veredito: v, intensidade: 0 },
+              }),
+            ).toEqual(sem);
+          }
+        }
+      }
+    }
+  });
+
+  it("calcularPlano: ausente e intensidade 0 ⇒ toEqual, sem chaves novas", () => {
+    for (const dias of diasGrade) {
+      for (const dif of [0, 1]) {
+        for (const [tb, tn] of totaisGrade) {
+          const topicos = [
+            ...Array.from({ length: tb }, (_, i) =>
+              topico({ id: `b${i}`, novo: false, dificuldade: dif }),
+            ),
+            ...Array.from({ length: tn }, (_, i) =>
+              topico({ id: `n${i}`, novo: true }),
+            ),
+          ];
+          const p: CalcularPlanoParams = {
+            topicos,
+            datasDisponiveis: datas("2026-03-02", 6),
+            horasPorDia: 2,
+            diasRestantes: dias,
+            ordinal: "segunda",
+          };
+          const sem = calcularPlano(p);
+          expect("diagnosticoAplicado" in sem).toBe(false);
+          const zero = calcularPlano({
+            ...p,
+            diagnostico: { veredito: "lacuna_base", intensidade: 0 },
+          });
+          expect(zero).toEqual(sem);
+        }
+      }
+    }
+  });
+
+  const m = (
+    dias: number,
+    dif: number,
+    d?: { veredito: "lacuna_base" | "dificuldade_novo"; intensidade: number },
+    totais: [number, number] = [1, 1],
+  ) =>
+    calcularMisturaBaseNovo({
+      diasRestantes: dias,
+      totalBase: totais[0],
+      totalNovo: totais[1],
+      dificuldadeBase: dif,
+      ...(d !== undefined ? { diagnostico: d } : {}),
+    });
+  const lac = (i: number) => ({ veredito: "lacuna_base" as const, intensidade: i });
+  const nov = (i: number) => ({
+    veredito: "dificuldade_novo" as const,
+    intensidade: i,
+  });
+
+  it("tabela de casos", () => {
+    expect(m(15, 0).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(15, 0, lac(1)).fracaoBase).toBeCloseTo(0.6375, 3);
+    expect(m(15, 0, lac(0.4)).fracaoBase).toBeCloseTo(0.54, 3);
+    expect(m(15, 0, lac(0)).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(15, 0, nov(1)).fracaoBase).toBeCloseTo(0.3125, 3);
+    expect(m(0, 0, lac(1)).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(0, 0, lac(1)).fracaoNovo).toBeCloseTo(0.525, 3);
+    expect(m(0, 0, nov(1)).fracaoBase).toBeCloseTo(0.15, 3);
+    expect(m(30, 0, lac(1)).fracaoBase).toBeCloseTo(0.8, 3);
+    expect(m(45, 0, nov(1)).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(15, 1, lac(1)).fracaoBase).toBeCloseTo(0.7188, 3);
+    expect(m(15, 1, nov(1)).fracaoBase).toBeCloseTo(0.3938, 3);
+    expect(m(15, 0, lac(1), [1, 0])).toEqual({ fracaoBase: 1, fracaoNovo: 0 });
+    expect(m(15, 0, nov(1), [0, 1])).toEqual({ fracaoBase: 0, fracaoNovo: 1 });
+  });
+
+  it("sanitiza intensidade: NaN = 0, 2 = 1, -1 = 0", () => {
+    expect(m(15, 0, lac(NaN)).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(15, 0, lac(2))).toEqual(m(15, 0, lac(1)));
+    expect(m(15, 0, lac(-1)).fracaoBase).toBeCloseTo(0.475, 3);
+    expect(m(15, 0, lac(Infinity)).fracaoBase).toBeCloseTo(0.475, 3);
+  });
+
+  it("monotonia em intensidade e ordem novo ≤ sem ≤ lacuna", () => {
+    for (const dias of diasGrade) {
+      let antLac = -1;
+      let antNov = 2;
+      for (let k = 0; k <= 10; k++) {
+        const i = k / 10;
+        const l = m(dias, 0.5, lac(i)).fracaoBase;
+        const n = m(dias, 0.5, nov(i)).fracaoBase;
+        const s = m(dias, 0.5).fracaoBase;
+        expect(l).toBeGreaterThanOrEqual(antLac);
+        expect(n).toBeLessThanOrEqual(antNov);
+        expect(n).toBeLessThanOrEqual(s);
+        expect(s).toBeLessThanOrEqual(l);
+        antLac = l;
+        antNov = n;
+      }
+    }
+  });
+
+  it("limites: fracaoBase em [PISO,TETO] e novo > 0 mesmo com prova hoje", () => {
+    for (const dias of diasGrade) {
+      for (const d of [lac(1), nov(1)]) {
+        const r = m(dias, 1, d);
+        expect(r.fracaoBase).toBeGreaterThanOrEqual(0.15);
+        expect(r.fracaoBase).toBeLessThanOrEqual(0.8);
+        expect(r.fracaoNovo).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("modulação pelo tempo (lacuna_base, i=1, dificuldade 0)", () => {
+    const dias = [0, 1, 7, 15, 29, 30, 60];
+    let ganhoAnterior = Infinity;
+    for (const d of dias) {
+      const sem = m(d, 0).fracaoBase;
+      const com = m(d, 0, lac(1));
+      expect(com.fracaoBase).toBeGreaterThanOrEqual(sem);
+      expect(com.fracaoBase).toBeLessThanOrEqual(0.8);
+      expect(com.fracaoNovo).toBeGreaterThanOrEqual(0.2);
+      const ganho = com.fracaoBase - sem;
+      expect(ganho).toBeLessThanOrEqual(ganhoAnterior + 1e-9);
+      if (d >= 30) expect(ganho).toBe(0);
+      ganhoAnterior = ganho;
+    }
+  });
+});
+
+describe("diagnóstico em calcularPlano — diagnosticoAplicado e invariantes", () => {
+  const mk = (
+    dias: number,
+    totais: [number, number],
+    diagnostico?: CalcularPlanoParams["diagnostico"],
+    dificuldade = 0,
+  ): CalcularPlanoParams => ({
+    topicos: [
+      ...Array.from({ length: totais[0] }, (_, i) =>
+        topico({ id: `b${i}`, novo: false, dificuldade }),
+      ),
+      ...Array.from({ length: totais[1] }, (_, i) =>
+        topico({ id: `n${i}`, novo: true }),
+      ),
+    ],
+    datasDisponiveis: datas("2026-03-02", 6),
+    horasPorDia: 2,
+    diasRestantes: dias,
+    ordinal: "segunda",
+    ...(diagnostico !== undefined ? { diagnostico } : {}),
+  });
+  const lac = { veredito: "lacuna_base" as const, intensidade: 1 };
+  const nov = { veredito: "dificuldade_novo" as const, intensidade: 1 };
+
+  it("presente quando muda a fracaoBase (15 dias, lacuna i=1)", () => {
+    const r = calcularPlano(mk(15, [2, 2], lac));
+    expect(r.diagnosticoAplicado).toEqual(lac);
+    expect(r.mistura?.fracaoBase).toBeGreaterThan(
+      calcularPlano(mk(15, [2, 2])).mistura!.fracaoBase,
+    );
+  });
+
+  it("ausente quando não muda (teto, piso, um lado vazio, i=0, omitido)", () => {
+    expect(calcularPlano(mk(30, [2, 2], lac)).diagnosticoAplicado).toBeUndefined();
+    expect(calcularPlano(mk(0, [2, 2], nov)).diagnosticoAplicado).toBeUndefined();
+    expect(calcularPlano(mk(15, [2, 0], lac)).diagnosticoAplicado).toBeUndefined();
+    expect(calcularPlano(mk(15, [0, 2], nov)).diagnosticoAplicado).toBeUndefined();
+    expect(
+      calcularPlano(mk(15, [2, 2], { ...lac, intensidade: 0 })).diagnosticoAplicado,
+    ).toBeUndefined();
+    expect("diagnosticoAplicado" in calcularPlano(mk(15, [2, 2]))).toBe(false);
+  });
+
+  it("mantém as invariantes da fatia 2 com diagnóstico na grade", () => {
+    for (const dias of [1, 7, 15, 30, 60]) {
+      for (const totais of [[1, 1], [3, 2], [6, 5]] as Array<[number, number]>) {
+        for (const d of [lac, nov]) {
+          for (const dif of [0, 1]) {
+            const p = mk(dias, totais, d, dif);
+            const r = calcularPlano(p);
+            const cap = p.horasPorDia * 60;
+            let soma = 0;
+            let diasFolgaPequena = 0;
+            for (const dia of r.dias) {
+              const s = dia.blocos.reduce((a, b) => a + b.minutos, 0);
+              expect(s).toBeLessThanOrEqual(cap);
+              for (const b of dia.blocos) {
+                expect(b.minutos).toBeGreaterThanOrEqual(15);
+              }
+              if (cap - s < 15) diasFolgaPequena += 1;
+              soma += s;
+            }
+            const capTotal = p.datasDisponiveis.length * cap;
+            expect(soma).toBeLessThanOrEqual(capTotal);
+            if (r.aviso === undefined) {
+              expect(soma).toBeGreaterThanOrEqual(capTotal - 14 * diasFolgaPequena);
+            }
+          }
+        }
+      }
+    }
+  });
+});
