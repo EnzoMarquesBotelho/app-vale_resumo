@@ -327,8 +327,9 @@ configurar `npm run package` para gerar um executável.
   verificação manual.
 
 - [x] **Unificação Agenda de revisão + Plano de estudo (linha do tempo única) e
-  fluxo de criação da prova** — `design-unificacao-agenda-plano.md` (branch
-  `feat/unifica-agenda-plano`, ainda não mergeada). Prova com plano (não
+  fluxo de criação da prova** — `design-unificacao-agenda-plano.md` /
+  `roadmap-unificacao-agenda-plano.md` (branch `feat/unifica-agenda-plano`,
+  implementação `9664187`, ainda não mergeada). Prova com plano (não
   passada) mostra estudo + revisão + checkpoint por data (revisão no mesmo dia
   do checkpoint aparece junto); prova sem plano mantém a Agenda de revisão
   idêntica. Novo campo **Tipo de prova** (1ª/2ª/final/ENEM/ENADE, `Prova.tipo?`

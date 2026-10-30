@@ -9,9 +9,10 @@
   **Agenda de revisão + Plano de estudo numa linha do tempo única** e fluxo de
   criação da prova unificado (nome automático, ENEM/ENADE, datas passadas
   bloqueadas). Build, lint e **1015 testes** passando (61 arquivos; +70 sobre
-  os 945 da master, conferidos de verdade com `npm test`). Detalhes em
-  "Entregue" abaixo. O hash do commit de implementação fica no `git log` da
-  branch (não citado aqui de propósito).
+  os 945 da master, conferidos de verdade com `npm test`). Referência estável:
+  **commit de implementação `9664187`** + design `f85c87e`/`4f61e2e` + o commit
+  de docs da fatia (hash dele não citado aqui de propósito: autorreferência).
+  Decisões em `roadmap-unificacao-agenda-plano.md`; detalhes em "Entregue".
 - Build, lint e **945 testes** passando na master (58 arquivos de teste), conferidos de
   verdade na master após o merge fast-forward da fatia 4 (a master estava em
   `bc81789` antes do merge; baseline anterior: 781). Entregue e na master:
@@ -260,8 +261,9 @@
   card na Agenda e a regressão visual de Exercicios após a extração
   (`ListaExercicios`; não há testes de componente no repo).
 - **Unificação Agenda de revisão + Plano de estudo (linha do tempo única) e
-  fluxo de criação da prova** (`design-unificacao-agenda-plano.md`; branch
-  `feat/unifica-agenda-plano`): provas **com plano** (e não passadas) mostram
+  fluxo de criação da prova** (`design-unificacao-agenda-plano.md`,
+  `roadmap-unificacao-agenda-plano.md`; branch `feat/unifica-agenda-plano`,
+  implementação `9664187`): provas **com plano** (e não passadas) mostram
   uma única lista por data com **estudo**, **revisão** e **checkpoint**; a
   revisão que cai no mesmo dia de um checkpoint (na prática 7 e 3 dias antes)
   aparece junto dele (só exibição: a sessão salva nunca é alterada). Estudo é só

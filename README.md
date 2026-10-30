@@ -48,8 +48,8 @@ podem ser reabertos a qualquer momento.
   **agenda de revisão** (revisar alguns dias antes da prova), que você pode ajustar à mão, e dá
   uma **dica do dia** — rápida (automática) ou mais elaborada (pela IA). Provas podem ser de uma
   matéria específica ou abrangentes (tipo ENEM/ENADE, cobrindo todas as matérias).
-- **Linha do tempo única**: em provas com plano de estudo, estudo, revisões e checkpoints aparecem
-  na mesma lista, por data. A revisão que cai no mesmo dia de um checkpoint aparece junto dele.
+- **Uma lista só por prova**: em provas com plano de estudo, o que estudar, as revisões e os
+  checkpoints aparecem juntos numa única linha do tempo, por data, sem passos separados. A revisão que cai no mesmo dia de um checkpoint aparece junto dele.
   Você continua podendo marcar, mover, remover e adicionar revisões; o bloco de estudo muda
   editando o plano. Provas sem plano mantêm a agenda de revisão de sempre. ENEM e ENADE contam
   como primeira prova no plano (todo o conteúdo é base).
