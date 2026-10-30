@@ -22,6 +22,7 @@ import type {
   OllamaStatus,
   PerguntaQuiz,
   PlanoEstudo,
+  PreferenciaCheckpoint,
   Prova,
   Quiz,
   Resumo,
@@ -34,6 +35,7 @@ import type {
 } from "./types";
 import type { AlvoExportacao, ResultadoExportacao } from "./export/types";
 import type { PlanoCalculado } from "./plano";
+import type { VisaoCheckpoints } from "./checkpoints";
 import type { ProgressoGeracao } from "./geracaoLotes";
 import type { EstadoTema, ThemePreference } from "./theme";
 import type { UpdaterStatus } from "./updater";
@@ -102,6 +104,14 @@ export const IPC_CHANNELS = {
   gerarDiagnostico: "prova:gerar-diagnostico",
   /** Grava as escolhas do aluno no diagnóstico (a correção é mecânica). */
   responderDiagnostico: "prova:responder-diagnostico",
+  /** Calcula (sem IA) a visão dos checkpoints pré-prova da prova. */
+  calcularCheckpoints: "prova:calcular-checkpoints",
+  /** Gera (IA) a lista de exercícios de um checkpoint e a persiste. */
+  gerarCheckpoint: "prova:gerar-checkpoint",
+  /** Marca a lista de um checkpoint como concluída. */
+  concluirCheckpoint: "prova:concluir-checkpoint",
+  /** Troca a preferência de checkpoint (lembrete ⇄ automático). */
+  definirPreferenciaCheckpoint: "prova:definir-preferencia-checkpoint",
   /** Remove uma prova pelo id. */
   removerProva: "prova:remover",
   /** Calcula a dica MECÂNICA do dia de uma prova (sem IA, instantânea). */
@@ -379,6 +389,27 @@ export interface AppApi {
    * diagnóstico da prova `id` e resolve com a prova (diagnóstico concluído).
    */
   responderDiagnostico: (id: string, escolhas: number[]) => Promise<Prova>;
+  /**
+   * Calcula (somente leitura, sem IA) os checkpoints pré-prova da prova `id`:
+   * datas, assuntos cobertos e estado de cada um. Rejeita com mensagem amigável.
+   */
+  calcularCheckpoints: (id: string) => Promise<VisaoCheckpoints>;
+  /**
+   * Gera a lista de exercícios do checkpoint `checkpointId` (ex.: "d14") da
+   * prova `id` e resolve com a prova. Empurra progresso com
+   * `artefato: "checkpoint"`. Rejeita com mensagem amigável.
+   */
+  gerarCheckpoint: (id: string, checkpointId: string) => Promise<Prova>;
+  /** Marca como concluída a lista do checkpoint e resolve com a prova. */
+  concluirCheckpoint: (id: string, checkpointId: string) => Promise<Prova>;
+  /**
+   * Define a preferência de checkpoint ("lembrete" ou "automatico") sem
+   * recarimbar o questionário, e resolve com a prova.
+   */
+  definirPreferenciaCheckpoint: (
+    id: string,
+    preferencia: PreferenciaCheckpoint,
+  ) => Promise<Prova>;
   /** Remove a prova pelo `id` (no-op se já não existe). */
   removerProva: (id: string) => Promise<void>;
   /**

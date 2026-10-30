@@ -76,6 +76,18 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC_CHANNELS.gerarDiagnostico, id),
   responderDiagnostico: (id, escolhas) =>
     ipcRenderer.invoke(IPC_CHANNELS.responderDiagnostico, id, escolhas),
+  calcularCheckpoints: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.calcularCheckpoints, id),
+  gerarCheckpoint: (id, checkpointId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gerarCheckpoint, id, checkpointId),
+  concluirCheckpoint: (id, checkpointId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.concluirCheckpoint, id, checkpointId),
+  definirPreferenciaCheckpoint: (id, preferencia) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.definirPreferenciaCheckpoint,
+      id,
+      preferencia,
+    ),
   removerProva: (id) => ipcRenderer.invoke(IPC_CHANNELS.removerProva, id),
   dicaDoDia: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDoDia, id),
   dicaDaIa: (id) => ipcRenderer.invoke(IPC_CHANNELS.dicaDaIa, id),

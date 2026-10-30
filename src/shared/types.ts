@@ -414,6 +414,8 @@ export interface Prova {
   plano?: PlanoEstudo;
   /** Diagnóstico do plano (quiz de múltipla escolha), quando o aluno o fez. */
   diagnostico?: DiagnosticoPlano;
+  /** Listas de exercícios de checkpoint pré-prova (fatia 4), irmão de `plano`. */
+  checkpoints?: CheckpointsPlano;
 }
 
 /** Qual prova é — define o recorte base vs novo (intent). */
@@ -573,4 +575,45 @@ export interface DiagnosticoPlano {
   respostas?: number[];
   /** ISO 8601; presente se, e somente se, `respostas` está presente. */
   concluidoEm?: string;
+}
+
+// --- Checkpoints pré-prova (fatia 4) ------------------------------------------
+
+/** Tópico coberto por um checkpoint (id do doc ou `manual:`; título do momento). */
+export interface TopicoCheckpoint {
+  id: string;
+  titulo: string;
+}
+
+/** Por que um assunto da janela ficou fora da lista. */
+export type MotivoCheckpointIgnorado = "manual" | "sem_texto" | "fora_da_amostra";
+
+export interface TopicoCheckpointIgnorado extends TopicoCheckpoint {
+  motivo: MotivoCheckpointIgnorado;
+}
+
+/** Uma lista de exercícios gerada para um checkpoint. */
+export interface CheckpointGerado {
+  /** "d<diasAntes>" (ex.: "d14"); regex /^d[1-9]\d{0,2}$/. */
+  id: string;
+  /** ISO 8601 da geração. */
+  geradoEm: string;
+  /** Assuntos EFETIVAMENTE usados no texto-base (>= 1). */
+  topicos: TopicoCheckpoint[];
+  /** Assuntos da janela que ficaram de fora, com motivo. */
+  ignorados: TopicoCheckpointIgnorado[];
+  /** Quantidade pedida (CHECKPOINT_QUANTIDADE no momento da geração). */
+  pedido: number;
+  /** >= CHECKPOINT_MINIMO_EXERCICIOS. */
+  exercicios: Exercicio[];
+  /** ISO 8601; presente = o aluno marcou como concluída. */
+  concluidoEm?: string;
+}
+
+/** Bloco opcional e aditivo, IRMÃO de `plano` e `diagnostico` em `Prova`. */
+export interface CheckpointsPlano {
+  /** `assinaturaPlano(plano)` no momento da geração (reuso da fatia 3). */
+  assinatura: string;
+  /** Uma entrada por id, ordenadas por `diasAntes` decrescente (d28, d14, d7, d3). */
+  itens: CheckpointGerado[];
 }

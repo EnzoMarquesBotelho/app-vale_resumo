@@ -89,13 +89,16 @@ import {
   DadosProvaInvalidosError,
   ProvaNaoEncontradaError,
   carregarProva,
+  concluirCheckpoint,
   criarProva,
+  definirPreferenciaCheckpoint,
   editarProva,
   hojeLocal,
   listarProvas,
   regerarAgenda,
   registrarRespostasDiagnostico,
   removerProva,
+  salvarCheckpoint,
   salvarDiagnostico,
   salvarPlano,
   salvarSessoes,
@@ -105,9 +108,19 @@ import {
   gerarDiagnostico,
   mensagemAmigavelDiagnostico,
 } from "../services/diagnostico.js";
+import {
+  CheckpointEmAndamentoError,
+  CheckpointNaoDisponivelError,
+  exigirCheckpointGeravel,
+  gerarListaCheckpoint,
+  mensagemAmigavelCheckpoint,
+  montarVisaoCheckpoints,
+} from "../services/checkpoints.js";
+import { assinaturaPlano } from "@shared/diagnostico";
 import type { MudancasProva, NovaProva } from "../services/provas.js";
 import { montarPlanoCalculado } from "../services/planoCalculo.js";
 import type { PlanoCalculado } from "@shared/plano";
+import type { VisaoCheckpoints } from "@shared/checkpoints";
 import { gerarDicaIa } from "../services/dica.js";
 import {
   carregarPreferenciaTema,
@@ -486,6 +499,22 @@ async function obterStatusOllama(): Promise<OllamaStatus> {
 
 /** Provas com geração de diagnóstico em andamento (guarda de concorrência). */
 const diagnosticosEmGeracao = new Set<string>();
+
+/** Provas com geração de checkpoint em andamento (prova → checkpointId). */
+const checkpointsEmGeracao = new Map<string, string>();
+
+/** Formato válido de id de checkpoint ("d14"). */
+const PADRAO_ID_CHECKPOINT = /^d[1-9]\d{0,2}$/;
+
+/** Valida o id de checkpoint vindo do renderer. */
+function exigirIdCheckpoint(valor: unknown): string {
+  if (typeof valor !== "string" || !PADRAO_ID_CHECKPOINT.test(valor)) {
+    throw new CheckpointNaoDisponivelError(
+      "Não encontrei esse checkpoint no plano atual.",
+    );
+  }
+  return valor;
+}
 
 /**
  * Resolve, no momento da geração, um modelo que realmente exista no Ollama.
@@ -1012,6 +1041,96 @@ export function registerIpcHandlers(): void {
         );
       } catch (erro) {
         throw new Error(mensagemAmigavelDiagnostico(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.calcularCheckpoints,
+    async (_event, id: string): Promise<VisaoCheckpoints> => {
+      try {
+        const prova = await carregarProva(id);
+        return montarVisaoCheckpoints(
+          prova,
+          hojeLocal(),
+          checkpointsEmGeracao.get(id),
+        );
+      } catch (erro) {
+        throw new Error(mensagemAmigavelCheckpoint(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.gerarCheckpoint,
+    async (event, id: string, checkpointId: string): Promise<Prova> => {
+      if (checkpointsEmGeracao.has(id)) {
+        throw new Error(mensagemAmigavelCheckpoint(new CheckpointEmAndamentoError()));
+      }
+      // Registra a guarda sem nada que possa lançar entre aqui e o `try`.
+      checkpointsEmGeracao.set(id, String(checkpointId));
+      try {
+        const cpId = exigirIdCheckpoint(checkpointId);
+        const prova = await carregarProva(id);
+        if (prova.plano === undefined) {
+          throw new DadosProvaInvalidosError(
+            "Monte o plano de estudo antes de preparar os checkpoints.",
+          );
+        }
+        const visao = montarVisaoCheckpoints(prova, hojeLocal());
+        const item = exigirCheckpointGeravel(visao, cpId);
+        // Capturada ANTES da IA: se o plano mudar durante a geração, o save recusa.
+        const assinatura = assinaturaPlano(prova.plano);
+        const model = await modeloParaGeracao();
+        const lista = await gerarListaCheckpoint({
+          checkpoint: item,
+          // QUALQUER erro de leitura (ausente, corrompido, EACCES) = sem texto.
+          carregarTexto: async (docId) => {
+            try {
+              return (await carregarDocumento(docId)).texto;
+            } catch {
+              return null;
+            }
+          },
+          gerar: (prompt, format) => generate({ prompt, model, format }),
+          aoProgresso: empurrarProgresso(event, "checkpoint"),
+          agora: new Date().toISOString(),
+        });
+        return await salvarCheckpoint(id, assinatura, lista);
+      } catch (erro) {
+        throw new Error(mensagemAmigavelCheckpoint(erro));
+      } finally {
+        checkpointsEmGeracao.delete(id);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.concluirCheckpoint,
+    async (_event, id: string, checkpointId: string): Promise<Prova> => {
+      try {
+        return await concluirCheckpoint(
+          id,
+          exigirIdCheckpoint(checkpointId),
+          new Date().toISOString(),
+        );
+      } catch (erro) {
+        throw new Error(mensagemAmigavelCheckpoint(erro));
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.definirPreferenciaCheckpoint,
+    async (_event, id: string, preferencia: unknown): Promise<Prova> => {
+      try {
+        return await definirPreferenciaCheckpoint(
+          id,
+          preferencia,
+          new Date().toISOString(),
+        );
+      } catch (erro) {
+        throw new Error(mensagemAmigavelCheckpoint(erro));
       }
     },
   );

@@ -179,3 +179,17 @@ export const PESO_DIAGNOSTICO = 0.5;
  */
 export const DIAG_AMOSTRA_REFERENCIA =
   DIAG_PERGUNTAS_POR_TOPICO * DIAG_TOPICOS_POR_CAMADA;
+// --- Checkpoints pré-prova (fatia 4) ------------------------------------------
+
+/** Quantos dias antes da prova caem os checkpoints (ids `d28`, `d14`, `d7`, `d3`). */
+export const CHECKPOINT_DIAS_ANTES = [28, 14, 7, 3] as const;
+/** Exercícios pedidos por checkpoint (fixo, não configurável). */
+export const CHECKPOINT_QUANTIDADE = 8;
+/** Modo dos exercícios do checkpoint. */
+export const CHECKPOINT_MODO = "mista" as const;
+/** Máximo de assuntos usados no texto-base de uma lista. */
+export const CHECKPOINT_TOPICOS_MAX = 6;
+/** Teto (em caracteres) do texto-base de uma lista. */
+export const CHECKPOINT_TEXTO_MAX = tamanhoMaximoChunkCaracteres;
+/** Mínimo de exercícios para a lista valer. */
+export const CHECKPOINT_MINIMO_EXERCICIOS = 3;

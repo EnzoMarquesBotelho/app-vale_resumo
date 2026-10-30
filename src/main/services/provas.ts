@@ -18,6 +18,8 @@ import { readdir, readFile, mkdir, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  CHECKPOINT_DIAS_ANTES,
+  CHECKPOINT_MINIMO_EXERCICIOS,
   INTERVALOS_REVISAO_PADRAO,
 } from "@shared/constants";
 import { montarCaderno } from "@shared/notebooks";
@@ -36,7 +38,14 @@ import { assinaturaPlano } from "@shared/diagnostico";
 import { slugTopico } from "@shared/slug";
 import type {
   AlternativaQuiz,
+  CheckpointGerado,
+  CheckpointsPlano,
   DiagnosticoPlano,
+  Exercicio,
+  ModoConteudo,
+  MotivoCheckpointIgnorado,
+  TopicoCheckpoint,
+  TopicoCheckpointIgnorado,
   MotivoTopicoIgnorado,
   NivelDificuldade,
   PerguntaDiagnostico,
@@ -254,6 +263,15 @@ export async function carregarProva(
         delete prova.diagnostico;
       } else {
         prova.diagnostico = saneado;
+      }
+    }
+    // Bloco aditivo da fatia 4: mesmo tratamento tolerante do diagnóstico.
+    if (typeof prova === "object" && prova !== null && "checkpoints" in prova) {
+      const saneado = sanearCheckpointsPersistido(prova.checkpoints);
+      if (saneado === undefined) {
+        delete prova.checkpoints;
+      } else {
+        prova.checkpoints = saneado;
       }
     }
     return prova;
@@ -828,4 +846,230 @@ export async function registrarRespostasDiagnostico(
  */
 export async function removerProva(id: string, baseDir?: string): Promise<void> {
   await rm(caminhoProva(id, baseDir), { force: true });
+}
+
+// --- Checkpoints pré-prova (fatia 4) -----------------------------------------
+
+const MODOS_EXERCICIO: readonly ModoConteudo[] = ["teorica", "pratica", "mista"];
+const MOTIVOS_CHECKPOINT_IGNORADO: readonly MotivoCheckpointIgnorado[] = [
+  "manual",
+  "sem_texto",
+  "fora_da_amostra",
+];
+const PADRAO_ID_CHECKPOINT = /^d[1-9]\d{0,2}$/;
+const TITULO_CHECKPOINT_MAX = 200;
+
+function textoNaoVazio(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function sanearExercicioPersistido(bruto: unknown): Exercicio | null {
+  const e = objetoOuNulo(bruto);
+  if (e === null) return null;
+  if (!textoNaoVazio(e.enunciado) || !textoNaoVazio(e.resposta)) return null;
+  if (!MODOS_EXERCICIO.includes(e.modo as ModoConteudo)) return null;
+  return {
+    enunciado: e.enunciado.trim(),
+    resposta: e.resposta.trim(),
+    modo: e.modo as ModoConteudo,
+  };
+}
+
+/** Valida um item de checkpoint persistido; `null` se inválido. */
+function sanearItemCheckpoint(bruto: unknown): CheckpointGerado | null {
+  const it = objetoOuNulo(bruto);
+  if (it === null) return null;
+  if (typeof it.id !== "string" || !PADRAO_ID_CHECKPOINT.test(it.id)) return null;
+  if (!textoNaoVazio(it.geradoEm)) return null;
+
+  const exercicios: Exercicio[] = [];
+  for (const b of Array.isArray(it.exercicios) ? it.exercicios : []) {
+    const ex = sanearExercicioPersistido(b);
+    if (ex !== null) exercicios.push(ex);
+  }
+  if (exercicios.length < CHECKPOINT_MINIMO_EXERCICIOS) return null;
+
+  const topicos: TopicoCheckpoint[] = [];
+  const vistos = new Set<string>();
+  for (const b of Array.isArray(it.topicos) ? it.topicos : []) {
+    const t = objetoOuNulo(b);
+    if (t === null || !textoNaoVazio(t.id) || typeof t.titulo !== "string") continue;
+    if (vistos.has(t.id)) continue;
+    vistos.add(t.id);
+    topicos.push({ id: t.id, titulo: t.titulo.slice(0, TITULO_CHECKPOINT_MAX) });
+  }
+  if (topicos.length === 0) return null;
+
+  const ignorados: TopicoCheckpointIgnorado[] = [];
+  for (const b of Array.isArray(it.ignorados) ? it.ignorados : []) {
+    const ig = objetoOuNulo(b);
+    if (
+      ig !== null &&
+      textoNaoVazio(ig.id) &&
+      typeof ig.titulo === "string" &&
+      MOTIVOS_CHECKPOINT_IGNORADO.includes(ig.motivo as MotivoCheckpointIgnorado)
+    ) {
+      ignorados.push({
+        id: ig.id,
+        titulo: ig.titulo.slice(0, TITULO_CHECKPOINT_MAX),
+        motivo: ig.motivo as MotivoCheckpointIgnorado,
+      });
+    }
+  }
+
+  const pedido =
+    typeof it.pedido === "number" && Number.isInteger(it.pedido) && it.pedido >= 1
+      ? it.pedido
+      : exercicios.length;
+
+  return {
+    id: it.id,
+    geradoEm: it.geradoEm,
+    topicos,
+    ignorados,
+    pedido,
+    exercicios,
+    ...(textoNaoVazio(it.concluidoEm) ? { concluidoEm: it.concluidoEm } : {}),
+  };
+}
+
+function numeroDoIdCheckpoint(id: string): number {
+  return Number(id.slice(1));
+}
+
+/**
+ * Leitura tolerante do bloco `checkpoints` persistido. Nunca lança: bloco
+ * inválido ⇒ `undefined`; item inválido é descartado; ids únicos (mantém o 1º),
+ * ordenados por `diasAntes` decrescente. Chaves opcionais por spread condicional.
+ */
+export function sanearCheckpointsPersistido(
+  bruto: unknown,
+): CheckpointsPlano | undefined {
+  const b = objetoOuNulo(bruto);
+  if (b === null || !textoNaoVazio(b.assinatura) || !Array.isArray(b.itens)) {
+    return undefined;
+  }
+  const itens: CheckpointGerado[] = [];
+  const ids = new Set<string>();
+  for (const bruta of b.itens) {
+    const item = sanearItemCheckpoint(bruta);
+    if (item === null || ids.has(item.id)) continue;
+    ids.add(item.id);
+    itens.push(item);
+  }
+  itens.sort((x, y) => numeroDoIdCheckpoint(y.id) - numeroDoIdCheckpoint(x.id));
+  const limitados = itens.slice(0, CHECKPOINT_DIAS_ANTES.length);
+  return limitados.length === 0
+    ? undefined
+    : { assinatura: b.assinatura, itens: limitados };
+}
+
+/**
+ * Persiste uma lista de checkpoint recém-gerada (substitui a de mesmo id).
+ * Recarrega a prova e só grava se o plano ainda tem a assinatura usada na
+ * geração. Com assinatura nova, o bloco antigo é substituído por um bloco só
+ * com este item.
+ *
+ * @throws {DadosProvaInvalidosError} se o plano sumiu ou mudou.
+ */
+export async function salvarCheckpoint(
+  id: string,
+  assinaturaDaGeracao: string,
+  item: CheckpointGerado,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  if (
+    prova.plano === undefined ||
+    assinaturaDaGeracao !== assinaturaPlano(prova.plano)
+  ) {
+    throw new DadosProvaInvalidosError(
+      "Os assuntos do plano mudaram enquanto eu preparava a lista. Tente de novo.",
+    );
+  }
+  const atual = prova.checkpoints;
+  const mesmos =
+    atual !== undefined && atual.assinatura === assinaturaDaGeracao
+      ? atual.itens.filter((i) => i.id !== item.id)
+      : [];
+  const itens = [...mesmos, item].sort(
+    (x, y) => numeroDoIdCheckpoint(y.id) - numeroDoIdCheckpoint(x.id),
+  );
+  const atualizada: Prova = {
+    ...prova,
+    checkpoints: { assinatura: assinaturaDaGeracao, itens },
+    atualizadoEm: item.geradoEm,
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Marca a lista do checkpoint como concluída. Idempotente: já concluída ⇒
+ * devolve a prova sem regravar nem mudar carimbos.
+ *
+ * @throws {DadosProvaInvalidosError} sem a lista no bloco atual.
+ */
+export async function concluirCheckpoint(
+  id: string,
+  checkpointId: string,
+  agora: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  const bloco = prova.checkpoints;
+  const item = bloco?.itens.find((i) => i.id === checkpointId);
+  if (
+    prova.plano === undefined ||
+    bloco === undefined ||
+    item === undefined ||
+    bloco.assinatura !== assinaturaPlano(prova.plano)
+  ) {
+    throw new DadosProvaInvalidosError(
+      "Não encontrei essa lista para marcar como concluída.",
+    );
+  }
+  if (item.concluidoEm !== undefined) return prova;
+  const atualizada: Prova = {
+    ...prova,
+    checkpoints: {
+      ...bloco,
+      itens: bloco.itens.map((i) =>
+        i.id === checkpointId ? { ...i, concluidoEm: agora } : i,
+      ),
+    },
+    atualizadoEm: agora,
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
+}
+
+/**
+ * Troca a preferência lembrete⇄automático SEM tocar `plano.atualizadoEm`
+ * (âncora da data-base dos checkpoints).
+ *
+ * @throws {DadosProvaInvalidosError} sem plano ou com preferência inválida.
+ */
+export async function definirPreferenciaCheckpoint(
+  id: string,
+  preferenciaBruta: unknown,
+  agora: string,
+  baseDir?: string,
+): Promise<Prova> {
+  const prova = await carregarProva(id, baseDir);
+  if (prova.plano === undefined) {
+    throw new DadosProvaInvalidosError(
+      "Monte o plano de estudo antes de escolher os checkpoints.",
+    );
+  }
+  if (preferenciaBruta !== "automatico" && preferenciaBruta !== "lembrete") {
+    throw new DadosProvaInvalidosError("Escolha automático ou lembrete.");
+  }
+  const atualizada: Prova = {
+    ...prova,
+    plano: { ...prova.plano, checkpoint: preferenciaBruta },
+    atualizadoEm: agora,
+  };
+  await escreverProva(atualizada, baseDir);
+  return atualizada;
 }

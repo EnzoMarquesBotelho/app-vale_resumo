@@ -305,7 +305,7 @@ export interface ContextoFrase {
 }
 
 /** Junta títulos: `A`, `A e B`, `A, B e C`, `A, B, C e mais N`. */
-function juntarTitulos(titulos: string[]): string {
+export function juntarTitulos(titulos: string[]): string {
   const n = titulos.length;
   if (n === 1) return titulos[0];
   if (n === 2) return `${titulos[0]} e ${titulos[1]}`;

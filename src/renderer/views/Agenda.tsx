@@ -11,6 +11,8 @@ import type {
   VinculoProva,
 } from "@shared/types";
 import { getApi } from "../api";
+import { Checkpoints } from "./Checkpoints";
+import { aplicarSeMesmaProva } from "./checkpointsReconsulta";
 import { Diagnostico } from "./Diagnostico";
 import { PlanoEstudo } from "./PlanoEstudo";
 
@@ -609,6 +611,22 @@ export function Agenda(): React.JSX.Element {
               <Diagnostico
                 prova={provaSelecionada}
                 aoAtualizar={setProvaSelecionada}
+              />
+            )}
+
+          {/* Checkpoints pré-prova: mesmas condições do diagnóstico. O setter é
+              funcional e só aplica se a prova ainda é a selecionada (uma geração
+              terminando depois de o aluno trocar/fechar a prova não a sobrescreve). */}
+          {provaSelecionada.plano !== undefined &&
+            !montandoPlano &&
+            provas.find((p) => p.id === provaSelecionada.id)?.estado !==
+              "passada" && (
+              <Checkpoints
+                key={provaSelecionada.id}
+                prova={provaSelecionada}
+                aoAtualizar={(p) =>
+                  setProvaSelecionada((atual) => aplicarSeMesmaProva(atual, p))
+                }
               />
             )}
 

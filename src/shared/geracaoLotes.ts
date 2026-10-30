@@ -12,7 +12,7 @@
  */
 
 /** Qual artefato está sendo gerado em lotes. */
-export type ArtefatoLote = "quiz" | "exercicios" | "diagnostico";
+export type ArtefatoLote = "quiz" | "exercicios" | "diagnostico" | "checkpoint";
 
 /**
  * Callback de progresso que o SERVIÇO chama. O serviço é AGNÓSTICO ao artefato:

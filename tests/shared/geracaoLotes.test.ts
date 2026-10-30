@@ -9,6 +9,7 @@ import {
   particionarQuantidade,
   rotuloProgresso,
 } from "@shared/geracaoLotes";
+import type { ProgressoGeracao } from "@shared/geracaoLotes";
 
 describe("particionarQuantidade", () => {
   it("divide 100 em lotes de 15 (último leva o resto)", () => {
@@ -258,5 +259,18 @@ describe("rotuloProgresso", () => {
         total: 100,
       }),
     ).toBe("Gerando 30 de 100…");
+  });
+});
+
+describe("ArtefatoLote: checkpoint (fatia 4)", () => {
+  it("aceita 'checkpoint' como artefato do progresso", () => {
+    const p: ProgressoGeracao = {
+      geracaoId: "g1",
+      artefato: "checkpoint",
+      prontos: 8,
+      total: 8,
+    };
+    expect(p.artefato).toBe("checkpoint");
+    expect(typeof rotuloProgresso(p)).toBe("string");
   });
 });
