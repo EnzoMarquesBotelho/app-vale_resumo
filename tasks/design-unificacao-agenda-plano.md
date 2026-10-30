@@ -35,7 +35,7 @@ Nenhum canal IPC novo (só tipos de `criarProva`/`editarProva` ganham `tipo`).
 | K5 | Montar plano em prova com sessões editadas à mão **não migra nada**: as sessões ficam como estão e aparecem na linha do tempo. |
 | K6 | Fonte única da escolha de tipo/ordinal: **`Prova.tipo` (novo, opcional)**. `plano.ordinal` continua persistido como **cópia derivada** mantida pelo main (porque `assinaturaPlano`, `calcularPlano` e checkpoints já a leem e dados antigos já a têm). O questionário só pergunta o ordinal quando a prova não tem `tipo`. |
 | K7 | **ENEM e ENADE contam como `primeira` para o plano** (todo o conteúdo é base, sem "novo"). Recomendação a confirmar com o usuário (§3.3). |
-| K8 | `tipo` e `vinculo` são eixos independentes. Escolher ENEM/ENADE no formulário **pré-seleciona** "abrangente" na UI (reversível); o main não acopla os dois. |
+| K8 | `tipo` e `vinculo` são eixos independentes. Escolher ENEM/ENADE no formulário **pré-seleciona** "abrangente" só se o vínculo está intocado e sem caderno (`vinculoAposEscolherTipo`); caderno já escolhido é preservado; o main não acopla os dois. |
 | K9 | Nome automático = função pura `nomeProva`. "Automático vs do usuário" é **estado efêmero do formulário** (sem campo persistido). Em edição de prova existente o título nunca muda sozinho. |
 | K10 | Data mínima da prova = **amanhã**, validada no main (autoridade) e na UI (espelho), relógio local. Prova antiga com data passada abre normalmente; salvar sem mudar a data é permitido. |
 | K11 | Sessões movidas à mão: **mínimo = hoje, máximo = data da prova**, aplicado na UI; o main segue como hoje (descarta passadas). Justificativa em §5.5. |
@@ -66,7 +66,34 @@ export const ROTULOS_TIPO_PROVA: Record<TipoProva, string>;     // "1ª prova","
 export function ehTipoProva(v: unknown): v is TipoProva;
 export function ordinalDeTipo(t: TipoProva): OrdinalProva;      // primeira→primeira, segunda→segunda, final→final, enem→primeira, enade→primeira
 export function aplicarOrdinalAoPlano(plano: PlanoEstudo, ordinal: OrdinalProva): PlanoEstudo;
+
+/** Estado do vínculo no formulário (só o que a regra precisa). */
+export interface EstadoVinculoForm {
+  tipoVinculo: "caderno" | "abrangente";
+  cadernoNome: string;     // "" = nenhum caderno escolhido
+  /** true depois que o ALUNO clicou num radio de vínculo ou escolheu um caderno (a pré-seleção automática NÃO marca). */
+  tocado: boolean;
+}
+/**
+ * Vínculo resultante de o aluno escolher `tipo` no select. Única regra de "ENEM/ENADE sugere abrangente".
+ * Só devolve "abrangente" quando tipo ∈ {enem, enade} E !tocado E cadernoNome === "". Em todo outro caso devolve
+ * `atual.tipoVinculo` (escolher 1ª/2ª/final, "Não definido" ou voltar atrás NUNCA desfaz o vínculo).
+ */
+export function vinculoAposEscolherTipo(atual: EstadoVinculoForm, tipo: TipoProva | ""): "caderno" | "abrangente";
 ```
+
+Tabela de casos de `vinculoAposEscolherTipo`:
+
+| `atual` (`tipoVinculo`, `cadernoNome`, `tocado`) | `tipo` | Saída |
+|---|---|---|
+| caderno, `""`, false | `enem` | `abrangente` |
+| caderno, `""`, false | `enade` | `abrangente` |
+| caderno, `"Cálculo"`, true | `enem` | `caderno` (caderno escolhido: nome preservado) |
+| caderno, `"Cálculo"`, false (preenchido por outro caminho) | `enade` | `caderno` (`cadernoNome !== ""` basta) |
+| caderno, `""`, true (aluno clicou em "Ligada a um caderno" sem escolher) | `enem` | `caderno` |
+| abrangente, `""`, true | `primeira` | `abrangente` (não desfaz) |
+| abrangente, `""`, false (veio de ENEM) | `segunda` | `abrangente` (não desfaz; o aluno volta manualmente) |
+| caderno, `""`, false | `primeira` / `""` | `caderno` |
 
 `aplicarOrdinalAoPlano`: devolve **novo** objeto; troca `ordinal`; se `ordinal === "primeira"`, força
 `topicos[i].novo = false` (mesma regra de `sanearPlano`); **não** altera `atualizadoEm` (ver §2.4). Se o ordinal já é o
@@ -99,6 +126,10 @@ checkpoints (mesma assinatura), sem código novo de invalidação.
   (`null` em `editarProva`) apaga a chave. Mesma `escreverProva` atômica (`.tmp` + rename).
 - Leitura (`carregarProva`): se a chave `tipo` existe e `!ehTipoProva(valor)` → `delete prova.tipo` (tolerante,
   igual a `diagnostico`/`checkpoints`); nunca lança. Chave ausente → prova volta byte-a-byte como antes.
+- **I1 só é garantido por ESCRITA.** `carregarProva` não reconcilia `tipo` válido com `plano.ordinal` divergente (arquivo
+  editado à mão): nada é corrigido nem lançado. Em divergência, a UI mostra o `tipo` e **o cálculo usa `plano.ordinal`**
+  (é o que `assinaturaPlano`/`calcularPlano` já leem); a próxima escrita pelo main (`salvarPlano` ou `editarProva` com
+  `tipo`) restaura I1. Teste de borda em §15.
 - Nenhuma migração em lote. Nenhuma prova antiga perde `sessoes`, `plano`, `diagnostico` ou `checkpoints`.
 
 ## 3. Fluxo de criação: tipo, ordinal, vínculo, ENEM/ENADE
@@ -116,11 +147,21 @@ Estado novo do formulário: `tipo: TipoProva | ""` e `tituloEditado: boolean`.
   radios de ordinal; mostra uma linha de leitura "Tipo de prova: ENEM (mude em Editar prova)" e usa
   `ordinalDeTipo(prova.tipo)` como ordinal inicial. Se `tipo` é `undefined` (prova antiga), os radios aparecem como
   hoje. O main sobrescreve o ordinal recebido por `ordinalDeTipo(prova.tipo)` quando há `tipo` (autoridade no main).
+  **Onde, exatamente, em `salvarPlano(id, planoBruto: unknown, agora)`** (`sanearPlano` lê `p.ordinal` do bruto e não
+  conhece `tipo`): (1) `carregarProva(id)`; (2) se `prova.tipo !== undefined` **e** `planoBruto` é objeto não nulo e não
+  array, clonar raso `{...planoBruto, ordinal: ordinalDeTipo(prova.tipo)}` e passar o clone a `sanearPlano` (assim a
+  regra `primeira ⇒ novo=false` do saneador já vale para ENEM/ENADE); (3) se `planoBruto` não é objeto, passar como está e
+  deixar `sanearPlano` lançar como hoje (sem `tipo` não há o que sobrescrever); (4) após o saneamento, se
+  `prova.tipo === undefined`, gravar `tipo = plano.ordinal` (I3). O renderer continua enviando o ordinal; o main é quem decide.
 - (b) Retrocompatibilidade: prova antiga com `plano.ordinal` e sem `tipo` segue válida (I2); mesmos cálculos,
   mesmas assinaturas. Ao abrir "Editar prova", o select de tipo mostra "Não definido" (não adivinhamos). Se o aluno
   escolher um tipo, `editarProva` sincroniza o plano (§3.4).
 - (c) ENEM/ENADE × `vinculo` abrangente: **independentes**. Na UI, escolher ENEM ou ENADE pré-seleciona "Prova
-  abrangente" (o aluno pode voltar para "Ligada a um caderno"). Escolher 1ª/2ª/final não mexe no vínculo. O main
+  abrangente" **somente** se o aluno ainda não mexeu no vínculo e nenhum caderno foi escolhido; se já há caderno (ou o
+  aluno clicou num radio de vínculo), o vínculo e o nome do caderno **ficam** (ENEM + caderno é combinação válida).
+  Regra única e testável em `vinculoAposEscolherTipo` (§2.2). A pré-seleção não marca `tocado`, e voltar a 1ª/2ª/final
+  nunca desfaz o vínculo. Em **edição** de prova existente, `tocado = true` desde a abertura (nunca troca o vínculo
+  sozinho). Escolher 1ª/2ª/final não mexe no vínculo. O main
   aceita qualquer combinação (ex.: `enade` + caderno; `primeira` + abrangente). `modoDistribuicao` segue como hoje;
   o texto do radio muda de "Prova abrangente (ENEM/ENADE)" para "Prova abrangente (todos os cadernos)".
   Motivo: o vínculo diz *de onde vêm os assuntos* (já usado por `PlanoEstudo` ao listar documentos); o tipo diz *qual
@@ -141,14 +182,35 @@ promessa de "cai na prova"** (a copy do app continua orientando estudo, não pre
 
 `MudancasProva` ganha `tipo?: TipoProva | null` (`null` = remover). Regras:
 
+Tipos (corrige a imprecisão de `Partial<Pick<…>>`, que não serve para `null`):
+
+```ts
+// src/main/services/provas.ts
+export type MudancasProva =
+  Partial<Pick<Prova, "titulo" | "data" | "vinculo" | "intervalos">> & { tipo?: TipoProva | null };
+export interface NovaProva { /* campos atuais */ tipo?: TipoProva }
+// src/shared/ipc.ts: os literais inline de criarProva/editarProva ganham `tipo?: TipoProva` e `tipo?: TipoProva | null`.
+```
+
 1. `tipo` ausente em `mudancas` → nada muda no tipo.
 2. `tipo` válido → grava `tipo`; se a prova tem `plano` e `ordinalDeTipo(tipo) !== plano.ordinal`, grava
    `plano = aplicarOrdinalAoPlano(plano, ordinalDeTipo(tipo))`. Efeito automático (sem código novo): `estadoDiagnostico`
    passa a "desatualizado" e `estadoBlocoCheckpoints` a "desatualizado" (assinatura mudou).
 3. `tipo === null` → apaga a chave `tipo`; `plano.ordinal` permanece como está (I2).
 4. `tipo` inválido (não-nulo, não-`TipoProva`) → `DadosProvaInvalidosError("Escolha um tipo de prova válido.")`.
-5. Troca `primeira` → `segunda`/`final` com plano existente: tópicos seguem `novo=false` (nada a adivinhar). A UI mostra
-   um aviso de status: "O tipo mudou. Revise o plano para marcar o que é novo." É honesto e não destrutivo.
+5. **Perda de `novo` (decisão do achado de revisão: opção "confirmar").** Trocar para ordinal `primeira` (1ª prova,
+   ENEM, ENADE) força `topicos[].novo=false`, e a volta para `segunda`/`final` **não** restaura a marcação. Como isso é
+   perda de dado do usuário disparada por um `select`, a UI **bloqueia o salvamento até confirmar**: quando
+   `prova.plano?.topicos.some(t => t.novo)` e `ordinalDeTipo(novoTipo) === "primeira"` e o ordinal atual não é
+   `primeira`, o formulário de edição mostra, em `role="alert"`, "Trocar para este tipo descarta a marcação de assuntos
+   novos do plano (não dá para desfazer)." e o botão "Salvar" vira "Salvar e descartar marcação" (o aluno pode
+   cancelar a troca do tipo). A decisão é função pura `tipoDescartaNovos(plano, novoTipo): boolean` em `tipoProva.ts`.
+   O **main continua sendo a autoridade e aplica `aplicarOrdinalAoPlano` sem pedir confirmação** (a confirmação é de UI;
+   chamadas diretas ao IPC são do próprio app). Alternativa descartada: preservar `novo` em disco e ignorá-lo quando
+   `primeira` — exigiria mascarar `novo` em `montarPlanoCalculado` e em `assinaturaPlano`, tocando módulos que o pedido
+   manda não mexer.
+6. Troca `primeira` → `segunda`/`final` com plano existente: tópicos seguem `novo=false`. A UI mostra o aviso de status
+   "O tipo mudou. Revise o plano para marcar o que é novo." (honesto e sem perda: nada havia marcado).
 
 ## 4. Nome automático (`src/shared/nomeProva.ts`, puro)
 
@@ -165,8 +227,12 @@ export const NOME_PROVA_MAX = 200;                   // = TITULO_MAX do main
 export function nomeProva(e: EntradaNomeProva): string;
 
 export interface EstadoTitulo { titulo: string; editado: boolean }
-/** O aluno digitou/apagou no campo. `editado = valor.trim() !== ""`. */
-export function tituloAposDigitar(valor: string): EstadoTitulo;
+/**
+ * O aluno digitou/apagou no campo.
+ * modo "criar": `editado = valor.trim() !== ""` (campo vazio retoma o automático).
+ * modo "editar": `editado = true` SEMPRE (inclusive campo vazio; o main rejeita título vazio ao salvar).
+ */
+export function tituloAposDigitar(valor: string, modo: "criar" | "editar"): EstadoTitulo;
 /** Caderno/tipo mudaram. Se `editado`, devolve o MESMO estado (mesma referência). */
 export function tituloAposMudanca(estado: EstadoTitulo, e: EntradaNomeProva): EstadoTitulo;
 ```
@@ -195,7 +261,8 @@ unidas por `SEPARADOR_NOME_PROVA`; resultado truncado em 200; sem caderno e sem 
 |---|---|---|
 | Formulário de **criação** abre | `false`, título `""` | Escolher caderno/tipo preenche. |
 | Aluno digita qualquer texto não vazio | `true` | Mudar caderno/tipo **não** sobrescreve. |
-| Aluno apaga tudo (campo vazio) | `false` | O automático volta a seguir caderno/tipo (recomeço consciente). |
+| Aluno apaga tudo (campo vazio) **na criação** | `false` | O automático volta a seguir caderno/tipo (recomeço consciente). |
+| Aluno apaga tudo **na edição** | `true` (exceção declarada: em edição o vazio NÃO retoma o automático) | O título nunca muda sozinho; salvar vazio é rejeitado pelo main (`sanearTitulo`); o botão "Usar sugestão" é o único caminho para o automático. |
 | Formulário de **edição** abre | `true` sempre | O título nunca muda sozinho. Se `nomeProva(form) !== titulo` e a sugestão não é vazia, aparece o botão de texto "Usar “Cálculo — 2ª prova”" que aplica **só ao clique**. |
 | Trocar vínculo para abrangente | (inalterado) | `cadernoNome` deixa de contar em `nomeProva`; se `editado=false` o título recalcula. |
 
@@ -207,6 +274,14 @@ existente não reescreve o título" garantida também no servidor.
 ### 5.1 Contrato puro (`src/shared/dataProva.ts`)
 
 ```ts
+/* Ordem de avaliação de validarDataProva (fixa):
+ *  1. `data` com formato inválido (inclui "" e 2026-02-30) ⇒ { ok:false, motivo:"formato" }, SEMPRE, mesmo que
+ *     `data === dataAtual`. `data` inválida NUNCA lança.
+ *  2. `dataAtual !== undefined && data === dataAtual` ⇒ ok (prova antiga, inalterada).
+ *  3. `data >= dataMinimaProva(hoje)` ⇒ ok; senão `nao_futura`.
+ * `hoje` inválido LANÇA (via dataMinimaProva, contrato de diaParaNumero em agenda.ts:36-40): é erro de programação do
+ * chamador (o main passa hojeLocal()), não entrada do usuário. Só lança quando a avaliação chega à etapa 3; nas etapas
+ * 1 e 2 (retorno antecipado) `hoje` nem é lido. Os testes fixam esse comportamento. */
 /** Data-calendário local de um Date (getFullYear/getMonth/getDate; NUNCA toISOString/UTC). */
 export function dataLocalDe(d: Date): string;
 /** hoje + 1 dia (virada de mês/ano/bissexto corretas). Lança se `hoje` for inválido (contrato de agenda.ts). */
@@ -287,7 +362,12 @@ export type TipoItemLinha = "estudo" | "revisao" | "checkpoint";
 export type SituacaoItem = "passado" | "hoje" | "futuro";
 
 interface ItemBase {
-  /** Estável entre chamadas com as mesmas entradas: `e:<data>`, `r:<sessao.id>`, `c:<checkpoint.id>`. */
+  /**
+   * Determinística para as MESMAS entradas: `e:<data>`, `r:<sessao.id>`, `c:<checkpoint.id>`.
+   * NÃO é estável entre salvamentos: os ids de sessão são posicionais (`s${i}`, renumerados em `salvarSessoes`/
+   * `recomputarAgenda`), então mover/remover uma revisão reatribui ids. Uso permitido: `key` do React dentro de UM
+   * render. Proibido: guardar estado de UI (foco, "aberto", edição) indexado por `chave`/`sessao.id` entre salvamentos.
+   */
   chave: string;
   data: string;                 // "YYYY-MM-DD"
   situacao: SituacaoItem;       // comparação lexicográfica de `data` com `hoje`
@@ -487,8 +567,9 @@ Alterados:
 - `src/shared/types.ts` (`TipoProva`, `Prova.tipo?`), `src/shared/ipc.ts` (assinaturas de `criarProva`/`editarProva`;
   **sem canal novo**).
 - `src/main/services/provas.ts` (`tipo` em criar/editar/carregar, backfill em `salvarPlano`, data mínima, `hojeLocal`
-  delegando a `dataLocalDe`). `src/main/ipc/index.ts`: **sem mudança funcional** (os handlers já passam `hojeLocal()`);
-  apenas tipos de `NovaProva`/`MudancasProva` fluem. `src/main/preload.ts` e `src/renderer/api.ts`: sem mudança
+  delegando a `dataLocalDe`). `MudancasProva`/`NovaProva` ganham `tipo` (§3.4) e os literais de `criarProva`/`editarProva` em
+  `src/shared/ipc.ts` também. `src/main/ipc/index.ts`: **sem mudança funcional** (os handlers já passam `hojeLocal()`;
+  só os tipos mudam). `src/main/preload.ts` e `src/renderer/api.ts`: sem mudança
   (conferir na implementação que nada tipa os campos de forma fechada).
 - `src/renderer/views/Agenda.tsx` (formulário, `min`, título automático, `noValidate`, ramo plano/sem plano),
   `PlanoEstudo.tsx` (ordinal), `Checkpoints.tsx` (hook + componentes), `src/renderer/styles.css` (`.linha-*`).
@@ -510,8 +591,12 @@ Alterados:
 | Prova antiga sem `tipo`, com `plano.ordinal` | válida; radios aparecem; cálculos idênticos | ✅ |
 | `tipo` corrompido em disco | descartado na leitura | ✅ |
 | Trocar tipo/ordinal com diagnóstico concluído | assinatura muda ⇒ diagnóstico e checkpoints "desatualizados" | ✅ |
-| Trocar `segunda`→`primeira` | tópicos viram `novo=false` | ✅ |
-| Trocar `primeira`→`segunda`/`final` | tópicos ficam base; aviso para revisar o plano | ✅ (aviso) |
+| Trocar `segunda`/`final`→`primeira` (ou ENEM/ENADE) com assuntos marcados "novo" | UI exige confirmação explícita ("Salvar e descartar marcação"); só então `novo=false` | ✅ (confirmação) |
+| Voltar `primeira`→`segunda`/`final` depois de descartar | tópicos ficam base; aviso para revisar o plano (a marcação descartada não volta) | ✅ (aviso) |
+| ENEM + caderno já escolhido | vínculo e nome do caderno preservados (`vinculoAposEscolherTipo`) | ✅ |
+| `tipo` válido divergente de `plano.ordinal` em disco (edição manual) | não reconcilia na leitura; cálculo usa `plano.ordinal`; escrita seguinte restaura I1 | ✅ |
+| Apagar o título ao editar prova existente | continua "do usuário"; salvar vazio é rejeitado; só o botão "Usar sugestão" restaura o automático | ✅ |
+| Foco/estado de UI por id de sessão entre salvamentos | proibido (ids posicionais); `chave` só como `key` de render | ✅ |
 | ENEM/ENADE | ordinal `primeira`; sem "novo"; sem lista curada | ✅ (decisão a confirmar) |
 | Título digitado à mão e depois mudar caderno/tipo | não sobrescreve | ✅ |
 | Aluno apaga o título | volta ao automático | ✅ |
@@ -554,6 +639,13 @@ diagnóstico (`classificarDiagnostico`, `pontuarDiagnostico`) e `assinaturaPlano
   sobrescreve; vazio retoma o automático; mesma referência quando `editado`).
 - `dataProva.test.ts`: tabela §5.2 com `hoje` fixo, incluindo virada de mês/ano/bissexto e `dataLocalDe` com
   `new Date(2026, 9, 30, 23, 59)` e `new Date(2026, 9, 31, 0, 1)` (construtor local ⇒ independente de fuso do CI).
+- `tipoProva.test.ts` (também): tabela completa de `vinculoAposEscolherTipo` (§2.2): caderno já escolhido + ENEM ⇒ `caderno`;
+  vínculo intocado sem caderno + ENEM/ENADE ⇒ `abrangente`; voltar a 1ª prova não desfaz; `tocado=true` + ENEM ⇒ `caderno`.
+  `tipoDescartaNovos`: plano com `novo` + `primeira`/`enem`/`enade` ⇒ true; plano sem `novo`, sem plano, ou ordinal atual
+  já `primeira` ⇒ false; `segunda`→`final` ⇒ false.
+- `nomeProva.test.ts` (também): `tituloAposDigitar("", "criar").editado===false`; `tituloAposDigitar("", "editar").editado===true`.
+- `dataProva.test.ts` (também): ordem de avaliação: `data` inválida com `dataAtual` igual ⇒ `formato`; `data===dataAtual`
+  com `hoje` inválido ⇒ ok sem lançar; `hoje` inválido na etapa 3 ⇒ lança; `data` inválida nunca lança.
 - `tipoProva.test.ts`: `ordinalDeTipo` para os 5 tipos (**ENEM→primeira, ENADE→primeira**); `aplicarOrdinalAoPlano`
   (forca `novo=false` em `primeira`, mesma referência se igual, não toca `atualizadoEm`); **troca de ordinal muda
   `assinaturaPlano` e `estadoDiagnostico` vira "desatualizado"**.
@@ -571,6 +663,13 @@ diagnóstico (`classificarDiagnostico`, `pontuarDiagnostico`) e `assinaturaPlano
   - Ordinal: `salvarPlano` com `tipo:"enem"` grava `plano.ordinal==="primeira"` e `novo=false` mesmo que o renderer
     mande `final`; sem `tipo`, backfill `tipo=plano.ordinal`; `editarProva({tipo:"final"})` com plano ⇒ `plano.ordinal`
     sincronizado, `plano.atualizadoEm` intacto, **diagnóstico concluído passa a "desatualizado" e checkpoints também**.
+  - **`novo` ao trocar o tipo:** `segunda` com tópicos `novo=true` → `editarProva({tipo:"primeira"})` ⇒ todos `novo=false`
+    e `plano.atualizadoEm` intacto; → `editarProva({tipo:"segunda"})` ⇒ `ordinal==="segunda"`, `novo` segue `false` (não
+    restaura, comportamento documentado e confirmado pela UI); diagnóstico desatualizado nos dois sentidos.
+  - **`salvarPlano` × `tipo`:** `planoBruto` não-objeto ⇒ `sanearPlano` lança como hoje; objeto com ordinal divergente e
+    `tipo:"enade"` ⇒ gravado `primeira`; prova sem `tipo` ⇒ backfill `tipo=plano.ordinal`.
+  - **Divergência em disco:** JSON com `tipo:"final"` e `plano.ordinal:"primeira"` ⇒ `carregarProva` devolve ambos como
+    estão (sem lançar); `calcularPlano` usa `primeira`; `salvarPlano` seguinte grava `ordinal==="final"` (I1 restaurado).
   - **Round-trip de prova ANTIGA:** fixture JSON (sem `tipo`, com `sessoes` manuais/concluídas, `plano`, `diagnostico`,
     `checkpoints`) ⇒ `carregarProva` deep-equal ao arquivo; depois `editarProva` (título), `salvarSessoes`, `regerarAgenda`
     e `salvarPlano` ⇒ blocos preservados e nenhuma chave `tipo: undefined` gravada (exceto o backfill documentado no
@@ -611,3 +710,22 @@ no fim (regra do repositório), com a contagem real de testes.
 4. "Regerar sugestões" fica, renomeado, e só afeta revisões.
 5. Provas antigas com data passada continuam abrindo; só **novas** datas passadas/hoje são bloqueadas.
 6. Sessões movidas à mão podem ser a partir de **hoje** (não de amanhã) e até a data da prova.
+7. Trocar o tipo de uma prova que já tem plano para 1ª prova/ENEM/ENADE **descarta a marcação de assuntos "novo"**; a tela pede confirmação antes.
+8. ENEM/ENADE só sugerem "prova abrangente" se você ainda não escolheu caderno; se já escolheu, o caderno e o nome ficam.
+
+## 18. Respostas à revisão do design (loop 2)
+
+| # | Sev. | Resposta |
+|---|---|---|
+| 1 | MEDIUM | **Corrigido.** `vinculoAposEscolherTipo` (pura, com `tocado`) em §2.2, regra reescrita em §3.2(c), tabela de casos e testes em §15, borda em §13. |
+| 2 | MEDIUM | **Corrigido pela opção (b) (confirmação).** §3.4(5): UI bloqueia até confirmar quando há `novo` e o destino é `primeira`; `tipoDescartaNovos` pura; main segue autoridade. Opção (a) descartada com motivo (tocaria `montarPlanoCalculado`/`assinaturaPlano`). Teste `segunda→primeira→segunda` em §15; §13 atualizado. |
+| 3 | NIT | **Corrigido.** `tituloAposDigitar(valor, modo)`; exceção declarada em §4.1/§4.3: em edição o vazio não retoma o automático. |
+| 4 | NIT | **Corrigido.** Passo a passo do `salvarPlano` (clone raso do bruto, guarda para não-objeto, backfill pós-saneamento) em §3.2(a); testes em §15. |
+| 5 | NIT | **Corrigido.** `MudancasProva = Partial<Pick<…>> & { tipo?: TipoProva \| null }`, `NovaProva.tipo?` e literais de `shared/ipc.ts` em §3.4; §12 passa a listar `provas.ts` e `ipc.ts` como edições de tipo (preload sem mudança). |
+| 6 | NIT | **Corrigido.** Contrato de `chave` em §6.1: determinística por render, não estável entre salvamentos; uso restrito a `key` do React. |
+| 7 | NIT | **Corrigido.** Ordem fixa de avaliação de `validarDataProva` e política de `hoje` inválido em §5.1; testes em §15. |
+| 8 | NIT | **Corrigido.** "I1 só por escrita; divergência em disco ignorada, cálculo usa `plano.ordinal`" em §2.5; teste em §15. |
+
+Pendências **não verificadas** pela revisão e herdadas: contagem exata de 945 testes (não executada na fase de design),
+corpo de `Checkpoints.tsx` (extração mecânica depende de o componente não ter estado entrelaçado ao JSX; conferir na
+fatia 4) e a ordem real dos blocos em `Agenda.tsx` (§9.1 foi descrita a partir de leitura do código na fase anterior).
