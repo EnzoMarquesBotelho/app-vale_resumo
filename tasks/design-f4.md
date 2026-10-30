@@ -19,8 +19,10 @@ Tudo que decide *quando*, *onde*, *quais assuntos* e *em que estado* é **lógic
 pura** em `src/shared/checkpoints.ts`, com o relógio injetado. A IA só gera os
 exercícios (via `gerarExercicios`, reuso integral) e, se o aluno pedir,
 corrige. O comportamento "automático" é, honestamente: **ao abrir uma prova na
-Agenda, o app prepara UMA lista (a mais recente que já venceu e ainda não
-existe)**, com progresso visível. Nada roda em segundo plano.
+Agenda, o app prepara no máximo UMA lista, e só se o checkpoint mais recente
+que já venceu (data ≤ hoje) ainda não tem lista**, com um aviso de "preparando…" sem contagem (o caminho curto de
+`gerarExercicios` só reporta progresso uma vez, no fim). Nada roda em segundo
+plano.
 
 **Stack travada (aprovada = fechada):** Electron + React + TypeScript, Vite
 (`electron-vite`), IPC tipado via `contextBridge`, persistência em JSON atômico
@@ -42,9 +44,17 @@ a cada cálculo** (o plano não guarda progresso). Consequências:
 **Decisão:** os checkpoints são calculados sobre um **plano de referência**:
 `montarPlanoCalculado(prova, dataBase)`, onde `dataBase` é a **data local em
 que o questionário foi salvo** (`plano.atualizadoEm` convertido para data
-local), limitada a `hoje` (`min(dataBase, hoje)`). Esse plano é estável (só
-muda se o aluno re-salvar o questionário ou o diagnóstico mudar a régua) e
-traz o calendário completo da base até a véspera. "Já estudado até o dia D" =
+local), limitada a `hoje` (`min(dataBase, hoje)`). Esse plano é **estável no
+dia a dia** (não anda com o relógio), mas **não é imutável**: muda se o aluno
+re-salvar o questionário, **concluir o diagnóstico depois da `dataBase`**
+(`montarPlanoCalculado` aplica `diagnosticoAplicavel`, o que muda a mistura e o
+último bloco de cada assunto) ou **editar a data da prova** (`editarProva` não
+recarimba `plano.atualizadoEm`). Nesses dois últimos casos a assinatura NÃO
+muda, então as datas/janelas dos pontos podem se deslocar sem invalidar o
+bloco. Mitigação: para listas já geradas (`pronto`/`feito`) a UI mostra os
+`topicos`/`ignorados` **persistidos** (a verdade do que a lista cobre), nunca o
+planejado; o planejado só vale para `futuro`/`devido`/`atrasado`/`indisponivel`
+(§7, §11). Ele traz o calendário completo da base até a véspera. "Já estudado até o dia D" =
 "o plano de referência já terminou de agendar blocos desse tópico até D",
 **assumindo que o aluno seguiu o plano** (o app não mede o que foi de fato
 estudado; ver §11).
@@ -59,7 +69,7 @@ recarimbaria `plano.atualizadoEm` e deslocaria a `dataBase`.
 | D1 | Onde caem os checkpoints | Pontos fixos **a 28, 14, 7 e 3 dias da prova** (`CHECKPOINT_DIAS_ANTES`), mantidos só se a data cair **estritamente depois** de `dataBase` e se a janela tiver ≥ 1 tópico. Id estável `d<diasAntes>` (`d28`, `d14`, `d7`, `d3`). | Alinhado aos intervalos 7/3 da Agenda; o "faltam X dias" do intent vira texto direto; ids estáveis chaveiam a lista persistida; cadência cresce sozinha com a distância da prova (≤ 4) sem configuração. |
 | D2 | Quais tópicos cada ponto cobre | Janela `(dataAnterior, data]`: tópico entra no ponto cuja janela contém a **data do seu ÚLTIMO bloco** no plano de referência. Cada tópico cai em no máximo um ponto. | Definição pura, sem ambiguidade; cobre o que já "terminou de ser estudado", sem repetir. |
 | D3 | Texto-base e tamanho | Até **6 assuntos** por ponto (amostra espaçada), texto em seções `## Título` com orçamento igual por seção, total ≤ **12000** caracteres (`tamanhoMaximoChunkCaracteres`). **8 exercícios, modo `mista`**, caminho curto (8 ≤ limiar 20 → 1 chamada + 1 corretiva). | Quantidade pequena e fixa: 1–2 chamadas (≤ 10 min no pior caso com timeout de 300 s), sem lotes/dedup, sem a lentidão/parcial de listas grandes. **Confirmada** a recomendação do brief. |
-| D4 | Modo automático | Ao **abrir a prova na Agenda** (e ao trocar para automático com a prova aberta): gera **no máximo UMA** lista, a do checkpoint **mais recente com data ≤ hoje** que não tem lista (`devido` ou `atrasado`). Os mais antigos ficam `atrasado` com botão manual. Sem retry automático na mesma sessão. | App desktop não roda em segundo plano; gerar tudo em sequência gastaria modelo local à toa e deixaria o aluno esperando minutos. Uma lista por abertura é previsível. |
+| D4 | Modo automático | Ao **abrir a prova na Agenda** (e ao trocar para automático com a prova aberta): o **candidato** é o item de **maior `data ≤ hoje` entre os não `indisponivel`, tenha ou não lista**. Se o estado dele é `devido`/`atrasado` ⇒ gera essa lista (e só ela). Se é `pronto`/`feito` ⇒ **não gera nada**, mesmo que existam itens mais antigos `atrasado`. Os mais antigos **permanecem só manuais** (botão "Gerar lista") em qualquer abertura posterior. Sem retry automático na mesma sessão. | App desktop não roda em segundo plano; encadear as listas vencidas gastaria o modelo local à toa (até 4 gerações) e deixaria o aluno esperando. Uma lista, a mais relevante hoje, é previsível; o histórico fica à escolha do aluno. |
 | D5 | Cancelar / timeout total | **Não há.** Uma lista = no máximo 2 chamadas, cada uma com o timeout de 300 s já existente. A geração em andamento termina e persiste mesmo se o aluno sair da tela. | Sem sequência longa, o botão cancelar não se paga (o Ollama não é abortável pelo renderer hoje). Registrado como NÃO coberto. |
 | D6 | Preferência depois | Canal IPC **pequeno e dedicado** `definirPreferenciaCheckpoint(id, pref)`; **não** reusa `salvarPlano`. Efeito: lembrete→automático dispara a verificação imediatamente se a prova estiver aberta. | Preserva `plano.atualizadoEm` (âncora da `dataBase`); sem reenviar o plano inteiro. |
 | D7 | Responder/corrigir | **Entra.** Extrai `ListaExercicios` de `Exercicios.tsx` (enunciado, resposta digitada, "Ver resposta", "Corrigir com IA" via `avaliarRespostas`). Respostas e correções são **efêmeras** (como em Exercicios). Persistido: a lista e `concluidoEm` ("Marcar como concluída"). | Reuso sem reescrever; coerente com o que o aluno já conhece. Nota/desempenho do checkpoint NÃO é guardado nem alimenta o plano (§11). |
@@ -305,18 +315,34 @@ export function escolherCheckpointAutomatico(p: {
 }): string | undefined
 ```
 
-Contrato: devolve o `id` do **item de maior `data` entre os `devido`/`atrasado`**
-(só ele; nunca cai para um mais antigo), ou `undefined` se: `preferencia !==
-"automatico"`; `bloco === "desatualizado"` (nunca sobrescreve lista antiga sem
-pedido); `emGeracao !== undefined`; não há `devido`/`atrasado`; ou o escolhido já
-está em `tentados` (evita laço após falha).
+Contrato: o **candidato** é o item de **maior `data` com `diferencaDias(data,
+hoje) <= 0`** (isto é, `data ≤ hoje`) entre os itens com estado ≠ `indisponivel`
+(`indisponivel` não é elegível e não bloqueia), **independente de ter lista**.
+Devolve o `id` do candidato **somente se** o estado dele é `devido` ou
+`atrasado`; **nunca cai para um item mais antigo**. Devolve `undefined` se:
+não há candidato; o candidato é `pronto`/`feito`; `preferencia !== "automatico"`;
+`bloco === "desatualizado"` (nunca sobrescreve lista antiga sem pedido);
+`emGeracao !== undefined`; ou o `id` do candidato está em `tentados` (evita laço
+após falha). Consequência: com `d7 pronto` + `d14 atrasado` o app não gera
+nada; o `d14` só por clique. Esse contrato é idempotente: depois que a lista
+do candidato é gravada e a visão recarregada, a função devolve `undefined`.
+
+`tentados` aqui contém **somente ids de checkpoint da prova atual** (`"d14"`).
+A conversão a partir do Set global do renderer está em §7.
 
 | # | Entrada | Saída |
 |---|---|---|
 | 1 | auto, `d14` devido | `"d14"` |
 | 2 | auto, `d14` atrasado + `d7` atrasado | `"d7"` (o mais recente) |
 | 3 | auto, `d14` atrasado + `d7` devido | `"d7"` |
-| 4 | auto, `d7` em `tentados` (falhou), `d14` atrasado | `undefined` (não cai para o `d14`) |
+| 4 | auto, `d7` atrasado em `tentados` (falhou), `d14` atrasado | `undefined` (não cai para o `d14`) |
+| 10 | auto, `d7` `pronto`, `d14` `atrasado` | `undefined` (candidato é `d7`, que já tem lista) |
+| 11 | auto, `d3` `indisponivel`, `d7` `pronto`, `d14` `atrasado` | `undefined` (indisponível ignorado; candidato `d7` pronto) |
+| 12 | auto, `d7` `feito`, `d14` `atrasado` | `undefined` |
+| 13 | auto, `d3` `futuro`, `d7` `atrasado` | `"d7"` (`futuro` tem `data > hoje`, não é candidato) |
+| 14 | auto, `d14` `atrasado` apenas, `tentados = {"d7"}` (id de outro ponto) | `"d14"` (só o id do candidato conta) |
+| 15 | auto, só `d14` `pronto` e `d7` `devido` | `"d7"` (candidato é o de maior data, `d7`) |
+| 16 | auto, todos `futuro` | `undefined` |
 | 5 | `lembrete` | `undefined` |
 | 6 | auto, bloco `desatualizado` | `undefined` |
 | 7 | auto, `emGeracao = "d14"` | `undefined` |
@@ -376,7 +402,7 @@ resultado final com `.slice(0, max)` por segurança. **Invariante: `length ≤ m
 | `rotuloEstadoCheckpoint(estado)` | `futuro`⇒"Em breve", `devido`⇒"Hoje", `atrasado`⇒"Atrasado", `pronto`⇒"Lista pronta", `feito`⇒"Concluído", `indisponivel`⇒"Sem material" |
 | `fraseCheckpointParcial(entregue, pedido)` | `null` se `entregue >= pedido`; senão `"Montei 5 de 8 exercícios. A lista vale, mas é menor que o previsto. Você pode gerar outra."` (**frase própria**: a quantidade não é do aluno, então NÃO usa `avisoGeracaoParcial`) |
 | `fraseCheckpointIgnorados(ig)` | `null` se vazio; `"Ficaram de fora, por não terem material importado: X."` (manual/sem_texto) e `"Ficaram de fora desta lista (limite de assuntos): Y."` (fora_da_amostra) |
-| `rotuloProgressoCheckpoint(p)` | `"Preparando a lista de exercícios…"` quando `total<=0`; senão `"Preparando a lista: ${prontos} de ${total} exercícios…"` |
+| `rotuloPreparandoCheckpoint()` | constante estável `"Preparando a lista de exercícios… isso pode levar alguns minutos."` (sem contagem: `gerarExercicios` no caminho curto chama `aoProgresso` uma única vez, no fim) |
 | `fraseSemCheckpoints(motivo)` | `curto_demais`⇒"O plano é curto demais para ter checkpoints."; `sem_topicos`/`sem_dias`/`prova_encerrada`⇒`null` (o card some; os avisos do plano já falam) |
 
 Exporta-se `juntarTitulos` de `diagnostico.ts` (hoje privada; mudança de
@@ -423,7 +449,9 @@ a prova antes de gravar):
   Carimba `atualizadoEm = item.geradoEm`.
 - `concluirCheckpoint(id, checkpointId, agora, baseDir?)`: exige bloco com a
   assinatura atual e o item; define `concluidoEm = agora` (idempotente: já
-  concluído ⇒ mantém o carimbo original). Senão `DadosProvaInvalidosError("Não encontrei essa lista para marcar como concluída.")`.
+  concluído ⇒ mantém o carimbo original e não regrava) e **carimba
+  `Prova.atualizadoEm = agora` na 1ª conclusão** (é o que faz o card recarregar a
+  visão, §7). Senão `DadosProvaInvalidosError("Não encontrei essa lista para marcar como concluída.")`.
 - `definirPreferenciaCheckpoint(id, preferenciaBruta, agora, baseDir?)`: exige
   `plano`; `preferenciaBruta ∈ {"automatico","lembrete"}` senão
   `DadosProvaInvalidosError("Escolha automático ou lembrete.")`; grava
@@ -464,7 +492,7 @@ export async function gerarListaCheckpoint(p: {
   checkpoint: CheckpointPlanejado;
   carregarTexto: (documentoId: string) => Promise<string | null>; // null = ausente/ilegível
   gerar?: GerarTexto;        // mock do Ollama nos testes
-  aoProgresso?: AoProgresso; // (exercíciosProntos, pedido)
+  aoProgresso?: AoProgresso; // repassado a gerarExercicios; chamado 1x no fim (caminho curto); a UI NÃO usa para contagem
   agora: string;             // ISO injetado
 }): Promise<CheckpointGerado>
 ```
@@ -473,7 +501,10 @@ Fluxo: (1) para cada tópico **não manual** do ponto, `carregarTexto` (qualquer
 exceção ⇒ sem texto); texto `trim` vazio ⇒ sem texto; (2)
 `planejarTextoCheckpoint`; `indisponivel` ⇒ lança `CheckpointIndisponivelError`
 **antes** de chamar a IA; (3) `montarTextoBaseCheckpoint` com o texto de cada
-selecionado; (4) `gerarExercicios({ texto, modo: CHECKPOINT_MODO, quantidade:
+selecionado; **se o resultado `.trim()` for `""` ⇒ lança
+`CheckpointIndisponivelError` antes da IA** (assim `SemTextoParaExerciciosError`
+nunca é alcançada neste fluxo; por segurança o mapeamento de erros também a
+trata como `CheckpointIndisponivelError`, §5.4); (4) `gerarExercicios({ texto, modo: CHECKPOINT_MODO, quantidade:
 CHECKPOINT_QUANTIDADE, gerar, aoProgresso })`; (5) `< CHECKPOINT_MINIMO_EXERCICIOS`
 exercícios ⇒ `CheckpointInsuficienteError`; (6) devolve `CheckpointGerado`
 (`topicos` = selecionados, `ignorados`, `pedido = CHECKPOINT_QUANTIDADE`).
@@ -485,7 +516,7 @@ exercícios ⇒ `CheckpointInsuficienteError`; (6) devolve `CheckpointGerado`
 | Ollama recusou conexão | `OllamaIndisponivelError` (existente) | sim | a mensagem existente ("Ollama offline…") | sem log (padrão da casa) |
 | Geração falhou/timeout após conectar | `GeracaoFalhouError` (existente) | sim | `"A geração da lista de exercícios falhou ou demorou demais. Tente novamente ou use um modelo mais leve."` (**não** repassa a mensagem original "reduza a quantidade") | sem log |
 | JSON inválido mesmo após a corretiva | `ExerciciosInvalidosError` (existente) | sim | `"Não consegui montar a lista de exercícios agora. Tente novamente."` | sem log |
-| Nenhum assunto com material | `CheckpointIndisponivelError` `CHECKPOINT_INDISPONIVEL` | não até o aluno importar material | `"Esta lista precisa de ao menos um assunto com material importado. Os assuntos digitados à mão não têm texto para eu criar exercícios."` | sem log |
+| Nenhum assunto com material, ou texto-base vazio (inclui `SemTextoParaExerciciosError` do `parse.ts`, mapeado para esta classe) | `CheckpointIndisponivelError` `CHECKPOINT_INDISPONIVEL` | não até o aluno importar material | `"Esta lista precisa de ao menos um assunto com material importado. Os assuntos digitados à mão não têm texto para eu criar exercícios."` | sem log |
 | < 3 exercícios | `CheckpointInsuficienteError` `CHECKPOINT_INSUFICIENTE` | sim | `"Só consegui montar N exercícios, poucos para uma lista. Tente novamente em instantes."` | sem log |
 | Estado não permite gerar (`futuro`/`indisponivel`/`feito`) ou id desconhecido | `CheckpointNaoDisponivelError` `CHECKPOINT_NAO_DISPONIVEL` | sim (mudar de estado) | por estado: futuro ⇒ `"Esta lista só fica disponível em DD/MM."`; feito ⇒ `"Esta lista já foi concluída."`; indisponível ⇒ mensagem de `CheckpointIndisponivelError`; id desconhecido ⇒ `"Não encontrei esse checkpoint no plano atual."` | sem log |
 | Já gerando para a prova | `CheckpointEmAndamentoError` `CHECKPOINT_EM_ANDAMENTO` | sim | `"Já estou preparando uma lista desta prova."` | sem log |
@@ -521,7 +552,10 @@ dos demais handlers (inexistente ⇒ `ProvaNaoEncontradaError`).
    `item = visao.itens.find(id)`; estado ∈ {`devido`,`atrasado`,`pronto`} senão
    `CheckpointNaoDisponivelError`;
 3. `assinatura = assinaturaPlano(prova.plano)` capturada **antes** da IA;
-4. `model = modeloParaGeracao()`; `gerarListaCheckpoint({... gerar: (prompt, format) => generate({ prompt, model, format }), aoProgresso: empurrarProgresso(event, "checkpoint"), agora })`;
+4. `const model = await modeloParaGeracao()` (com `await`, como no molde de
+   `ipc/index.ts`); `carregarTexto = async (docId) => { try { return
+   carregarDocumento(docId).texto } catch { return null } }` (qualquer erro ⇒
+   `null`, igual ao handler do diagnóstico); `gerarListaCheckpoint({... gerar: (prompt, format) => generate({ prompt, model, format }), aoProgresso: empurrarProgresso(event, "checkpoint"), agora })`;
 5. `salvarCheckpoint(id, assinatura, item)` → devolve a prova;
 6. `catch` ⇒ `throw new Error(mensagemAmigavelCheckpoint(erro))`; `finally` ⇒ remove do Map.
 
@@ -534,7 +568,14 @@ diagnóstico, com `artefato: "checkpoint"`.
 Componente novo `src/renderer/views/Checkpoints.tsx`, montado em `Agenda.tsx`
 **depois de `<Diagnostico>` e antes da Região 4 (Dica)**, com as mesmas
 condições do diagnóstico (`plano !== undefined`, `!montandoPlano`, prova não
-`passada`). `key={prova.id}`.
+`passada`). `key={prova.id}`. Assinatura (mesmo molde de `Diagnostico`, cuja prop é
+`aoAtualizar`): `Checkpoints({ prova, aoAtualizar }: { prova: Prova;
+aoAtualizar: (p: Prova) => void })`; `Agenda` passa `aoAtualizar={setProvaSelecionada}`.
+Toda ação que devolve `Prova` (`gerarCheckpoint`, `concluirCheckpoint`,
+`definirPreferenciaCheckpoint`) chama `aoAtualizar(provaNova)`; como as três
+carimbam `Prova.atualizadoEm`, o `useEffect` da carga dispara e a visão é
+recarregada. Falha de `gerarCheckpoint` não devolve prova: nesse caso o
+componente chama `calcularCheckpoints` explicitamente (para limpar `emGeracao`).
 
 **Carga:** `useEffect` em `[prova.id, prova.atualizadoEm]` chama
 `getApi().calcularCheckpoints(prova.id)`; guarda o resultado. Erro ⇒ mensagem
@@ -561,6 +602,10 @@ ao reabrir a prova; §11).
 | `feito` | "Abrir lista" |
 | `indisponivel` | texto da `CheckpointIndisponivelError` (sem botão) |
 
+- **Fonte do "Cobre:"**: para `pronto`/`feito` mostra `topicos` e `ignorados`
+  **persistidos** do item gerado (o que a lista realmente cobre, mesmo que o
+  plano de referência tenha se deslocado, §0.1); para `futuro`/`devido`/
+  `atrasado`/`indisponivel` mostra os `topicos` do planejado.
 - Lista aberta: `<ListaExercicios exercicios={…} />` + `fraseCheckpointParcial` +
   `fraseCheckpointIgnorados` (do item persistido) + botão "Marcar como concluída"
   (estado `pronto`).
@@ -570,17 +615,32 @@ ao reabrir a prova; §11).
 
 **Gatilho automático** (um `useEffect` em `[visao]`): calcula
 `escolherCheckpointAutomatico({ itens, preferencia, bloco, emGeracao,
-tentados })` com `tentados` = Set **de módulo** (vive até reiniciar o app, chave
-`${provaId}:${checkpointId}`, **adicionada antes** do `await` e mantida após
-sucesso ou falha). Se houver id: assina `aoProgressoGeracao` (filtra `artefato
-=== "checkpoint"`), mostra "Preparando a lista: 3 de 8 exercícios…" no item,
-chama `gerarCheckpoint`, em `finally` cancela a assinatura e recarrega a visão.
+tentados })`. O registro de tentativas é um `Set<string>` **de módulo**
+(`tentadosGlobal`, vive até reiniciar o app, chave `${provaId}:${checkpointId}`,
+**adicionada antes** do `await` e mantida após sucesso ou falha). **Conversão
+obrigatória antes da chamada pura** (helper puro exportado de
+`shared/checkpoints.ts`, testado):
+
+```ts
+export function tentadosDaProva(
+  global: ReadonlySet<string>, provaId: string,
+): Set<string>  // filtra chaves que começam com `${provaId}:` e remove o prefixo
+```
+
+A **troca explícita de preferência** (qualquer direção) remove de `tentadosGlobal`
+todas as chaves da prova (o aluno acabou de consentir de novo), antes de
+chamar `definirPreferenciaCheckpoint`; assim lembrete→automático após uma falha
+na sessão volta a disparar. Se houver id: mostra `rotuloPreparandoCheckpoint()`
+(sem contagem; não assina `aoProgressoGeracao`, que no caminho curto só reporta
+no fim) no item,
+chama `gerarCheckpoint`; em `finally` recarrega a visão.
 Falha ⇒ mensagem no item + botão "Tentar de novo" (clique manual, fora do Set).
 Se `visao.emGeracao` vier preenchido (reabriu a prova durante a geração), o card
 só mostra "Preparando…" e **não** dispara outra.
 
 **O que isso garante:** a prova aberta no dia → lista pronta na próxima
-visualização; vários dias sem abrir → 1 lista (a mais recente); Ollama offline
+visualização; vários dias sem abrir → 1 lista (a do checkpoint mais recente, e
+nenhuma se esse já tem lista; os mais antigos só por clique); Ollama offline
 → 1 tentativa por sessão, com mensagem; lembrete → zero chamadas ao modelo.
 
 ## 8. Alterar a preferência depois
@@ -590,7 +650,7 @@ UI no card (rádios). `definirPreferenciaCheckpoint` (§4) atualiza só
 
 | Troca | Efeito |
 |---|---|
-| lembrete → automático | com a prova aberta e um `devido`/`atrasado` sem lista, o gatilho da §7 dispara no mesmo render (a escolha explícita do aluno é o consentimento) |
+| lembrete → automático | o renderer limpa as chaves da prova em `tentadosGlobal` (§7) e chama `definirPreferenciaCheckpoint`; com a prova aberta, se o **candidato** (D4: maior `data ≤ hoje`) for `devido`/`atrasado`, o gatilho da §7 dispara após a recarga da visão (a escolha explícita do aluno é o consentimento); se o candidato já está `pronto`/`feito`, nada é gerado |
 | automático → lembrete | nenhuma geração nova; geração em andamento termina e persiste (não cancelável) |
 | questionário re-salvo | volta a valer o que o questionário disser (`salvarPlano` sobrescreve `checkpoint`), e a `dataBase` é recarimbada para hoje |
 
@@ -609,7 +669,13 @@ renderizar `<ListaExercicios exercicios={exercicios} />` dentro de
 `exercicios-resultado`, mantendo geração, contador, `ExportarControles` e aviso
 parcial; o reset ao regerar é garantido porque `exercicios` vai a `null` durante
 `gerar()` (o componente desmonta/remonta). Mesmos nomes de classes CSS: sem mudar
-`styles.css`.
+`styles.css`. **Estado inicial** (verificado em `Exercicios.tsx`): `respostas`
+e `avaliacoes` iniciam por inicializador de `useState` a partir de
+`respostasVaziasEx(exercicios)`/`avaliacoesVazias(exercicios.length)`, alinhados por
+índice; o componente extraído mantém isso e **não** sincroniza por efeito. Em
+`Checkpoints.tsx` ele é montado com `key={`${item.id}:${item.geradoEm}`}`, de modo
+que regerar a lista (novo `geradoEm`) zera respostas/correções. No teste manual
+conferir: abrir exercícios já salvos de um documento, responder, corrigir, regerar.
 
 Risco: não há testes de componente no repo (só `resumo-lote.test.ts`). Mitigação:
 extração mecânica sem mudar textos; verificação por `npm run build` + `lint` +
@@ -652,6 +718,9 @@ movidas junto.
 | Cobertura uniforme dos assuntos na lista | o prompt de `gerarExercicios` recebe um texto; não garante distribuição entre as seções | ❌ NÃO coberto |
 | Nota/desempenho da lista não é salvo e não ajusta o plano; respostas somem ao sair da tela | por desenho (como Exercicios) | ❌ NÃO coberto |
 | Re-salvar o questionário (mesmos assuntos) desloca a `dataBase` e pode orfanar uma lista cujo ponto deixou de existir (fica no disco, oculta) | aceito | ❌ NÃO coberto |
+| Diagnóstico concluído DEPOIS da `dataBase` muda a mistura e desloca pontos/janelas sem mudar a assinatura | listas já geradas continuam mostrando `topicos`/`ignorados` persistidos; pontos ainda sem lista usam o planejado novo | ❌ NÃO coberto (deslocamento aceito) |
+| Editar a data da prova (`editarProva` não recarimba `plano.atualizadoEm`) desloca os pontos | idem; ids `d<N>` são relativos à prova, então uma lista pode ficar ligada a uma data nova | ❌ NÃO coberto (deslocamento aceito) |
+| Checkpoints mais antigos com lista ausente depois de um mais recente pronto | nunca gerados automaticamente; só por clique | ✅ (por desenho, D4) |
 | Virada do dia com o card aberto | só atualiza ao reabrir a prova | ❌ NÃO coberto |
 | Gerar em todas as provas ao abrir o app / "iniciar com o computador" | só a prova aberta | ❌ NÃO coberto (fora de escopo) |
 | Corrida `salvarPlano` × `salvarCheckpoint` em milissegundos | mitigada pela assinatura | ❌ NÃO coberta formalmente |
@@ -667,13 +736,17 @@ movidas junto.
 - `resolverEstadosCheckpoints`: as 11 linhas da §3.2 + cada linha da tabela de
   transições (futuro→devido→atrasado por avanço de `hoje`; pronto; feito;
   desatualizado; indisponível).
-- `escolherCheckpointAutomatico`: as 9 linhas da §3.3.
+- `escolherCheckpointAutomatico`: as 16 linhas da §3.3 (inclui `pronto`+`atrasado`
+  mais antigo ⇒ `undefined` e idempotência após a geração).
+- `tentadosDaProva`: filtra só a prova pedida, remove o prefixo, ignora outras
+  provas e chaves sem o prefixo; prefixo parecido (`p1` × `p10`) não vaza; Set
+  vazio ⇒ vazio.
 - `planejarTextoCheckpoint` / `montarTextoBaseCheckpoint`: as 11 linhas da §3.4 +
   propriedade `length ≤ max` para vários tamanhos.
 - `preferenciaEfetiva`, `estadoBlocoCheckpoints`, `fraseLembreteCheckpoint`
   (singular/plural, só não manuais, vazio), `rotuloEstadoCheckpoint`,
   `fraseCheckpointParcial` (null/valores), `fraseCheckpointIgnorados`,
-  `rotuloProgressoCheckpoint`, `fraseSemCheckpoints`.
+  `rotuloPreparandoCheckpoint` (constante), `fraseSemCheckpoints`.
 
 **`tests/main/services/checkpoints.test.ts`**:
 - `dataLocalDeIso` (válida, inválida ⇒ `null`, fuso via `new Date(y,m,d,12)`).
@@ -683,7 +756,9 @@ movidas junto.
 - `gerarListaCheckpoint` com `gerar` mockado: caminho feliz (1 chamada, 8
   exercícios, tópicos/ignorados corretos); **tópico manual ignorado com aviso**;
   sem texto; **todos manuais/sem texto ⇒ `CheckpointIndisponivelError` e `gerar`
-  não chamado**; **geração parcial** (5 de 8 ⇒ persistível, `pedido = 8`); < 3
+  não chamado**; **texto-base vazio após montagem ⇒ `CheckpointIndisponivelError`,
+  `gerar` não chamado**; `SemTextoParaExerciciosError` ⇒ mensagem de indisponível
+  em `mensagemAmigavelCheckpoint`; **geração parcial** (5 de 8 ⇒ persistível, `pedido = 8`); < 3
   ⇒ `CheckpointInsuficienteError`; JSON ruim 2× ⇒ `ExerciciosInvalidosError`;
   corretiva funciona; `carregarTexto` lançando ⇒ sem texto; texto-base ≤ 12000
   e contém as seções esperadas (inspeciona o prompt recebido por `gerar`);
@@ -703,7 +778,8 @@ movidas junto.
   tabela §4; arquivo JSON corrompido continua tratado como antes.
 - `salvarCheckpoint` com assinatura divergente rejeita; assinatura nova substitui
   bloco antigo; `salvarPlano`/`editarProva`/`salvarSessoes` preservam o bloco.
-- `concluirCheckpoint` (ok, idempotente, sem item, bloco desatualizado).
+- `concluirCheckpoint` (ok, **carimba `Prova.atualizadoEm`**, idempotente sem
+  regravar nem mudar carimbos, sem item, bloco desatualizado).
 - `definirPreferenciaCheckpoint`: troca, **não altera `plano.atualizadoEm`**,
   altera `Prova.atualizadoEm`, valor inválido rejeita, prova sem plano rejeita.
 - escrita atômica: nenhum `.tmp` sobra.
