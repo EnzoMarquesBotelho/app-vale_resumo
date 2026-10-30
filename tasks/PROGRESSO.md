@@ -5,17 +5,18 @@
 
 ## Estado atual (branch master; Plano de estudo guiado COMPLETO — 4/4, fatia 4 já mergeada)
 
-- **Em andamento (branch `feat/unifica-agenda-plano`, ainda NÃO mergeada):**
-  **Agenda de revisão + Plano de estudo numa linha do tempo única** e fluxo de
-  criação da prova unificado (nome automático, ENEM/ENADE, datas passadas
-  bloqueadas). Build, lint e **1015 testes** passando (61 arquivos; +70 sobre
-  os 945 da master, conferidos de verdade com `npm test`). Referência estável:
+- **Entregue e na master:** **Agenda de revisão + Plano de estudo numa linha do
+  tempo única** e fluxo de criação da prova unificado (nome automático,
+  ENEM/ENADE, datas passadas bloqueadas). Build, lint e **1015 testes**
+  passando (61 arquivos; +70 sobre os 945 anteriores, conferidos de verdade com
+  `npm test` na master após o merge fast-forward). Referência estável:
   **commit de implementação `9664187`** + design `f85c87e`/`4f61e2e` + o commit
-  de docs da fatia (hash dele não citado aqui de propósito: autorreferência).
-  Decisões em `roadmap-unificacao-agenda-plano.md`; detalhes em "Entregue".
-- Build, lint e **945 testes** passando na master (58 arquivos de teste), conferidos de
-  verdade na master após o merge fast-forward da fatia 4 (a master estava em
-  `bc81789` antes do merge; baseline anterior: 781). Entregue e na master:
+  de docs da fatia (`db10c75`). O hash do commit que atualiza este cabeçalho não
+  é citado aqui de propósito (autorreferência). Decisões em
+  `roadmap-unificacao-agenda-plano.md`; detalhes em "Entregue".
+- Fatia anterior (já na master): **945 testes** (58 arquivos) após o merge
+  fast-forward da fatia 4 (a master estava em `bc81789` antes do merge;
+  baseline anterior: 781). Entregue e na master:
   **Plano de estudo guiado — Fatia 4/4** (checkpoints "pré-provas": listas de
   exercícios a 28/14/7/3 dias da prova, em modo lembrete ou automático,
   alterável depois). Com ela o **Plano de estudo guiado está COMPLETO (4/4)**.
@@ -354,8 +355,8 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
     o app à mão), cancelar geração, exportar a lista, UI de reordenar a
     cronologia (fatia 2).
   - [x] **Unificação Agenda + Plano (linha do tempo única) + fluxo de criação
-    da prova** — ENTREGUE na branch `feat/unifica-agenda-plano` (aguarda
-    merge; ver "Entregue").
+    da prova** — ENTREGUE e mergeada na master (impl. `9664187` + docs
+    `db10c75`; ver "Entregue").
   - **Fronteira vinculante (todas 2–4):** a distribuição NÃO depende do modelo;
     só a geração de texto/perguntas/exercícios usa Ollama. Ordem 1 → 2 → 3 → 4
     confirmada (3 depende de 1+2).

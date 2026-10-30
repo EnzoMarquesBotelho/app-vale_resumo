@@ -6,12 +6,14 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Branch `feat/unifica-agenda-plano` (não mergeada): linha do tempo única +
-> fluxo de criação da prova, **1015 testes** (61 arquivos), build/lint limpos.
-> Estado da master: **Plano de estudo guiado COMPLETO (4/4).** Fatia 4/4
-> (checkpoints pré-provas) já na master (commit de implementação `920e779` +
-> docs `82f7df5`, mergeada por fast-forward sobre `bc81789`),
-> **945 testes** passando (58 arquivos), build/lint limpos. Fatia 3/4 na master
+> Estado atual: linha do tempo única (Agenda de revisão + Plano) e fluxo de
+> criação da prova **já na master** (commit de implementação `9664187` + docs
+> `db10c75`, mergeada por fast-forward sobre `133c99e`), **1015 testes**
+> (61 arquivos), build/lint limpos.
+> **Plano de estudo guiado COMPLETO (4/4).** Fatia 4/4
+> (checkpoints pré-provas) na master (commit de implementação `920e779` +
+> docs `82f7df5`, mergeada por fast-forward sobre `bc81789`, 945 testes).
+> Fatia 3/4 na master
 > (`e533d17` + docs `d2193f8`, 781 testes); Fatia 2/4 (`48afc38`/`fabd62b` +
 > docs, 673 testes); Fatia 1/4 em `d4df16b` + docs.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
