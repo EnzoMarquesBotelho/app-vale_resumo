@@ -28,6 +28,42 @@ plano.
 (`electron-vite`), IPC tipado via `contextBridge`, persistência em JSON atômico
 (`Prova.checkpoints?`), Vitest com Ollama mockado. **Nenhuma dependência nova.**
 
+> **NOTA DO ORQUESTRADOR (design-loop ENCERRADO por decisão do usuário após o
+> 2º ciclo; ler antes de implementar):** a 2ª revisão
+> (`.agents/tasks/plano-f4-checkpoints/design-review.json`) ficou com 1 HIGH +
+> 3 MEDIUM + 4 NIT, todos de detalhe e com fix exato. Arquitetura, estados,
+> gatilho puro, persistência e o comportamento "automático" estão APROVADOS —
+> NÃO reabrir. Aplicar na implementação exatamente assim:
+> - **HIGH (§6, handler `gerarCheckpoint`, passo 4):** `carregarDocumento` é
+>   ASSÍNCRONA. Usar `return (await carregarDocumento(docId)).texto` (como o
+>   molde do diagnóstico) e testar com documento assíncrono/real, não com stub
+>   síncrono.
+> - **MEDIUM (§3.3 `escolherCheckpointAutomatico`):** o contrato usa
+>   `diferencaDias(data, hoje)` mas a assinatura não recebe `hoje`. Adicionar
+>   `hoje: string` ao parâmetro e um caso de teste com checkpoint `pronto`/
+>   `feito` de data FUTURA.
+> - **MEDIUM (§7 `emGeracao`, card preso em "Preparando…") — DECISÃO DO
+>   USUÁRIO, opção (a):** enquanto `emGeracao` for verdadeiro, o card
+>   RECONSULTA `calcularCheckpoints` a cada 5 s e RECARREGA a prova ao
+>   terminar, saindo sozinho de "Preparando…". Limpar o intervalo ao desmontar
+>   o card, ao trocar/fechar a prova e quando `emGeracao` voltar a falso (sem
+>   vazamento de timers). Acrescentar teste e passo manual correspondentes. NÃO
+>   registrar isso como "não coberto".
+> - **MEDIUM (§7 `aoAtualizar` × D5):** `aoAtualizar` não pode sobrescrever a
+>   seleção da Agenda depois de o aluno trocar/fechar a prova. Usar setter
+>   FUNCIONAL que só aplica se `atual?.id === p.id`, e um ref de montagem no
+>   componente (mesma guarda vale para o intervalo de reconsulta acima).
+> - **NIT 5 (§3.2 tabela, linha 11):** reescrever como "sem listas, `futuro`
+>   para tudo" (as regras 1–2 já dão `pronto`/`feito` antes).
+> - **NIT 6 (§7 destaque do lembrete vs D4):** justificar ou usar a MESMA regra
+>   de candidato do automático (não destacar um checkpoint mais antigo se há um
+>   mais recente `pronto`).
+> - **NIT 7 (§3.3 bloco desatualizado):** registrar em §11 como DECISÃO
+>   EXPLÍCITA que, em automático, nunca se gera com o bloco desatualizado até o
+>   aluno clicar manualmente.
+> - **NIT 8 (§6 guard):** explicitar que os passos 2–5 do handler ficam dentro
+>   do `try/finally`, para o guard de geração em andamento nunca ficar preso.
+
 ### 0.1 Descoberta que muda o desenho (premissa do brief corrigida)
 
 O brief diz "tópicos já estudados até aquele dia, segundo `PlanoCalculado.dias`".

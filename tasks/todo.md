@@ -6,12 +6,12 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: Plano de estudo guiado — **Fatia 3/4 (quiz diagnóstico + plano
-> ajustado) já na master** (commit de implementação `e533d17` + docs
-> `d2193f8`, mergeada por fast-forward sobre `b4b6cc2`),
-> **781 testes** passando (53 arquivos), build/lint limpos. Restante do plano
-> guiado: **Fatia 4/4 (checkpoints)**. Fatia 2/4 já na master (`48afc38`/
-> `fabd62b` + docs, 673 testes); Fatia 1/4 em `d4df16b` + docs.
+> Estado atual: **Plano de estudo guiado COMPLETO (4/4).** Fatia 4/4
+> (checkpoints pré-provas) implementada na branch `feat/plano-f4-checkpoints`
+> (commit de implementação `920e779`, ainda a mergear na master),
+> **945 testes** passando (58 arquivos), build/lint limpos. Fatia 3/4 na master
+> (`e533d17` + docs `d2193f8`, 781 testes); Fatia 2/4 (`48afc38`/`fabd62b` +
+> docs, 673 testes); Fatia 1/4 em `d4df16b` + docs.
 > Publicado no GitHub (`app-vale_resumo`), release pública `v0.1.1`.
 
 > **Pasta de material real para testes manuais/de aceitação:**
@@ -310,10 +310,25 @@ configurar `npm run package` para gerar um executável.
   dep nova; 781 testes (673 → 781). Qualidade real das perguntas do `llama3.1`,
   lentidão/parcial reais e encaixe visual = verificação manual.
 
+- [x] **Plano de estudo guiado — Fatia 4/4: checkpoints pré-provas (COMPLETA o
+  plano guiado)** — `design-f4.md`/`roadmap-plano-estudo-guiado-f4.md` (branch
+  `feat/plano-f4-checkpoints`, implementação `920e779`). Pontos fixos a 28/14/7/3
+  dias da prova; cada um gera uma lista de 8 exercícios (mista) dos assuntos que
+  o plano de referência já cobriu, reusando `gerarExercicios`; modo **lembrete**
+  ou **automático** (só o ponto mais recente, ao abrir a prova), alterável depois
+  por canal próprio; lista respondível/corrigível no card (`ListaExercicios`
+  extraído de `Exercicios.tsx`) e "marcar como concluída". Gatilho/estados/texto-
+  base puros em `src/shared/checkpoints.ts`; `Prova.checkpoints?` aditivo;
+  `services/checkpoints.ts`; 4 canais IPC; UI `Checkpoints.tsx`. Zero dep nova;
+  945 testes (781 → 945). Sanity com Ollama real tentado (8 exercícios, ~28 s);
+  qualidade/latência reais, modo automático em dias reais e encaixe visual =
+  verificação manual.
+
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo
-- **Plano de estudo guiado por questionário** — intent CONFIRMADO em
+- [x] **Plano de estudo guiado por questionário — COMPLETO (4/4 entregues;
+  mantido aqui só como histórico das sub-fatias)** — intent CONFIRMADO em
   `docs/intent/plano-estudo-guiado.md` (entrevista com `interview-me`), visão em
   `roadmap-plano-estudo-guiado.md`. Agenda dia-a-dia que decide pelo aluno (o quê/
   ordem/quanto), com **checkpoints "pré-provas"** (lista de exercícios, modo
@@ -336,9 +351,7 @@ configurar `npm run package` para gerar um executável.
   - [x] **Fatia 3/4 — Quiz diagnóstico** — ENTREGUE (ver "Fases pós-MVP";
     branch `feat/plano-f3-diagnostico`, implementação `e533d17`). Reusou
     `gerarQuiz` (só múltipla escolha); `avaliarLote` não foi necessário.
-  - [ ] **Fatia 4/4 — Checkpoints "pré-provas"** — reusa `gerarExercicios` +
-    `avisoGeracaoParcial`; gancho na `SessaoRevisao`; modo automático vs.
-    lembrete; gatilho temporal puro ("faltam X dias → agir").
+
 - [ ] **Edição manual dos mapas mentais**; exportar mapa como imagem.
 - [ ] **Exportação para Anki** (.apkg/CSV dos flashcards) — Markdown e PDF já feitos.
 - [ ] **Geração de IA em lote** (pasta inteira).

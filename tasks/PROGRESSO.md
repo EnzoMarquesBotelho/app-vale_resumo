@@ -3,20 +3,23 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (branch master; Fatia 3/4 do plano guiado já mergeada)
+## Estado atual (Plano de estudo guiado COMPLETO — 4/4; fatia 4 na branch `feat/plano-f4-checkpoints`, ainda a mergear na master)
 
-- Build, lint e **781 testes** passando (53 arquivos de teste), conferidos de
-  verdade na master após o merge fast-forward da fatia 3 (a master estava em
-  `b4b6cc2` antes do merge). Entregue e na master:
-  **Plano de estudo guiado — Fatia 3/4** (quiz diagnóstico opcional que mede se
-  a dificuldade está na base ou no conteúdo novo e ajusta a mistura do plano).
-  Referência estável: **commit de implementação `e533d17`** (série
-  `11643fa..e533d17`, 8 commits: régua, tipos/classificação puros, persistência,
-  orquestração, planoCalculo, IPC, extração `PlanoPrevia`, UI) + o commit de
-  docs da fatia (`d2193f8`). O hash do commit que atualiza este cabeçalho não é
-  citado aqui de propósito (autorreferência).
-  Histórico da contagem: fatia 1 = 614; fatia 2 = 635 → 673; **fatia 3 = 781**
-  (+108). Cresce, nunca encolhe.
+- Build, lint e **945 testes** passando (58 arquivos de teste), conferidos de
+  verdade no worktree `plano-f4-checkpoints` (baseline anterior: 781 na master
+  `bc81789`). Entregue:
+  **Plano de estudo guiado — Fatia 4/4** (checkpoints "pré-provas": listas de
+  exercícios a 28/14/7/3 dias da prova, em modo lembrete ou automático,
+  alterável depois). Com ela o **Plano de estudo guiado está COMPLETO (4/4)**.
+  Referência estável: **commit de implementação `920e779`** (`feat: checkpoints
+  pre-prova na Agenda…`, sobre `bc81789`) + os commits de design
+  `ff038e4`/`b6c108b`. O commit de docs desta fatia vem logo depois e não é
+  citado aqui de propósito (autorreferência); cite-o no próximo cabeçalho, como
+  foi feito com `d2193f8` na fatia 3.
+  Histórico da contagem: fatia 1 = 614; fatia 2 = 635 → 673; fatia 3 = 781;
+  **fatia 4 = 945** (+164). Cresce, nunca encolhe.
+- Fatia anterior (na master): **Plano de estudo guiado — Fatia 3/4** (quiz
+  diagnóstico), implementação `e533d17` + docs `d2193f8`.
 - Fatia anterior (já na master): **Plano de estudo guiado — Fatia 2/4**
   (questionário + régua base/novo + distribuição por dias), dois commits de
   feature (`48afc38`, `fabd62b`) + docs (`3a3a8de`, `16ea5c0`), master `16ea5c0`
@@ -221,6 +224,35 @@
   `llama3.1`, lentidão da geração (até 6 chamadas sequenciais, sem botão
   cancelar), comportamento parcial real, e encaixe visual/teclado/tema do card.
   Teste real contra o Ollama: **não tentado** nesta etapa.
+- **Plano de estudo guiado — Fatia 4/4: checkpoints pré-provas** (**COMPLETA o
+  plano guiado**; `design-f4.md`, decisões em
+  `roadmap-plano-estudo-guiado-f4.md`; branch `feat/plano-f4-checkpoints`,
+  implementação `920e779`): na Agenda, abaixo do Diagnóstico, o card
+  **Checkpoints** mostra até 4 pontos fixos a **28/14/7/3 dias da prova** (só
+  os que caem depois da data-base do plano e cobrem ≥ 1 assunto). Cada ponto
+  gera uma **lista de 8 exercícios (modo mista)** dos assuntos que o plano de
+  referência já terminou de agendar até ali (até 6 assuntos, texto-base ≤ 12000
+  caracteres), reusando `gerarExercicios` sem alterá-lo. **Lembrete** (padrão:
+  destaca o ponto acionável mais recente; nada é gerado sem clique) ou
+  **automático** (ao abrir a prova gera só o candidato mais recente; sem retry
+  na sessão; reconsulta a cada 5 s enquanto há geração em andamento);
+  preferência **alterável depois** por canal próprio que não recarimba o plano.
+  A lista abre no próprio card via `ListaExercicios` (extraído de
+  `Exercicios.tsx`): responder, ver resposta, "Corrigir com IA", marcar como
+  concluída, gerar outra. Peças: `src/shared/checkpoints.ts` (gatilho temporal
+  puro com relógio injetado, estados, texto-base, frases pt-BR),
+  `Prova.checkpoints?` aditivo (irmão de `plano`/`diagnostico`, leitura
+  tolerante, validade por assinatura do plano), `services/checkpoints.ts`
+  (orquestração + erros tipados), 4 canais IPC com guarda de duplo clique, UI
+  `Checkpoints.tsx` e `checkpointsReconsulta.ts`. A IA só gera/corrige; quando,
+  quais assuntos e estado são mecânicos. Zero dep nova; 945 testes (781 + 164,
+  Ollama mockado); build/lint verdes. **Sanity com Ollama real (llama3.1):
+  TENTADO** — `gerarListaCheckpoint` devolveu 8 exercícios em ~28 s e ignorou
+  o tópico manual com motivo; não substitui os testes. **Verificação manual do
+  usuário (NÃO coberta):** qualidade/latência reais do `llama3.1` nas listas,
+  modo automático abrindo o app em dias reais, encaixe visual/teclado/tema do
+  card na Agenda e a regressão visual de Exercicios após a extração
+  (`ListaExercicios`; não há testes de componente no repo).
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -276,11 +308,15 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
     implementação `e533d17`). Reusou `gerarQuiz` (só múltipla escolha, correção
     mecânica; `avaliarLote` NÃO foi usado). Classificação pura por camada,
     ajuste da mistura base/novo, `Prova.diagnostico?` e UI na Agenda.
-  - [ ] **Fatia 4/4 — Checkpoints "pré-provas" (reusa exercícios)** — reusa
-    `gerarExercicios` (lotes/dedup/progresso) e o `avisoGeracaoParcial`; encaixa
-    na `SessaoRevisao` (campo aditivo "checkpoint"); modo automático vs. lembrete
-    (alterável) como config do plano. Gatilho temporal ("faltam X dias → agir")
-    é lógica pura sobre as datas (reusa `diferencaDias`/`diasRestantes`).
+  - [x] **Fatia 4/4 — Checkpoints "pré-provas"** — ENTREGUE (ver "Entregue",
+    `roadmap-plano-estudo-guiado-f4.md`; branch `feat/plano-f4-checkpoints`,
+    implementação `920e779`). Reusou `gerarExercicios` (caminho curto, 8
+    exercícios); em vez de `SessaoRevisao`, o bloco aditivo `Prova.checkpoints?`
+    (irmão de `plano`/`diagnostico`). **O Plano de estudo guiado está COMPLETO
+    (4/4).** Ficou para depois (detalhe no roadmap da fatia): "iniciar com o
+    computador" (item de UX abaixo, que destravaria o modo automático sem abrir
+    o app à mão), cancelar geração, exportar a lista, UI de reordenar a
+    cronologia (fatia 2).
   - **Fronteira vinculante (todas 2–4):** a distribuição NÃO depende do modelo;
     só a geração de texto/perguntas/exercícios usa Ollama. Ordem 1 → 2 → 3 → 4
     confirmada (3 depende de 1+2).

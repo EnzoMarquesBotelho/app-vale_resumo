@@ -66,6 +66,18 @@ podem ser reabertos a qualquer momento.
   o app avisa que o diagnóstico ficou desatualizado. Assuntos digitados à mão (sem material
   importado) ficam de fora, e a geração pode demorar no modelo local. É uma orientação de
   estudo, não uma previsão da prova.
+- **Checkpoints antes da prova**: com o plano montado, o card **"Checkpoints"** na Agenda marca
+  pontos de checagem a **28, 14, 7 e 3 dias da prova** (só os que ainda cabem no seu plano). Em
+  cada ponto o app prepara uma **lista de 8 exercícios** sobre o que o plano já cobriu até ali.
+  Você escolhe como quer isso: **"Lembrar-me"** (o app avisa que a lista está na hora e você
+  clica em **Gerar lista**) ou **"Preparar automaticamente"** (ao abrir a prova na Agenda, o app
+  já prepara a lista do ponto mais recente). Dá para **trocar de modo a qualquer momento**, direto
+  no card. Cada lista abre ali mesmo: você **responde, vê a resposta e pede a correção da IA**,
+  como nos Exercícios, e pode **marcar como concluída** ou **gerar outra lista**. Se você ficou
+  vários dias sem abrir, só o ponto mais recente é preparado sozinho; os mais antigos ficam à sua
+  escolha, por botão. Assuntos digitados à mão (sem material importado) não entram nas listas, e o
+  app avisa. Suas respostas e notas da lista não são guardadas e não mudam o plano. O modo
+  automático só age com o app aberto na prova, e a geração pode demorar no modelo local.
 
 > Tudo roda offline. Se o Ollama não estiver rodando, o app mostra um passo a passo
 > para resolver, sem travar. Gerar ou corrigir muitos itens de uma vez pode ser lento no
@@ -142,7 +154,8 @@ A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblio
    do dia. Selecione uma prova e clique em **"Montar plano de estudo"** para responder o
    questionário e ver o plano dia a dia com o que estudar. Depois, se quiser um plano mais
    certeiro, use o card **Diagnóstico** logo abaixo para fazer o quiz rápido e ver o plano
-   ajustado.
+   ajustado. Mais abaixo, o card **Checkpoints** prepara as listas de exercícios de checagem
+   antes da prova (você escolhe entre ser lembrado ou deixar o app preparar sozinho).
 4. Tudo o que você gera fica salvo e reabre pela Biblioteca, organizado por caderno.
 5. Use **Exportar** (em cada artefato ou no documento inteiro) para salvar o material em
    **Markdown** ou **PDF** onde você quiser.
