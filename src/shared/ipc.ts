@@ -24,6 +24,7 @@ import type {
   PlanoEstudo,
   PreferenciaCheckpoint,
   Prova,
+  TipoProva,
   Quiz,
   Resumo,
   ResumoCaderno,
@@ -326,6 +327,7 @@ export interface AppApi {
     data: string;
     vinculo: VinculoProva;
     intervalos?: number[];
+    tipo?: TipoProva;
   }) => Promise<Prova>;
   /**
    * Lista as provas como resumos leves, da mais próxima para a mais distante,
@@ -350,7 +352,7 @@ export interface AppApi {
     id: string,
     mudancas: Partial<
       Pick<Prova, "titulo" | "data" | "vinculo" | "intervalos">
-    >,
+    > & { tipo?: TipoProva | null },
   ) => Promise<Prova>;
   /**
    * Substitui a lista de sessões (edição manual) e resolve com a prova

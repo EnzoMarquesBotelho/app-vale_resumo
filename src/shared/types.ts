@@ -416,7 +416,11 @@ export interface Prova {
   diagnostico?: DiagnosticoPlano;
   /** Listas de exercícios de checkpoint pré-prova (fatia 4), irmão de `plano`. */
   checkpoints?: CheckpointsPlano;
+  /** Tipo de prova escolhido pelo aluno (nome automático e ordinal do plano). Ausente em provas antigas. */
+  tipo?: TipoProva;
 }
+/** Tipo de prova escolhido pelo aluno (define o nome automático e o ordinal do plano). */
+export type TipoProva = "primeira" | "segunda" | "final" | "enem" | "enade";
 
 /** Qual prova é — define o recorte base vs novo (intent). */
 export type OrdinalProva = "primeira" | "segunda" | "final";

@@ -8,6 +8,7 @@ import type {
   TopicoPlano,
 } from "@shared/types";
 import type { PlanoCalculado } from "@shared/plano";
+import { ROTULOS_TIPO_PROVA, ordinalDeTipo } from "@shared/tipoProva";
 import { getApi } from "../api";
 import { PlanoPrevia } from "./PlanoPrevia";
 
@@ -88,8 +89,12 @@ export function PlanoEstudo({
 }: PlanoEstudoProps): React.JSX.Element {
   const planoAtual = prova.plano;
 
+  // Com `tipo` na prova, o ordinal vem dele (o main também decide); a pergunta
+  // só aparece para provas antigas sem tipo.
   const [ordinal, setOrdinal] = useState<OrdinalProva>(
-    planoAtual?.ordinal ?? "primeira",
+    prova.tipo !== undefined
+      ? ordinalDeTipo(prova.tipo)
+      : (planoAtual?.ordinal ?? "primeira"),
   );
   const [horasPorDia, setHorasPorDia] = useState<number>(
     planoAtual?.horasPorDia ?? 2,
@@ -223,21 +228,28 @@ export function PlanoEstudo({
         </p>
       )}
 
-      <fieldset className="plano-fieldset">
-        <legend>Qual prova é?</legend>
-        {(["primeira", "segunda", "final"] as OrdinalProva[]).map((o) => (
-          <label key={o} className="plano-radio">
-            <input
-              type="radio"
-              name="plano-ordinal"
-              value={o}
-              checked={ordinal === o}
-              onChange={() => setOrdinal(o)}
-            />
-            {ROTULOS_ORDINAL[o]}
-          </label>
-        ))}
-      </fieldset>
+      {prova.tipo !== undefined ? (
+        <p className="app-meta">
+          Tipo de prova: {ROTULOS_TIPO_PROVA[prova.tipo]} (mude em “Editar
+          prova”).
+        </p>
+      ) : (
+        <fieldset className="plano-fieldset">
+          <legend>Qual prova é?</legend>
+          {(["primeira", "segunda", "final"] as OrdinalProva[]).map((o) => (
+            <label key={o} className="plano-radio">
+              <input
+                type="radio"
+                name="plano-ordinal"
+                value={o}
+                checked={ordinal === o}
+                onChange={() => setOrdinal(o)}
+              />
+              {ROTULOS_ORDINAL[o]}
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       <div className="plano-linha">
         <label className="agenda-campo">

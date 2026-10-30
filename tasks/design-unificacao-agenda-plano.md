@@ -24,6 +24,44 @@ no questionário. A data mínima (amanhã) passa a ser exigida no main ao criar/
 Stack travada: Electron + React + TypeScript, Vite, Vitest, IPC via `getApi()`. **Nenhuma dependência nova.**
 Nenhum canal IPC novo (só tipos de `criarProva`/`editarProva` ganham `tipo`).
 
+> **NOTA DO ORQUESTRADOR (design-loop ENCERRADO por decisão do usuário após o
+> 2º ciclo; ler antes de implementar):** a 2ª revisão
+> (`.agents/tasks/unifica-agenda-plano/design-gate.json`) ficou com 2 MEDIUM +
+> 4 NIT, 0 HIGH. Arquitetura (visão derivada, `Prova.tipo?` aditivo, função
+> pura `linhaDoTempo.ts`, data mínima no main) APROVADA — NÃO reabrir.
+>
+> **DECISÕES DO USUÁRIO (vinculantes):**
+> - **ENEM e ENADE contam como "primeira"** para efeito do plano (todo o
+>   conteúdo é base, sem "novo"). Aprovado.
+> - **Trocar o tipo para 1ª prova, ENEM ou ENADE descarta a marcação "novo" dos
+>   assuntos, e a UI pede confirmação antes.** Aprovado.
+>
+> **Aplicar na implementação exatamente assim:**
+> - **MEDIUM 1 (contradição bloco legado × min/max):** o bloco legado "Agenda
+>   de revisão" (prova SEM plano, e prova PASSADA) fica INTOCADO, sem diff,
+>   como diz §0/§8. As datas mínima/máxima das revisões valem SÓ dentro de
+>   `LinhaDoTempo`. Corrigir §5.5/§7 para não dizer "em ambos os modos". Em
+>   prova passada não há min/max (a linha do tempo nem é renderizada).
+> - **MEDIUM 2 (guarda de prova passada):** renderizar `LinhaDoTempo` somente
+>   com `plano !== undefined && !montandoPlano && estado !== "passada"` (mesma
+>   guarda que a Agenda já usa para Diagnóstico/Checkpoints). Prova passada usa
+>   o bloco legado. O hook `useCheckpoints` só dispara com a linha do tempo
+>   montada. Corrigir §9.1.
+> - **NIT 3 (validação de formato em `validarDataProva`):** especificar regex
+>   `^\d{4}-\d{2}-\d{2}$` + round-trip `diaParaNumero`/`numeroParaDia`, ou
+>   exportar a `dataValida` do main para `src/shared/dataProva.ts` (a privada
+>   hoje não é alcançável pela função pura).
+> - **NIT 4 (intervalos de prova passada):** registrar em §13 como "herdado,
+>   NÃO coberto" que editar `intervalos` de prova passada apaga as sessões
+>   (comportamento atual preservado), ou bloquear — escolher o mais simples e
+>   declarar.
+> - **NIT 5 (extração do hook `useCheckpoints`):** critério de aceitação: os
+>   testes existentes de reconsulta (`tests/renderer/checkpoints-reconsulta`)
+>   passam SEM alterar `checkpointsReconsulta.ts`.
+> - **NIT 6 (baseline de testes):** o design cita 945; o `AGENTS.md` cita 781.
+>   A contagem real vem do `npm test` na implementação; reconciliar
+>   `AGENTS.md`, `PROGRESSO.md` e `todo.md` com ela.
+
 ## 1. Decisões-chave (resumo)
 
 | # | Decisão |

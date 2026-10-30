@@ -24,13 +24,11 @@ import {
 } from "@shared/constants";
 import { montarCaderno } from "@shared/notebooks";
 import {
-  diaParaNumero,
   diasRestantes,
   diferencaDias,
   estadoProva,
   gerarAgenda,
   normalizarIntervalos,
-  numeroParaDia,
   recomputarAgenda,
 } from "@shared/agenda";
 import { ehIsoPlausivel } from "@shared/cronologia";
@@ -55,18 +53,26 @@ import type {
   Prova,
   ResumoProva,
   SessaoRevisao,
+  TipoProva,
   TopicoPlano,
   VinculoProva,
 } from "@shared/types";
+import {
+  dataLocalDe,
+  dataValida,
+  validarDataProva,
+} from "@shared/dataProva";
+import {
+  aplicarOrdinalAoPlano,
+  ehTipoProva,
+  ordinalDeTipo,
+} from "@shared/tipoProva";
 
 /** Nome da subpasta, dentro do `userData`, onde as provas ficam salvas. */
 const SUBPASTA_PROVAS = "provas";
 
 /** Comprimento máximo do título de uma prova (truncado, não é erro). */
 const TITULO_MAX = 200;
-
-/** Casa estritamente "YYYY-MM-DD" (validação sintática antes da semântica). */
-const PADRAO_DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * `hojeLocal()`: ÚNICO leitor do relógio real nesta fatia. Compõe a data-
@@ -77,11 +83,7 @@ const PADRAO_DATA = /^\d{4}-\d{2}-\d{2}$/;
  * puras (elas recebem `hoje` como parâmetro); os handlers o resolvem uma vez.
  */
 export function hojeLocal(): string {
-  const agora = new Date();
-  const ano = agora.getFullYear().toString().padStart(4, "0");
-  const mes = (agora.getMonth() + 1).toString().padStart(2, "0");
-  const dia = agora.getDate().toString().padStart(2, "0");
-  return `${ano}-${mes}-${dia}`;
+  return dataLocalDe(new Date());
 }
 
 /** Erro lançado quando uma prova solicitada não existe em disco. */
@@ -133,20 +135,6 @@ async function escreverProva(prova: Prova, baseDir?: string): Promise<void> {
   const temporario = `${destino}.tmp`;
   await writeFile(temporario, JSON.stringify(prova, null, 2), "utf-8");
   await rename(temporario, destino);
-}
-
-/**
- * Valida uma data "YYYY-MM-DD": casa o regex E é uma data real (round-trip
- * exato por `numeroParaDia(diaParaNumero(data)) === data`). Datas inexistentes
- * (ex.: "2026-02-30") ou mal formatadas são rejeitadas.
- */
-function dataValida(data: unknown): data is string {
-  if (typeof data !== "string" || !PADRAO_DATA.test(data)) return false;
-  try {
-    return numeroParaDia(diaParaNumero(data)) === data;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -202,6 +190,17 @@ export interface NovaProva {
   vinculo: VinculoProva;
   /** Intervalos de repetição espaçada; ausente → default [7,3,1]. */
   intervalos?: number[];
+  /** Tipo de prova (opcional; define nome automático e ordinal do plano). */
+  tipo?: TipoProva | null;
+}
+
+/** Valida o tipo recebido: undefined/null = omitido; inválido = erro. */
+function sanearTipo(tipo: unknown): TipoProva | undefined {
+  if (tipo === undefined || tipo === null) return undefined;
+  if (!ehTipoProva(tipo)) {
+    throw new DadosProvaInvalidosError("Escolha um tipo de prova válido.");
+  }
+  return tipo;
 }
 
 /**
@@ -223,7 +222,12 @@ export async function criarProva(
   if (!dataValida(dados.data)) {
     throw new DadosProvaInvalidosError("Informe uma data válida (ano-mês-dia).");
   }
+  const resultadoData = validarDataProva({ data: dados.data, hoje });
+  if (!resultadoData.ok) {
+    throw new DadosProvaInvalidosError(resultadoData.mensagem);
+  }
   const vinculo = sanearVinculo(dados.vinculo);
+  const tipo = sanearTipo(dados.tipo);
   const intervalos = normalizarIntervalos(
     Array.isArray(dados.intervalos)
       ? dados.intervalos
@@ -239,6 +243,7 @@ export async function criarProva(
     sessoes: gerarAgenda({ dataProva: dados.data, intervalos, hoje }),
     criadoEm: agora,
     atualizadoEm: agora,
+    ...(tipo !== undefined ? { tipo } : {}),
   };
   await escreverProva(prova, baseDir);
   return prova;
@@ -264,6 +269,10 @@ export async function carregarProva(
       } else {
         prova.diagnostico = saneado;
       }
+    }
+    // Campo aditivo `tipo`: valor inválido é descartado em silêncio.
+    if (typeof prova === "object" && prova !== null && "tipo" in prova) {
+      if (!ehTipoProva(prova.tipo)) delete prova.tipo;
     }
     // Bloco aditivo da fatia 4: mesmo tratamento tolerante do diagnóstico.
     if (typeof prova === "object" && prova !== null && "checkpoints" in prova) {
@@ -359,7 +368,7 @@ export async function listarProvas(
 /** Mudanças aceitas por `editarProva` (campos omitidos ficam como estão). */
 export type MudancasProva = Partial<
   Pick<Prova, "titulo" | "data" | "vinculo" | "intervalos">
->;
+> & { tipo?: TipoProva | null };
 
 /**
  * Edita campos de uma prova. `vinculo`, quando presente, SUBSTITUI
@@ -390,6 +399,16 @@ export async function editarProva(
         "Informe uma data válida (ano-mês-dia).",
       );
     }
+    // Data inalterada passa mesmo se já ocorreu (prova antiga); data NOVA
+    // precisa ser a partir de amanhã.
+    const resultadoData = validarDataProva({
+      data: mudancas.data,
+      hoje,
+      dataAtual: prova.data,
+    });
+    if (!resultadoData.ok) {
+      throw new DadosProvaInvalidosError(resultadoData.mensagem);
+    }
     dataMudou = mudancas.data !== prova.data;
     data = mudancas.data;
   }
@@ -405,6 +424,19 @@ export async function editarProva(
     intervalos = normalizarIntervalos(mudancas.intervalos);
     intervalosMudaram =
       JSON.stringify(intervalos) !== JSON.stringify(prova.intervalos);
+  }
+
+  // `tipo`: ausente = nada muda; null = remove a chave; válido = grava e
+  // sincroniza o ordinal do plano (I1).
+  let tipoFinal = prova.tipo;
+  let plano = prova.plano;
+  if (mudancas.tipo === null) {
+    tipoFinal = undefined;
+  } else if (mudancas.tipo !== undefined) {
+    tipoFinal = sanearTipo(mudancas.tipo);
+    if (tipoFinal !== undefined && plano !== undefined) {
+      plano = aplicarOrdinalAoPlano(plano, ordinalDeTipo(tipoFinal));
+    }
   }
 
   // Recomputa SÓ quando data/intervalos mudam; mudar só o vínculo não mexe nas
@@ -427,7 +459,14 @@ export async function editarProva(
     intervalos,
     sessoes,
     atualizadoEm: new Date().toISOString(),
+    ...(plano !== undefined ? { plano } : {}),
   };
+  // Nunca grava `tipo: undefined`: remover o tipo apaga a chave.
+  if (tipoFinal === undefined) {
+    delete atualizada.tipo;
+  } else {
+    atualizada.tipo = tipoFinal;
+  }
   await escreverProva(atualizada, baseDir);
   return atualizada;
 }
@@ -640,10 +679,20 @@ export async function salvarPlano(
   baseDir?: string,
 ): Promise<Prova> {
   const prova = await carregarProva(id, baseDir);
-  const plano = sanearPlano(planoBruto, agora);
+  // Com `tipo`, o main decide o ordinal (o renderer só sugere).
+  const bruto =
+    prova.tipo !== undefined &&
+    typeof planoBruto === "object" &&
+    planoBruto !== null &&
+    !Array.isArray(planoBruto)
+      ? { ...planoBruto, ordinal: ordinalDeTipo(prova.tipo) }
+      : planoBruto;
+  const plano = sanearPlano(bruto, agora);
   const atualizada: Prova = {
     ...prova,
     ...(plano ? { plano } : {}),
+    // Backfill: prova sem tipo passa a ter tipo = ordinal escolhido.
+    ...(prova.tipo === undefined ? { tipo: plano.ordinal } : {}),
     atualizadoEm: agora,
   };
   await escreverProva(atualizada, baseDir);

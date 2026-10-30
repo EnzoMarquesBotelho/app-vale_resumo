@@ -5,7 +5,14 @@
 
 ## Estado atual (branch master; Plano de estudo guiado COMPLETO — 4/4, fatia 4 já mergeada)
 
-- Build, lint e **945 testes** passando (58 arquivos de teste), conferidos de
+- **Em andamento (branch `feat/unifica-agenda-plano`, ainda NÃO mergeada):**
+  **Agenda de revisão + Plano de estudo numa linha do tempo única** e fluxo de
+  criação da prova unificado (nome automático, ENEM/ENADE, datas passadas
+  bloqueadas). Build, lint e **1015 testes** passando (61 arquivos; +70 sobre
+  os 945 da master, conferidos de verdade com `npm test`). Detalhes em
+  "Entregue" abaixo. O hash do commit de implementação fica no `git log` da
+  branch (não citado aqui de propósito).
+- Build, lint e **945 testes** passando na master (58 arquivos de teste), conferidos de
   verdade na master após o merge fast-forward da fatia 4 (a master estava em
   `bc81789` antes do merge; baseline anterior: 781). Entregue e na master:
   **Plano de estudo guiado — Fatia 4/4** (checkpoints "pré-provas": listas de
@@ -252,6 +259,34 @@
   modo automático abrindo o app em dias reais, encaixe visual/teclado/tema do
   card na Agenda e a regressão visual de Exercicios após a extração
   (`ListaExercicios`; não há testes de componente no repo).
+- **Unificação Agenda de revisão + Plano de estudo (linha do tempo única) e
+  fluxo de criação da prova** (`design-unificacao-agenda-plano.md`; branch
+  `feat/unifica-agenda-plano`): provas **com plano** (e não passadas) mostram
+  uma única lista por data com **estudo**, **revisão** e **checkpoint**; a
+  revisão que cai no mesmo dia de um checkpoint (na prática 7 e 3 dias antes)
+  aparece junto dele (só exibição: a sessão salva nunca é alterada). Estudo é só
+  leitura; revisões mantêm marcar/mover/remover/adicionar/"Regerar revisões
+  sugeridas"; checkpoints mantêm gerar/abrir/concluir. Provas **sem plano** (e
+  passadas) mantêm a Agenda de revisão idêntica. Criação da prova: novo campo
+  **Tipo de prova** (1ª, 2ª, final, ENEM, ENADE; `Prova.tipo?` aditivo) preenche
+  o **título automático** com o caderno ("Cálculo — 2ª prova") sem sobrescrever
+  o que o aluno digitou; ENEM/ENADE só sugerem "prova abrangente" se nenhum
+  caderno foi escolhido e valem como 1ª prova no plano (sem "novo"); o
+  questionário deixa de perguntar "qual prova é" quando há tipo. Trocar para
+  1ª/ENEM/ENADE uma prova com assuntos "novo" pede confirmação (descarta a
+  marcação). **Datas passadas e hoje bloqueadas** (mínimo = amanhã) na UI (`min`)
+  e no main (criar e editar; prova antiga com data passada continua abrindo e
+  pode ser salva sem mudar a data). Peças puras: `src/shared/{linhaDoTempo,
+  tipoProva,nomeProva,dataProva}.ts`; UI `LinhaDoTempo.tsx` e hook
+  `useCheckpoints.ts` (extraído do antigo card Checkpoints). Zero dep nova; sem
+  canal IPC novo; geração por IA intocada. **1015 testes** (945 + 70).
+  **Verificação manual do usuário (NÃO coberta, sem testes de componente):**
+  criar prova (caderno → nome; tipo → nome; digitar e trocar tipo), data de
+  hoje bloqueada no seletor e na mensagem, prova antiga abre, montar plano →
+  linha do tempo, fusão 7/3 dias, mover/marcar/remover/adicionar revisão,
+  gerar/abrir/concluir checkpoint pela linha, temas claro/escuro e teclado.
+  Ficou fora (decisão do design): marcar bloco de estudo como feito, fundir
+  revisão e checkpoint a ±N dias, agrupar listas longas.
 - Infra: `.gitignore` e **ESLint** ignoram `.worktrees` e `**/out` (evita erros
   fantasmas de lint quando há worktree).
 
@@ -316,6 +351,9 @@ escolhida** (comportamento atual, nenhuma mudança de código necessária).
     computador" (item de UX abaixo, que destravaria o modo automático sem abrir
     o app à mão), cancelar geração, exportar a lista, UI de reordenar a
     cronologia (fatia 2).
+  - [x] **Unificação Agenda + Plano (linha do tempo única) + fluxo de criação
+    da prova** — ENTREGUE na branch `feat/unifica-agenda-plano` (aguarda
+    merge; ver "Entregue").
   - **Fronteira vinculante (todas 2–4):** a distribuição NÃO depende do modelo;
     só a geração de texto/perguntas/exercícios usa Ollama. Ordem 1 → 2 → 3 → 4
     confirmada (3 depende de 1+2).

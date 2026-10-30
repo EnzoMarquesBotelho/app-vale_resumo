@@ -6,7 +6,9 @@
 > **MVP (Fases 1–3 abaixo): CONCLUÍDO e na master.** As fatias pós-MVP estão
 > resumidas na seção "Fases pós-MVP" ao final deste arquivo; cada fatia tem seu
 > próprio doc `roadmap-*.md` com as decisões confirmadas.
-> Estado atual: **Plano de estudo guiado COMPLETO (4/4).** Fatia 4/4
+> Branch `feat/unifica-agenda-plano` (não mergeada): linha do tempo única +
+> fluxo de criação da prova, **1015 testes** (61 arquivos), build/lint limpos.
+> Estado da master: **Plano de estudo guiado COMPLETO (4/4).** Fatia 4/4
 > (checkpoints pré-provas) já na master (commit de implementação `920e779` +
 > docs `82f7df5`, mergeada por fast-forward sobre `bc81789`),
 > **945 testes** passando (58 arquivos), build/lint limpos. Fatia 3/4 na master
@@ -324,6 +326,20 @@ configurar `npm run package` para gerar um executável.
   qualidade/latência reais, modo automático em dias reais e encaixe visual =
   verificação manual.
 
+- [x] **Unificação Agenda de revisão + Plano de estudo (linha do tempo única) e
+  fluxo de criação da prova** — `design-unificacao-agenda-plano.md` (branch
+  `feat/unifica-agenda-plano`, ainda não mergeada). Prova com plano (não
+  passada) mostra estudo + revisão + checkpoint por data (revisão no mesmo dia
+  do checkpoint aparece junto); prova sem plano mantém a Agenda de revisão
+  idêntica. Novo campo **Tipo de prova** (1ª/2ª/final/ENEM/ENADE, `Prova.tipo?`
+  aditivo) gera o título automático (sem sobrescrever o digitado) e define o
+  ordinal do plano (ENEM/ENADE = 1ª prova); datas passadas e hoje bloqueadas na
+  UI e no main (mínimo = amanhã; prova antiga com data passada continua
+  abrindo). Puros `linhaDoTempo/tipoProva/nomeProva/dataProva` em `src/shared/`,
+  UI `LinhaDoTempo.tsx` + hook `useCheckpoints.ts`. Zero dep nova, sem canal IPC
+  novo. **1015 testes** (945 → 1015, 61 arquivos). Verificação manual do
+  usuário: fluxo de criação, data bloqueada, linha do tempo, fusão 7/3, temas e
+  teclado (sem testes de componente).
 ## Roadmap restante (complementos — não iniciados)
 
 ### Funcionalidades de estudo

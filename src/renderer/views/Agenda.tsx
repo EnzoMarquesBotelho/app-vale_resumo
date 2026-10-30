@@ -1,6 +1,22 @@
 import { useEffect, useState } from "react";
 import { INTERVALOS_REVISAO_PADRAO } from "@shared/constants";
 import { parsearIntervalos } from "@shared/agenda";
+import {
+  dataLocalDe,
+  dataMinimaProva,
+  validarDataProva,
+} from "@shared/dataProva";
+import {
+  nomeProva,
+  tituloAposDigitar,
+  tituloAposMudanca,
+} from "@shared/nomeProva";
+import {
+  ROTULOS_TIPO_PROVA,
+  TIPOS_PROVA,
+  tipoDescartaNovos,
+  vinculoAposEscolherTipo,
+} from "@shared/tipoProva";
 import type {
   DicaDoDia,
   ModoDistribuicao,
@@ -8,12 +24,13 @@ import type {
   ResumoCaderno,
   ResumoProva,
   SessaoRevisao,
+  TipoProva,
   VinculoProva,
 } from "@shared/types";
 import { getApi } from "../api";
-import { Checkpoints } from "./Checkpoints";
 import { aplicarSeMesmaProva } from "./checkpointsReconsulta";
 import { Diagnostico } from "./Diagnostico";
+import { LinhaDoTempo } from "./LinhaDoTempo";
 import { PlanoEstudo } from "./PlanoEstudo";
 
 /**
@@ -68,6 +85,12 @@ interface FormProva {
   cadernoNome: string;
   modoDistribuicao: ModoDistribuicao;
   intervalos: string;
+  /** Tipo de prova ("" = não definido). */
+  tipo: TipoProva | "";
+  /** `true` quando o título é do aluno (o automático não sobrescreve). */
+  tituloEditado: boolean;
+  /** `true` depois que o aluno mexeu no vínculo (a pré-seleção não conta). */
+  vinculoTocado: boolean;
 }
 
 /** Formulário inicial em branco (prova nova). */
@@ -79,7 +102,27 @@ function formVazio(): FormProva {
     cadernoNome: "",
     modoDistribuicao: "rotacao",
     intervalos: INTERVALOS_PADRAO_TEXTO,
+    tipo: "",
+    tituloEditado: false,
+    vinculoTocado: false,
   };
+}
+
+/** Nome automático a partir do vínculo e do tipo do formulário. */
+function nomeDoForm(form: FormProva): string {
+  return nomeProva({
+    cadernoNome: form.tipoVinculo === "caderno" ? form.cadernoNome : undefined,
+    tipo: form.tipo === "" ? undefined : form.tipo,
+  });
+}
+
+/** Aplica o nome automático ao título quando o aluno ainda não escreveu o dele. */
+function comTituloAutomatico(form: FormProva): FormProva {
+  const novo = tituloAposMudanca(
+    { titulo: form.titulo, editado: form.tituloEditado },
+    { cadernoNome: form.tipoVinculo === "caderno" ? form.cadernoNome : undefined, tipo: form.tipo === "" ? undefined : form.tipo },
+  );
+  return { ...form, titulo: novo.titulo, tituloEditado: novo.editado };
 }
 
 /** Deriva o estado do formulário a partir de uma prova carregada (edição). */
@@ -98,6 +141,10 @@ function formDeProva(prova: Prova): FormProva {
       prova.intervalos.length > 0
         ? prova.intervalos.join(", ")
         : INTERVALOS_PADRAO_TEXTO,
+    tipo: prova.tipo ?? "",
+    // Em edição o título nunca muda sozinho e o vínculo nunca é trocado sozinho.
+    tituloEditado: true,
+    vinculoTocado: true,
   };
 }
 
@@ -130,6 +177,8 @@ export function Agenda(): React.JSX.Element {
   const [form, setForm] = useState<FormProva | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [erroData, setErroData] = useState<string | null>(null);
+  const [avisoTipo, setAvisoTipo] = useState<string | null>(null);
 
   // `true` quando o formulário do plano de estudo está aberto.
   const [montandoPlano, setMontandoPlano] = useState(false);
@@ -207,6 +256,8 @@ export function Agenda(): React.JSX.Element {
     setErroDica(null);
     setEditandoId(null);
     setMontandoPlano(false);
+    setErroData(null);
+    setAvisoTipo(null);
     setForm(formVazio());
   }
 
@@ -215,6 +266,8 @@ export function Agenda(): React.JSX.Element {
     if (provaSelecionada === null) return;
     setMontandoPlano(false);
     setEditandoId(provaSelecionada.id);
+    setErroData(null);
+    setAvisoTipo(null);
     setForm(formDeProva(provaSelecionada));
   }
 
@@ -228,17 +281,43 @@ export function Agenda(): React.JSX.Element {
   async function salvarForm(): Promise<void> {
     if (form === null) return;
     setErro(null);
+    // Espelho da regra do main: data nova precisa ser a partir de amanhã.
+    const validacao = validarDataProva({
+      data: form.data,
+      hoje: dataLocalDe(new Date()),
+      dataAtual: editandoId !== null ? provaSelecionada?.data : undefined,
+    });
+    if (!validacao.ok) {
+      setErroData(validacao.mensagem);
+      return;
+    }
+    setErroData(null);
     setSalvando(true);
     try {
       const vinculo = vinculoDoForm(form);
       const intervalos = parsearIntervalos(form.intervalos);
       if (editandoId !== null) {
+        const ordinalAntes = provaSelecionada?.plano?.ordinal;
         const atualizada = await getApi().editarProva(editandoId, {
           titulo: form.titulo,
           data: form.data,
           vinculo,
           intervalos,
+          // "" = não definido: só remove o tipo se a prova tinha um.
+          tipo:
+            form.tipo !== ""
+              ? form.tipo
+              : provaSelecionada?.tipo !== undefined
+                ? null
+                : undefined,
         });
+        setAvisoTipo(
+          ordinalAntes === "primeira" &&
+            atualizada.plano !== undefined &&
+            atualizada.plano.ordinal !== "primeira"
+            ? "O tipo mudou. Revise o plano para marcar o que é novo."
+            : null,
+        );
         setProvaSelecionada(atualizada);
         const dicaDoDia = await getApi().dicaDoDia(atualizada.id);
         setDica(dicaDoDia);
@@ -248,6 +327,7 @@ export function Agenda(): React.JSX.Element {
           data: form.data,
           vinculo,
           intervalos,
+          ...(form.tipo !== "" ? { tipo: form.tipo } : {}),
         });
         setProvaSelecionada(criada);
         const dicaDoDia = await getApi().dicaDoDia(criada.id);
@@ -370,6 +450,23 @@ export function Agenda(): React.JSX.Element {
     }
   }
 
+  const descartaNovos =
+    editandoId !== null &&
+    form !== null &&
+    form.tipo !== "" &&
+    tipoDescartaNovos(provaSelecionada?.plano, form.tipo);
+  const sugestaoNome = form !== null ? nomeDoForm(form) : "";
+
+  // Prova passada usa sempre o bloco legado (sem linha do tempo).
+  const provaPassada =
+    provaSelecionada !== null &&
+    provas.find((p) => p.id === provaSelecionada.id)?.estado === "passada";
+  const mostrarLinhaDoTempo =
+    provaSelecionada !== null &&
+    provaSelecionada.plano !== undefined &&
+    !montandoPlano &&
+    !provaPassada;
+
   const sessoesOrdenadas =
     provaSelecionada === null
       ? []
@@ -449,33 +546,13 @@ export function Agenda(): React.JSX.Element {
       {form !== null && (
         <form
           className="agenda-form"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             void salvarForm();
           }}
         >
           <h3>{editandoId !== null ? "Editar prova" : "Nova prova"}</h3>
-
-          <label className="agenda-campo">
-            Título
-            <input
-              type="text"
-              value={form.titulo}
-              onChange={(e) =>
-                setForm({ ...form, titulo: e.target.value })
-              }
-              placeholder="Ex.: P1 de Cálculo"
-            />
-          </label>
-
-          <label className="agenda-campo">
-            Data da prova
-            <input
-              type="date"
-              value={form.data}
-              onChange={(e) => setForm({ ...form, data: e.target.value })}
-            />
-          </label>
 
           <fieldset className="agenda-vinculo">
             <legend>Vínculo</legend>
@@ -484,7 +561,15 @@ export function Agenda(): React.JSX.Element {
                 type="radio"
                 name="tipoVinculo"
                 checked={form.tipoVinculo === "caderno"}
-                onChange={() => setForm({ ...form, tipoVinculo: "caderno" })}
+                onChange={() =>
+                  setForm(
+                    comTituloAutomatico({
+                      ...form,
+                      tipoVinculo: "caderno",
+                      vinculoTocado: true,
+                    }),
+                  )
+                }
               />
               Ligada a um caderno
             </label>
@@ -494,7 +579,13 @@ export function Agenda(): React.JSX.Element {
                 <select
                   value={form.cadernoNome}
                   onChange={(e) =>
-                    setForm({ ...form, cadernoNome: e.target.value })
+                    setForm(
+                      comTituloAutomatico({
+                        ...form,
+                        cadernoNome: e.target.value,
+                        vinculoTocado: true,
+                      }),
+                    )
                   }
                 >
                   <option value="">Selecione um caderno…</option>
@@ -513,10 +604,16 @@ export function Agenda(): React.JSX.Element {
                 name="tipoVinculo"
                 checked={form.tipoVinculo === "abrangente"}
                 onChange={() =>
-                  setForm({ ...form, tipoVinculo: "abrangente" })
+                  setForm(
+                    comTituloAutomatico({
+                      ...form,
+                      tipoVinculo: "abrangente",
+                      vinculoTocado: true,
+                    }),
+                  )
                 }
               />
-              Prova abrangente (ENEM/ENADE)
+              Prova abrangente (todos os cadernos)
             </label>
             {form.tipoVinculo === "abrangente" && (
               <div className="agenda-modos">
@@ -540,6 +637,94 @@ export function Agenda(): React.JSX.Element {
           </fieldset>
 
           <label className="agenda-campo">
+            Tipo de prova
+            <select
+              value={form.tipo}
+              onChange={(e) => {
+                const tipo = e.target.value as TipoProva | "";
+                setForm(
+                  comTituloAutomatico({
+                    ...form,
+                    tipo,
+                    tipoVinculo: vinculoAposEscolherTipo(
+                      {
+                        tipoVinculo: form.tipoVinculo,
+                        cadernoNome: form.cadernoNome,
+                        tocado: form.vinculoTocado,
+                      },
+                      tipo,
+                    ),
+                  }),
+                );
+              }}
+            >
+              <option value="">Não definido</option>
+              {TIPOS_PROVA.map((t) => (
+                <option key={t} value={t}>
+                  {ROTULOS_TIPO_PROVA[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {descartaNovos && (
+            <p className="agenda-erro" role="alert">
+              Trocar para este tipo descarta a marcação de assuntos novos do
+              plano (não dá para desfazer).
+            </p>
+          )}
+
+          <label className="agenda-campo">
+            Título
+            <input
+              type="text"
+              value={form.titulo}
+              onChange={(e) => {
+                const est = tituloAposDigitar(
+                  e.target.value,
+                  editandoId !== null ? "editar" : "criar",
+                );
+                // Criar com campo vazio retoma o automático.
+                setForm(
+                  comTituloAutomatico({
+                    ...form,
+                    titulo: est.titulo,
+                    tituloEditado: est.editado,
+                  }),
+                );
+              }}
+              placeholder="Ex.: P1 de Cálculo"
+            />
+          </label>
+          {editandoId !== null &&
+            sugestaoNome !== "" &&
+            sugestaoNome !== form.titulo && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, titulo: sugestaoNome })}
+              >
+                Usar “{sugestaoNome}”
+              </button>
+            )}
+
+          <label className="agenda-campo">
+            Data da prova
+            <input
+              type="date"
+              value={form.data}
+              min={dataMinimaProva(dataLocalDe(new Date()))}
+              aria-invalid={erroData !== null}
+              aria-describedby={erroData !== null ? "agenda-erro-data" : undefined}
+              onChange={(e) => setForm({ ...form, data: e.target.value })}
+            />
+          </label>
+          {erroData !== null && (
+            <p id="agenda-erro-data" className="agenda-erro" role="alert">
+              {erroData}
+            </p>
+          )}
+
+          <label className="agenda-campo">
             Intervalos (dias antes)
             <input
               type="text"
@@ -553,7 +738,11 @@ export function Agenda(): React.JSX.Element {
 
           <div className="agenda-form-acoes">
             <button type="submit" disabled={salvando}>
-              {salvando ? "Salvando…" : "Salvar"}
+              {salvando
+                ? "Salvando…"
+                : descartaNovos
+                  ? "Salvar e descartar marcação"
+                  : "Salvar"}
             </button>
             <button
               type="button"
@@ -614,21 +803,11 @@ export function Agenda(): React.JSX.Element {
               />
             )}
 
-          {/* Checkpoints pré-prova: mesmas condições do diagnóstico. O setter é
-              funcional e só aplica se a prova ainda é a selecionada (uma geração
-              terminando depois de o aluno trocar/fechar a prova não a sobrescreve). */}
-          {provaSelecionada.plano !== undefined &&
-            !montandoPlano &&
-            provas.find((p) => p.id === provaSelecionada.id)?.estado !==
-              "passada" && (
-              <Checkpoints
-                key={provaSelecionada.id}
-                prova={provaSelecionada}
-                aoAtualizar={(p) =>
-                  setProvaSelecionada((atual) => aplicarSeMesmaProva(atual, p))
-                }
-              />
-            )}
+          {avisoTipo !== null && (
+            <p className="app-meta" role="status">
+              {avisoTipo}
+            </p>
+          )}
 
           {/* Região 4 — Dica do dia. */}
           {dica !== null && (
@@ -652,7 +831,26 @@ export function Agenda(): React.JSX.Element {
             </div>
           )}
 
-          {/* Região 3 — Agenda editável. */}
+          {/* Prova com plano (e não passada): linha do tempo única. O setter é
+              funcional e só aplica se a prova ainda é a selecionada (uma geração
+              terminando depois de o aluno trocar/fechar a prova não a sobrescreve). */}
+          {mostrarLinhaDoTempo && (
+            <LinhaDoTempo
+              key={provaSelecionada.id}
+              prova={provaSelecionada}
+              aoAtualizar={(p) =>
+                setProvaSelecionada((atual) => aplicarSeMesmaProva(atual, p))
+              }
+              aoAlternarConcluida={alternarConcluida}
+              aoMoverSessao={moverSessao}
+              aoRemoverSessao={removerSessao}
+              aoAdicionarSessao={adicionarSessao}
+              aoRegerar={() => void regerar()}
+            />
+          )}
+
+          {/* Região 3 — Agenda editável (prova sem plano ou passada). */}
+          {!mostrarLinhaDoTempo && (
           <div className="agenda-sessoes">
             <div className="agenda-sessoes-header">
               <h4>Agenda de revisão</h4>
@@ -708,6 +906,7 @@ export function Agenda(): React.JSX.Element {
               </ul>
             )}
           </div>
+          )}
         </div>
       )}
     </section>

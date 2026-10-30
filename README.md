@@ -48,8 +48,14 @@ podem ser reabertos a qualquer momento.
   **agenda de revisão** (revisar alguns dias antes da prova), que você pode ajustar à mão, e dá
   uma **dica do dia** — rápida (automática) ou mais elaborada (pela IA). Provas podem ser de uma
   matéria específica ou abrangentes (tipo ENEM/ENADE, cobrindo todas as matérias).
+- **Linha do tempo única**: em provas com plano de estudo, estudo, revisões e checkpoints aparecem
+  na mesma lista, por data. A revisão que cai no mesmo dia de um checkpoint aparece junto dele.
+  Você continua podendo marcar, mover, remover e adicionar revisões; o bloco de estudo muda
+  editando o plano. Provas sem plano mantêm a agenda de revisão de sempre. ENEM e ENADE contam
+  como primeira prova no plano (todo o conteúdo é base).
 - **Plano de estudo guiado**: a partir de uma prova cadastrada, clique em **"Montar plano de
-  estudo"** e responda um questionário curto — qual prova é (1ª, 2ª ou final), quantas horas por
+  estudo"** e responda um questionário curto — qual prova é (1ª, 2ª ou final; se você já escolheu
+  o tipo ao criar a prova, o app não pergunta de novo), quantas horas por
   dia e quantos dias por semana você consegue estudar, e quais assuntos caem (marcando a
   dificuldade de cada um). O app monta sozinho a **agenda dia a dia**: ele divide o tempo entre a
   **base** (o que você já viu) e o **conteúdo novo** conforme a prova está longe ou perto, dá mais
@@ -150,12 +156,15 @@ A navegação fica na **barra lateral** à esquerda, com duas seções: **Biblio
 2. Abra um documento para ir à **tela do documento**, onde ficam **Resumo**, **Flashcards**,
    **Exercícios**, **Mapa mental** e **Quiz** — clique em gerar em cada um. Em Exercícios você
    responde e pede a correção da IA; no Quiz você responde e revisa com pontuação.
-3. Na **Agenda**, cadastre provas para ver a contagem regressiva, a agenda de revisão e a dica
-   do dia. Selecione uma prova e clique em **"Montar plano de estudo"** para responder o
+3. Na **Agenda**, cadastre provas (escolha o **tipo**: 1ª prova, 2ª prova, prova final, ENEM ou
+   ENADE; o título é preenchido sozinho com o caderno e o tipo, e você pode digitar o seu) para
+   ver a contagem regressiva, a agenda de revisão e a dica do dia. Só dá para marcar provas a
+   partir de amanhã. Selecione uma prova e clique em **"Montar plano de estudo"** para responder o
    questionário e ver o plano dia a dia com o que estudar. Depois, se quiser um plano mais
    certeiro, use o card **Diagnóstico** logo abaixo para fazer o quiz rápido e ver o plano
-   ajustado. Mais abaixo, o card **Checkpoints** prepara as listas de exercícios de checagem
-   antes da prova (você escolhe entre ser lembrado ou deixar o app preparar sozinho).
+   ajustado. Mais abaixo, o **Plano de estudo** reúne numa única linha do tempo, por data, o
+   que estudar, as revisões e os checkpoints com listas de exercícios de checagem (você escolhe
+   entre ser lembrado ou deixar o app preparar sozinho).
 4. Tudo o que você gera fica salvo e reabre pela Biblioteca, organizado por caderno.
 5. Use **Exportar** (em cada artefato ou no documento inteiro) para salvar o material em
    **Markdown** ou **PDF** onde você quiser.

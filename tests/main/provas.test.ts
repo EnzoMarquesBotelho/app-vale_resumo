@@ -36,6 +36,8 @@ import {
 
 /** "Hoje" fixo usado na maioria dos testes (datas determinísticas). */
 const HOJE = "2026-03-10";
+/** "Hoje" anterior, só para semear provas que hoje seriam rejeitadas. */
+const HOJE_ANTERIOR = "2026-02-20";
 
 const vinculoCaderno: VinculoProva = {
   tipo: "caderno",
@@ -180,9 +182,10 @@ describe("provas: listar", () => {
       HOJE,
       baseDir,
     );
+    // Semeada com um "hoje" anterior: criar prova para hoje é bloqueado.
     await criarProva(
       { titulo: "Hoje", data: "2026-03-10", vinculo: vinculoCaderno },
-      HOJE,
+      HOJE_ANTERIOR,
       baseDir,
     );
     await criarProva(
@@ -228,9 +231,10 @@ describe("provas: listar", () => {
   });
 
   it("prova passada aparece com estado 'passada' e diasRestantes negativo", async () => {
+    // Semeada com um "hoje" anterior: criar prova no passado é bloqueado.
     await criarProva(
       { titulo: "Passou", data: "2026-03-01", vinculo: vinculoCaderno },
-      HOJE,
+      HOJE_ANTERIOR,
       baseDir,
     );
     const lista = await listarProvas(HOJE, baseDir);
