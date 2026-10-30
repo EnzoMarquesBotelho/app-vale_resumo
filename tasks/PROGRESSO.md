@@ -3,19 +3,18 @@
 > Nome do app definido: **Desenrola** (tagline "estudo sem complicação").
 > Onde paramos — atualizado em 2026-10-30.
 
-## Estado atual (Plano de estudo guiado COMPLETO — 4/4; fatia 4 na branch `feat/plano-f4-checkpoints`, ainda a mergear na master)
+## Estado atual (branch master; Plano de estudo guiado COMPLETO — 4/4, fatia 4 já mergeada)
 
 - Build, lint e **945 testes** passando (58 arquivos de teste), conferidos de
-  verdade no worktree `plano-f4-checkpoints` (baseline anterior: 781 na master
-  `bc81789`). Entregue:
+  verdade na master após o merge fast-forward da fatia 4 (a master estava em
+  `bc81789` antes do merge; baseline anterior: 781). Entregue e na master:
   **Plano de estudo guiado — Fatia 4/4** (checkpoints "pré-provas": listas de
   exercícios a 28/14/7/3 dias da prova, em modo lembrete ou automático,
   alterável depois). Com ela o **Plano de estudo guiado está COMPLETO (4/4)**.
   Referência estável: **commit de implementação `920e779`** (`feat: checkpoints
   pre-prova na Agenda…`, sobre `bc81789`) + os commits de design
-  `ff038e4`/`b6c108b`. O commit de docs desta fatia vem logo depois e não é
-  citado aqui de propósito (autorreferência); cite-o no próximo cabeçalho, como
-  foi feito com `d2193f8` na fatia 3.
+  `ff038e4`/`b6c108b` + o commit de docs da fatia (`82f7df5`). O hash do commit
+  que atualiza este cabeçalho não é citado aqui de propósito (autorreferência).
   Histórico da contagem: fatia 1 = 614; fatia 2 = 635 → 673; fatia 3 = 781;
   **fatia 4 = 945** (+164). Cresce, nunca encolhe.
 - Fatia anterior (na master): **Plano de estudo guiado — Fatia 3/4** (quiz
